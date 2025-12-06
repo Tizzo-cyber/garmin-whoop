@@ -480,8 +480,10 @@
             const [loading, setLoading] = useState(false);
             const [ready, setReady] = useState(false);
             const [showReset, setShowReset] = useState(false);
+            const [playingAudio, setPlayingAudio] = useState(false);
             const chatRef = useRef(null);
             const inputRef = useRef(null);
+            const audioRef = useRef(null);
             
             const isSakura = coach === 'sakura';
             const accent = isSakura ? 'var(--accent-pink)' : 'var(--accent-green)';
@@ -489,6 +491,33 @@
             const coachEmoji = isSakura ? '🌸' : '🥋';
             const coachTitle = isSakura ? 'Mental & Spiritual Coach' : 'Athletic Performance Coach';
             const bgClass = isSakura ? 'bg-gradient-sakura' : 'bg-gradient-sensei';
+            
+            const playAudio = async (text) => {
+                if (playingAudio) return;
+                setPlayingAudio(true);
+                
+                try {
+                    const res = await fetch(`${API}/api/tts`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ text, coach })
+                    });
+                    const data = await res.json();
+                    
+                    if (data.audio) {
+                        const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+                        audioRef.current = audio;
+                        audio.onended = () => setPlayingAudio(false);
+                        audio.onerror = () => setPlayingAudio(false);
+                        await audio.play();
+                    } else {
+                        setPlayingAudio(false);
+                    }
+                } catch (e) {
+                    console.error('TTS error:', e);
+                    setPlayingAudio(false);
+                }
+            };
             
             useEffect(() => {
                 setMessages([]);
@@ -611,9 +640,19 @@
                                     <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} fade-in`}>
                                         <div className={`chat-bubble ${m.role === 'user' ? 'chat-user' : `chat-ai ${coach}`}`}>
                                             {m.role === 'assistant' && (
-                                                <div className="flex items-center gap-3 mb-3 pb-3 border-b border-[var(--border)]">
-                                                    <span className="text-2xl">{coachEmoji}</span>
-                                                    <span className="font-semibold" style={{ color: accent }}>{coachName}</span>
+                                                <div className="flex items-center justify-between gap-3 mb-3 pb-3 border-b border-[var(--border)]">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-2xl">{coachEmoji}</span>
+                                                        <span className="font-semibold" style={{ color: accent }}>{coachName}</span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => playAudio(m.content)}
+                                                        disabled={playingAudio}
+                                                        className={`text-xl transition-opacity ${playingAudio ? 'animate-pulse opacity-100' : 'opacity-60 hover:opacity-100'}`}
+                                                        title="Ascolta"
+                                                    >
+                                                        {playingAudio ? '🔉' : '🔊'}
+                                                    </button>
                                                 </div>
                                             )}
                                             <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>

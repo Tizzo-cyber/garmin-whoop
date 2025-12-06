@@ -631,6 +631,39 @@ Rispondi in italiano, max 200 parole."""
             'biological_age': m.biological_age
         } for m in metrics])
     
+    @app.route('/api/tts', methods=['POST'])
+    @token_required
+    def text_to_speech(current_user):
+        """Converte testo in audio usando OpenAI TTS"""
+        if not openai_client:
+            return jsonify({'error': 'OpenAI non configurato'}), 500
+        
+        data = request.get_json()
+        text = data.get('text', '')[:1000]  # Max 1000 caratteri
+        coach = data.get('coach', 'sensei')
+        
+        if not text:
+            return jsonify({'error': 'Testo vuoto'}), 400
+        
+        # Voci diverse per i coach
+        voice = 'onyx' if coach == 'sensei' else 'nova'  # onyx=maschile, nova=femminile
+        
+        try:
+            response = openai_client.audio.speech.create(
+                model="tts-1",
+                voice=voice,
+                input=text,
+                response_format="mp3"
+            )
+            
+            # Ritorna audio come base64
+            import base64
+            audio_b64 = base64.b64encode(response.content).decode('utf-8')
+            return jsonify({'audio': audio_b64, 'format': 'mp3'})
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
     return app
 
 
