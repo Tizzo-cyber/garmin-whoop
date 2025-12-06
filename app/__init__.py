@@ -503,7 +503,7 @@ Rispondi in italiano, max 200 parole."""
     @app.route('/api/recalculate', methods=['POST'])
     @token_required
     def recalculate_bio_age(current_user):
-        """Ricalcola età biologica per tutti i dati esistenti"""
+        """Ricalcola età biologica con formula WHOOP-like"""
         
         # Prima assicuriamoci che le colonne esistano
         try:
@@ -528,88 +528,71 @@ Rispondi in italiano, max 200 parole."""
         for metric in metrics:
             total_impact = 0
             
-            # RHR
+            # 1. RHR (formula WHOOP: +1 anno ogni 10 bpm sopra 60)
             if metric.resting_hr:
                 rhr = metric.resting_hr
-                if rhr < 50: metric.bio_age_rhr_impact = -1.5
-                elif rhr < 55: metric.bio_age_rhr_impact = -1.0
-                elif rhr < 60: metric.bio_age_rhr_impact = -0.5
-                elif rhr < 65: metric.bio_age_rhr_impact = 0.0
-                elif rhr < 70: metric.bio_age_rhr_impact = 0.5
-                elif rhr < 75: metric.bio_age_rhr_impact = 1.0
-                else: metric.bio_age_rhr_impact = 1.5
+                metric.bio_age_rhr_impact = round((rhr - 60) / 10, 1)
+                metric.bio_age_rhr_impact = max(-3, min(3, metric.bio_age_rhr_impact))
                 total_impact += metric.bio_age_rhr_impact
             else:
-                metric.bio_age_rhr_impact = 0.0
+                metric.bio_age_rhr_impact = None
             
-            # VO2 Max
+            # 2. VO2 Max (baseline 42, ogni 5 punti = 1 anno)
             if metric.vo2_max:
                 vo2 = metric.vo2_max
-                if vo2 >= 55: metric.bio_age_vo2_impact = -2.5
-                elif vo2 >= 50: metric.bio_age_vo2_impact = -1.5
-                elif vo2 >= 45: metric.bio_age_vo2_impact = -0.5
-                elif vo2 >= 40: metric.bio_age_vo2_impact = 0.0
-                elif vo2 >= 35: metric.bio_age_vo2_impact = 0.5
-                else: metric.bio_age_vo2_impact = 1.5
+                metric.bio_age_vo2_impact = round((42 - vo2) / 5, 1)
+                metric.bio_age_vo2_impact = max(-3, min(3, metric.bio_age_vo2_impact))
                 total_impact += metric.bio_age_vo2_impact
             else:
                 metric.bio_age_vo2_impact = 0.0
             
-            # Sleep - GESTISCE ANCHE GIORNI VUOTI
+            # 3. Sleep (ottimale 7-8.5h = -0.5, altrimenti penalità)
             if metric.sleep_seconds and metric.sleep_seconds > 0:
                 sleep_hours = metric.sleep_seconds / 3600
-                if 7.0 <= sleep_hours <= 8.5: metric.bio_age_sleep_impact = -0.8
-                elif 6.5 <= sleep_hours < 7.0 or 8.5 < sleep_hours <= 9.0: metric.bio_age_sleep_impact = -0.3
-                elif 6.0 <= sleep_hours < 6.5 or 9.0 < sleep_hours <= 9.5: metric.bio_age_sleep_impact = 0.3
-                elif 5.0 <= sleep_hours < 6.0: metric.bio_age_sleep_impact = 1.0
-                else: metric.bio_age_sleep_impact = 1.5
+                if sleep_hours >= 7 and sleep_hours <= 8.5:
+                    metric.bio_age_sleep_impact = -0.5
+                else:
+                    diff = abs(sleep_hours - 7.5)
+                    metric.bio_age_sleep_impact = round(diff * 0.6, 1)
+                metric.bio_age_sleep_impact = max(-2, min(2, metric.bio_age_sleep_impact))
                 total_impact += metric.bio_age_sleep_impact
             else:
-                metric.bio_age_sleep_impact = None  # Nessun dato, non conta
+                metric.bio_age_sleep_impact = None
             
-            # Steps
+            # 4. Steps (soglie meno severe)
             if metric.steps and metric.steps > 0:
                 steps = metric.steps
-                if steps >= 12000: metric.bio_age_steps_impact = -1.0
-                elif steps >= 10000: metric.bio_age_steps_impact = -0.5
-                elif steps >= 7500: metric.bio_age_steps_impact = 0.0
-                elif steps >= 5000: metric.bio_age_steps_impact = 0.5
+                if steps >= 10000: metric.bio_age_steps_impact = -1.0
+                elif steps >= 8000: metric.bio_age_steps_impact = -0.5
+                elif steps >= 6000: metric.bio_age_steps_impact = 0.0
+                elif steps >= 4000: metric.bio_age_steps_impact = 0.5
                 else: metric.bio_age_steps_impact = 1.0
                 total_impact += metric.bio_age_steps_impact
             else:
                 metric.bio_age_steps_impact = None
             
-            # Stress
-            if metric.stress_avg and metric.stress_avg > 0:
-                stress = metric.stress_avg
-                if stress < 25: metric.bio_age_stress_impact = -0.5
-                elif stress < 40: metric.bio_age_stress_impact = 0.0
-                elif stress < 55: metric.bio_age_stress_impact = 0.3
-                elif stress < 70: metric.bio_age_stress_impact = 0.7
-                else: metric.bio_age_stress_impact = 1.2
-                total_impact += metric.bio_age_stress_impact
-            else:
-                metric.bio_age_stress_impact = None
-            
-            # HR Zones
+            # 5. HR Zones
             moderate = metric.moderate_intensity_minutes or 0
             vigorous = metric.vigorous_intensity_minutes or 0
-            intensity_minutes = moderate + vigorous * 2
-            if intensity_minutes > 0:
-                if intensity_minutes >= 60: metric.bio_age_hrz_impact = -0.8
-                elif intensity_minutes >= 40: metric.bio_age_hrz_impact = -0.4
-                elif intensity_minutes >= 20: metric.bio_age_hrz_impact = 0.0
-                elif intensity_minutes >= 10: metric.bio_age_hrz_impact = 0.3
-                else: metric.bio_age_hrz_impact = 0.6
+            intensity_score = moderate + (vigorous * 2)
+            if intensity_score > 0:
+                if intensity_score >= 45: metric.bio_age_hrz_impact = -1.0
+                elif intensity_score >= 30: metric.bio_age_hrz_impact = -0.5
+                elif intensity_score >= 15: metric.bio_age_hrz_impact = 0.0
+                elif intensity_score >= 5: metric.bio_age_hrz_impact = 0.3
+                else: metric.bio_age_hrz_impact = 0.5
                 total_impact += metric.bio_age_hrz_impact
             else:
                 metric.bio_age_hrz_impact = None
+            
+            # 6. Stress - NON usato in WHOOP
+            metric.bio_age_stress_impact = None
             
             metric.biological_age = round(real_age + total_impact, 1)
             count += 1
         
         db.session.commit()
-        return jsonify({'message': f'Ricalcolati {count} giorni', 'count': count, 'real_age': real_age})
+        return jsonify({'message': f'Ricalcolati {count} giorni (formula WHOOP)', 'count': count, 'real_age': real_age})
     
     @app.route('/api/debug/bio', methods=['GET'])
     @token_required

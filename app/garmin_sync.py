@@ -365,118 +365,95 @@ class GarminSyncService:
     
     def _calculate_biological_age(self, metric: DailyMetric, user: User):
         """
-        Calcola l'età biologica basata su vari parametri.
-        Valori negativi = ringiovaniscono, positivi = invecchiano.
+        Calcola l'età biologica in stile WHOOP.
+        Basato su 6 metriche principali (senza stress).
+        Formula RHR: +1 anno ogni 10 bpm sopra 60.
         """
         real_age = user.get_real_age()
         total_impact = 0
         
-        # 1. RHR Impact (-2 to +2 anni)
-        # RHR basso = giovane, alto = vecchio
-        # Riferimento: 60 bpm = neutro per adulto medio
+        # 1. RHR Impact (formula WHOOP: +1 anno ogni 10 bpm sopra 60)
+        # Baseline = 60 bpm
         if metric.resting_hr:
             rhr = metric.resting_hr
-            if rhr < 50:
-                metric.bio_age_rhr_impact = -1.5  # Atleta
-            elif rhr < 55:
-                metric.bio_age_rhr_impact = -1.0
-            elif rhr < 60:
-                metric.bio_age_rhr_impact = -0.5
-            elif rhr < 65:
-                metric.bio_age_rhr_impact = 0.0
-            elif rhr < 70:
-                metric.bio_age_rhr_impact = 0.5
-            elif rhr < 75:
-                metric.bio_age_rhr_impact = 1.0
-            else:
-                metric.bio_age_rhr_impact = 1.5
+            # Ogni 10 bpm = 1 anno
+            metric.bio_age_rhr_impact = round((rhr - 60) / 10, 1)
+            # Cap tra -3 e +3
+            metric.bio_age_rhr_impact = max(-3, min(3, metric.bio_age_rhr_impact))
             total_impact += metric.bio_age_rhr_impact
+        else:
+            metric.bio_age_rhr_impact = None
         
-        # 2. VO2 Max Impact (-3 to +2 anni)
-        # VO2 alto = giovane
+        # 2. VO2 Max Impact (-3 to +3 anni)
+        # Basato su ricerca: VO2 alto = longevità
         if metric.vo2_max:
             vo2 = metric.vo2_max
-            if vo2 >= 55:
-                metric.bio_age_vo2_impact = -2.5
-            elif vo2 >= 50:
-                metric.bio_age_vo2_impact = -1.5
-            elif vo2 >= 45:
-                metric.bio_age_vo2_impact = -0.5
-            elif vo2 >= 40:
-                metric.bio_age_vo2_impact = 0.0
-            elif vo2 >= 35:
-                metric.bio_age_vo2_impact = 0.5
-            else:
-                metric.bio_age_vo2_impact = 1.5
+            # Baseline ~42 per adulto medio
+            # Ogni 5 punti = ~1 anno
+            metric.bio_age_vo2_impact = round((42 - vo2) / 5, 1)
+            metric.bio_age_vo2_impact = max(-3, min(3, metric.bio_age_vo2_impact))
             total_impact += metric.bio_age_vo2_impact
         else:
             metric.bio_age_vo2_impact = 0.0
         
-        # 3. Sleep Impact (-1.5 to +2 anni)
-        # 7-8 ore = ottimale (negativo), <6 o >9 = peggio
-        if metric.sleep_seconds:
+        # 3. Sleep Impact (-2 to +2 anni)
+        # WHOOP: 7-8 ore = ottimale
+        if metric.sleep_seconds and metric.sleep_seconds > 0:
             sleep_hours = metric.sleep_seconds / 3600
-            if 7.0 <= sleep_hours <= 8.5:
-                metric.bio_age_sleep_impact = -0.8  # Ottimale
-            elif 6.5 <= sleep_hours < 7.0 or 8.5 < sleep_hours <= 9.0:
-                metric.bio_age_sleep_impact = -0.3  # Buono
-            elif 6.0 <= sleep_hours < 6.5 or 9.0 < sleep_hours <= 9.5:
-                metric.bio_age_sleep_impact = 0.3   # Accettabile
-            elif 5.0 <= sleep_hours < 6.0:
-                metric.bio_age_sleep_impact = 1.0   # Scarso
+            # Ottimale = 7.5 ore, ogni ora di differenza = ~0.8 anni
+            diff_from_optimal = abs(sleep_hours - 7.5)
+            if sleep_hours >= 7 and sleep_hours <= 8.5:
+                metric.bio_age_sleep_impact = -0.5  # Bonus per range ottimale
             else:
-                metric.bio_age_sleep_impact = 1.5   # Molto scarso
+                metric.bio_age_sleep_impact = round(diff_from_optimal * 0.6, 1)
+            metric.bio_age_sleep_impact = max(-2, min(2, metric.bio_age_sleep_impact))
             total_impact += metric.bio_age_sleep_impact
+        else:
+            metric.bio_age_sleep_impact = None
         
-        # 4. Steps Impact (-1 to +1.5 anni)
-        # Più passi = meglio
-        if metric.steps:
+        # 4. Steps Impact (-1.5 to +1.5 anni)
+        # WHOOP: passi giornalieri correlati a longevità
+        # Baseline ~7500 passi
+        if metric.steps and metric.steps > 0:
             steps = metric.steps
-            if steps >= 12000:
+            if steps >= 10000:
                 metric.bio_age_steps_impact = -1.0
-            elif steps >= 10000:
+            elif steps >= 8000:
                 metric.bio_age_steps_impact = -0.5
-            elif steps >= 7500:
+            elif steps >= 6000:
                 metric.bio_age_steps_impact = 0.0
-            elif steps >= 5000:
+            elif steps >= 4000:
                 metric.bio_age_steps_impact = 0.5
             else:
                 metric.bio_age_steps_impact = 1.0
             total_impact += metric.bio_age_steps_impact
+        else:
+            metric.bio_age_steps_impact = None
         
-        # 5. Stress Impact (-0.5 to +1.5 anni)
-        # Stress basso = meglio
-        if metric.stress_avg:
-            stress = metric.stress_avg
-            if stress < 25:
-                metric.bio_age_stress_impact = -0.5
-            elif stress < 40:
-                metric.bio_age_stress_impact = 0.0
-            elif stress < 55:
-                metric.bio_age_stress_impact = 0.3
-            elif stress < 70:
-                metric.bio_age_stress_impact = 0.7
-            else:
-                metric.bio_age_stress_impact = 1.2
-            total_impact += metric.bio_age_stress_impact
-        
-        # 6. HR Zones Impact (-1 to +1 anni)
-        # Tempo in zone alte = allenamento = meglio
+        # 5. HR Zones Impact (-1.5 to +1.5 anni)
+        # WHOOP: tempo in zone HR 4-5 molto importante
         moderate = metric.moderate_intensity_minutes or 0
         vigorous = metric.vigorous_intensity_minutes or 0
-        intensity_minutes = moderate + vigorous * 2
+        # Zone alte pesano di più
+        intensity_score = moderate + (vigorous * 2)
         
-        if intensity_minutes >= 60:
-            metric.bio_age_hrz_impact = -0.8
-        elif intensity_minutes >= 40:
-            metric.bio_age_hrz_impact = -0.4
-        elif intensity_minutes >= 20:
-            metric.bio_age_hrz_impact = 0.0
-        elif intensity_minutes >= 10:
-            metric.bio_age_hrz_impact = 0.3
+        if intensity_score > 0:
+            if intensity_score >= 45:
+                metric.bio_age_hrz_impact = -1.0
+            elif intensity_score >= 30:
+                metric.bio_age_hrz_impact = -0.5
+            elif intensity_score >= 15:
+                metric.bio_age_hrz_impact = 0.0
+            elif intensity_score >= 5:
+                metric.bio_age_hrz_impact = 0.3
+            else:
+                metric.bio_age_hrz_impact = 0.5
+            total_impact += metric.bio_age_hrz_impact
         else:
-            metric.bio_age_hrz_impact = 0.6
-        total_impact += metric.bio_age_hrz_impact
+            metric.bio_age_hrz_impact = None
+        
+        # 6. Stress - NON usato in WHOOP, lo azzeriamo
+        metric.bio_age_stress_impact = None
         
         # Calcola età biologica finale
         metric.biological_age = round(real_age + total_impact, 1)
