@@ -1,5 +1,5 @@
 """
-Garmin WHOOP - Flask App
+Garmin WHOOP - Flask App with WHOOP-style Biological Age
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -26,14 +26,29 @@ def create_app():
     with app.app_context():
         db.create_all()
         
-        # Migration: aggiungi colonne mancanti
-        try:
-            db.session.execute(text('ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_year INTEGER'))
-            db.session.execute(text('ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS biological_age FLOAT'))
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            print(f"Migration: {e}")
+        # Migrations
+        migrations = [
+            'ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_year INTEGER',
+            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS biological_age FLOAT',
+            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS vo2_max FLOAT',
+            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_rhr_impact FLOAT',
+            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_vo2_impact FLOAT',
+            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_sleep_impact FLOAT',
+            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_steps_impact FLOAT',
+            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_stress_impact FLOAT',
+            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_hrz_impact FLOAT',
+            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS hr_zone_1_seconds INTEGER',
+            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS hr_zone_2_seconds INTEGER',
+            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS hr_zone_3_seconds INTEGER',
+            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS hr_zone_4_seconds INTEGER',
+            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS hr_zone_5_seconds INTEGER',
+        ]
+        for sql in migrations:
+            try:
+                db.session.execute(text(sql))
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
     
     def token_required(f):
         @wraps(f)
@@ -69,9 +84,6 @@ def create_app():
             password_hash=generate_password_hash(data['password']),
             birth_year=data.get('birth_year')
         )
-        if data.get('garmin_email') and data.get('garmin_password'):
-            user.garmin_email = data['garmin_email']
-            user.set_garmin_password(data['garmin_password'], app.config['ENCRYPTION_KEY'])
         db.session.add(user)
         db.session.commit()
         return jsonify({'message': 'Utente creato', 'user_id': user.id}), 201
@@ -92,7 +104,6 @@ def create_app():
                 'id': user.id,
                 'email': user.email,
                 'garmin_connected': bool(user.garmin_email),
-                'last_sync': user.last_sync.isoformat() if user.last_sync else None,
                 'birth_year': user.birth_year
             }
         })
@@ -147,28 +158,18 @@ def create_app():
         metric = DailyMetric.query.filter_by(user_id=current_user.id, date=date.today()).first()
         if not metric:
             return jsonify({'message': 'Nessun dato per oggi'}), 404
-        return jsonify(_metric_to_dict(metric))
-    
-    @app.route('/api/metrics/range', methods=['GET'])
-    @token_required
-    def get_metrics_range(current_user):
-        start = request.args.get('start', (date.today() - timedelta(days=7)).isoformat())
-        end = request.args.get('end', date.today().isoformat())
-        metrics = DailyMetric.query.filter(
-            DailyMetric.user_id == current_user.id,
-            DailyMetric.date >= start,
-            DailyMetric.date <= end
-        ).order_by(DailyMetric.date.desc()).all()
-        return jsonify([_metric_to_dict(m) for m in metrics])
+        return jsonify(_metric_to_dict(metric, current_user))
     
     @app.route('/api/metrics/summary', methods=['GET'])
     @token_required
     def get_summary(current_user):
-        week_ago = date.today() - timedelta(days=7)
+        days = request.args.get('days', 30, type=int)
+        start_date = date.today() - timedelta(days=days)
         metrics = DailyMetric.query.filter(
             DailyMetric.user_id == current_user.id,
-            DailyMetric.date >= week_ago
+            DailyMetric.date >= start_date
         ).order_by(DailyMetric.date.desc()).all()
+        
         if not metrics:
             return jsonify({'message': 'Nessun dato disponibile'}), 404
         
@@ -176,9 +177,10 @@ def create_app():
             vals = [x for x in lst if x is not None]
             return round(sum(vals) / len(vals), 1) if vals else None
         
+        # Calculate averages for bio age impacts
         return jsonify({
             'period': {
-                'start': week_ago.isoformat(),
+                'start': start_date.isoformat(),
                 'end': date.today().isoformat(),
                 'days_with_data': len(metrics)
             },
@@ -187,15 +189,28 @@ def create_app():
                 'strain': safe_avg([m.strain_score for m in metrics]),
                 'sleep_performance': safe_avg([m.sleep_performance for m in metrics]),
                 'sleep_hours': safe_avg([m.sleep_seconds / 3600 if m.sleep_seconds else None for m in metrics]),
-                'biological_age': safe_avg([m.biological_age for m in metrics])
+                'biological_age': safe_avg([m.biological_age for m in metrics]),
+                'resting_hr': safe_avg([m.resting_hr for m in metrics]),
+                'vo2_max': safe_avg([m.vo2_max for m in metrics]),
+                'steps': safe_avg([m.steps for m in metrics]),
+                # Bio age impacts averages
+                'bio_impacts': {
+                    'rhr': safe_avg([m.bio_age_rhr_impact for m in metrics]),
+                    'vo2': safe_avg([m.bio_age_vo2_impact for m in metrics]),
+                    'sleep': safe_avg([m.bio_age_sleep_impact for m in metrics]),
+                    'steps': safe_avg([m.bio_age_steps_impact for m in metrics]),
+                    'stress': safe_avg([m.bio_age_stress_impact for m in metrics]),
+                    'hrz': safe_avg([m.bio_age_hrz_impact for m in metrics]),
+                }
             },
-            'today': _metric_to_dict(metrics[0]) if metrics else None
+            'real_age': current_user.get_real_age(),
+            'today': _metric_to_dict(metrics[0], current_user) if metrics else None
         })
     
     @app.route('/api/metrics/trend', methods=['GET'])
     @token_required
     def get_trend(current_user):
-        days = request.args.get('days', 30, type=int)
+        days = request.args.get('days', 90, type=int)
         start_date = date.today() - timedelta(days=days)
         metrics = DailyMetric.query.filter(
             DailyMetric.user_id == current_user.id,
@@ -206,15 +221,34 @@ def create_app():
             'date': m.date.isoformat(),
             'recovery': m.recovery_score,
             'strain': m.strain_score,
-            'sleep_performance': m.sleep_performance,
             'sleep_hours': round(m.sleep_seconds / 3600, 1) if m.sleep_seconds else None,
             'biological_age': m.biological_age,
             'resting_hr': m.resting_hr,
+            'vo2_max': m.vo2_max,
             'steps': m.steps,
-            'stress': m.stress_avg
         } for m in metrics]
         
-        return jsonify({'data': trend_data, 'trends': {}})
+        # Calculate pace of aging (compare last 30 days to previous 30 days)
+        pace_of_aging = None
+        if len(metrics) >= 30:
+            recent = [m.biological_age for m in metrics[-30:] if m.biological_age]
+            if len(recent) >= 15:
+                recent_avg = sum(recent) / len(recent)
+                older = [m.biological_age for m in metrics[:-30] if m.biological_age]
+                if older and len(older) >= 15:
+                    older_avg = sum(older) / len(older)
+                    # Pace: negative = getting younger
+                    days_diff = 30
+                    age_diff = recent_avg - older_avg
+                    # Convert to yearly pace: if in 30 days you got 0.1 years younger, pace = -1.2x
+                    yearly_pace = (age_diff / days_diff) * 365
+                    pace_of_aging = round(yearly_pace, 1)
+        
+        return jsonify({
+            'data': trend_data,
+            'real_age': current_user.get_real_age(),
+            'pace_of_aging': pace_of_aging
+        })
     
     @app.route('/api/metrics/advice', methods=['GET'])
     @token_required
@@ -249,47 +283,28 @@ def create_app():
             else:
                 advice.append({
                     'type': 'recovery', 'priority': 'danger',
-                    'coach': "⚠️ STOP! Il tuo corpo chiede riposo.",
+                    'coach': "⚠️ Il tuo corpo chiede riposo.",
                     'zen': "Anche la spada deve riposare.",
                     'action': "Riposo attivo oggi"
                 })
         
-        avg_sleep = sum(m.sleep_seconds for m in metrics if m.sleep_seconds) / max(len([m for m in metrics if m.sleep_seconds]), 1)
-        if avg_sleep > 0:
-            avg_sleep_hours = avg_sleep / 3600
-            if avg_sleep_hours < 6:
-                advice.append({
-                    'type': 'sleep', 'priority': 'danger',
-                    'coach': f"😴 ALLARME SONNO! Media {avg_sleep_hours:.1f}h",
-                    'zen': "La notte è il tempio della rigenerazione.",
-                    'action': "Vai a letto 1 ora prima stasera"
-                })
-        
-        avg_steps = sum(m.steps for m in metrics if m.steps) / max(len([m for m in metrics if m.steps]), 1)
-        if avg_steps > 0 and avg_steps < 5000:
-            advice.append({
-                'type': 'activity', 'priority': 'danger',
-                'coach': f"🚶 MUOVITI! Solo {int(avg_steps)} passi medi.",
-                'zen': "L'acqua ferma diventa stagnante.",
-                'action': "Obiettivo: 8000 passi oggi"
-            })
-        
+        # Bio age advice
         if today.biological_age:
-            real_age = current_user.birth_year and (datetime.now().year - current_user.birth_year) or 45
-            diff = today.biological_age - real_age
-            if diff <= -3:
+            real_age = current_user.get_real_age()
+            diff = real_age - today.biological_age
+            if diff >= 3:
                 advice.append({
                     'type': 'bio_age', 'priority': 'success',
-                    'coach': f"🎯 FENOMENO! {abs(diff):.0f} anni più giovane!",
+                    'coach': f"🎯 FENOMENO! {diff:.1f} anni più giovane!",
                     'zen': "Il tempo scorre, ma tu fluisci controcorrente.",
-                    'action': "Le tue abitudini funzionano!"
+                    'action': "Continua così!"
                 })
-            elif diff > 2:
+            elif diff < -2:
                 advice.append({
                     'type': 'bio_age', 'priority': 'warning',
                     'coach': f"⚠️ Età biologica {today.biological_age:.0f} vs {real_age}",
                     'zen': "Mai troppo tardi per rinascere.",
-                    'action': "Più movimento, più sonno, meno stress"
+                    'action': "Focus su movimento e sonno"
                 })
         
         return jsonify({'advice': advice})
@@ -305,10 +320,8 @@ def create_app():
             'type': a.activity_type,
             'start_time': a.start_time.isoformat() if a.start_time else None,
             'duration_minutes': round(a.duration_seconds / 60, 1) if a.duration_seconds else None,
-            'distance_km': round(a.distance_meters / 1000, 2) if a.distance_meters else None,
             'calories': a.calories,
             'avg_hr': a.avg_hr,
-            'max_hr': a.max_hr,
             'strain': a.strain_score
         } for a in activities])
     
@@ -323,7 +336,7 @@ def create_app():
     return app
 
 
-def _metric_to_dict(m):
+def _metric_to_dict(m, user):
     return {
         'date': m.date.isoformat(),
         'scores': {
@@ -332,39 +345,35 @@ def _metric_to_dict(m):
             'sleep_performance': m.sleep_performance,
             'biological_age': m.biological_age
         },
+        'bio_impacts': {
+            'rhr': m.bio_age_rhr_impact,
+            'vo2': m.bio_age_vo2_impact,
+            'sleep': m.bio_age_sleep_impact,
+            'steps': m.bio_age_steps_impact,
+            'stress': m.bio_age_stress_impact,
+            'hrz': m.bio_age_hrz_impact
+        },
+        'real_age': user.get_real_age(),
         'heart': {
             'resting_hr': m.resting_hr,
-            'min_hr': m.min_hr,
-            'max_hr': m.max_hr,
+            'vo2_max': m.vo2_max,
             'hrv_last_night': m.hrv_last_night
         },
         'body_battery': {
             'high': m.body_battery_high,
-            'low': m.body_battery_low,
-            'charged': m.body_battery_charged,
-            'drained': m.body_battery_drained
+            'low': m.body_battery_low
         },
         'sleep': {
             'total_hours': round(m.sleep_seconds / 3600, 1) if m.sleep_seconds else None,
             'deep_hours': round(m.deep_sleep_seconds / 3600, 1) if m.deep_sleep_seconds else None,
-            'light_hours': round(m.light_sleep_seconds / 3600, 1) if m.light_sleep_seconds else None,
             'rem_hours': round(m.rem_sleep_seconds / 3600, 1) if m.rem_sleep_seconds else None,
-            'awake_hours': round(m.awake_seconds / 3600, 1) if m.awake_seconds else None,
-            'score': m.sleep_score,
-            'start': m.sleep_start.strftime('%H:%M') if m.sleep_start else None,
-            'end': m.sleep_end.strftime('%H:%M') if m.sleep_end else None
         },
-        'stress': {'average': m.stress_avg, 'max': m.stress_max},
+        'stress': {'average': m.stress_avg},
         'activity': {
             'steps': m.steps,
-            'calories': m.total_calories,
             'active_calories': m.active_calories,
-            'distance_km': round(m.distance_meters / 1000, 2) if m.distance_meters else None,
-            'moderate_minutes': m.moderate_intensity_minutes,
             'vigorous_minutes': m.vigorous_intensity_minutes
-        },
-        'respiration': {'average': m.avg_respiration, 'min': m.min_respiration, 'max': m.max_respiration},
-        'spo2': {'average': m.avg_spo2, 'min': m.min_spo2}
+        }
     }
 
 

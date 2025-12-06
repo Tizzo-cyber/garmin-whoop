@@ -1,6 +1,5 @@
 """
-Garmin Sync Service
-Recupera dati da Garmin Connect e li salva nel database
+Garmin Sync Service - WHOOP-style biological age
 """
 
 from datetime import date, datetime, timedelta
@@ -35,6 +34,7 @@ class GarminSyncService:
             client = Garmin(user.garmin_email, garmin_password)
             client.login()
             
+            # Sync daily metrics
             for i in range(days_back):
                 day = date.today() - timedelta(days=i)
                 try:
@@ -44,31 +44,28 @@ class GarminSyncService:
                 except Exception as e:
                     result['errors'].append(f"Metrics {day}: {str(e)}")
             
+            # Sync activities
             try:
-                activities = client.get_activities(0, 20)
+                activities = client.get_activities(0, 50)
                 for act in activities:
                     try:
                         synced = self._sync_activity(user, act)
                         if synced:
                             result['activities_synced'] += 1
                     except Exception as e:
-                        result['errors'].append(f"Activity {act.get('activityId')}: {str(e)}")
+                        pass
             except Exception as e:
-                result['errors'].append(f"Activities fetch: {str(e)}")
+                result['errors'].append(f"Activities: {str(e)}")
             
             user.last_sync = datetime.utcnow()
-            
-            log.status = 'success' if not result['errors'] else 'partial'
+            log.status = 'success'
             log.metrics_synced = result['metrics_synced']
             log.activities_synced = result['activities_synced']
-            if result['errors']:
-                log.error_message = '\n'.join(result['errors'][:10])
-            
             result['success'] = True
             
         except Exception as e:
             log.status = 'error'
-            log.error_message = f"{str(e)}\n{traceback.format_exc()}"
+            log.error_message = str(e)
             result['errors'].append(str(e))
         
         finally:
@@ -88,6 +85,7 @@ class GarminSyncService:
         
         raw_data = {}
         
+        # Daily summary
         try:
             summary = client.get_stats(day_str)
             raw_data['summary'] = summary
@@ -102,15 +100,9 @@ class GarminSyncService:
             metric.floors_ascended = summary.get('floorsAscended')
             metric.moderate_intensity_minutes = summary.get('moderateIntensityMinutes')
             metric.vigorous_intensity_minutes = summary.get('vigorousIntensityMinutes')
-            metric.active_seconds = summary.get('activeSeconds')
-            metric.sedentary_seconds = summary.get('sedentarySeconds')
             
             metric.stress_avg = summary.get('averageStressLevel')
             metric.stress_max = summary.get('maxStressLevel')
-            metric.rest_stress_duration = summary.get('restStressDuration')
-            metric.low_stress_duration = summary.get('lowStressDuration')
-            metric.medium_stress_duration = summary.get('mediumStressDuration')
-            metric.high_stress_duration = summary.get('highStressDuration')
             
             metric.body_battery_high = summary.get('bodyBatteryHighestValue')
             metric.body_battery_low = summary.get('bodyBatteryLowestValue')
@@ -120,10 +112,10 @@ class GarminSyncService:
             metric.avg_respiration = summary.get('avgWakingRespirationValue')
             metric.min_respiration = summary.get('lowestRespirationValue')
             metric.max_respiration = summary.get('highestRespirationValue')
-            
         except Exception as e:
             raw_data['summary_error'] = str(e)
         
+        # Sleep
         try:
             sleep = client.get_sleep_data(day_str)
             raw_data['sleep'] = sleep
@@ -149,18 +141,25 @@ class GarminSyncService:
                     )
                 except:
                     pass
-                    
-            sleep_scores = daily_sleep.get('sleepScores', {})
-            if sleep_scores:
-                metric.sleep_score = sleep_scores.get('overall', {}).get('value')
-                
         except Exception as e:
             raw_data['sleep_error'] = str(e)
         
+        # VO2 Max
+        try:
+            fitness = client.get_max_metrics(day_str)
+            raw_data['fitness'] = fitness
+            if fitness:
+                for item in fitness:
+                    if item.get('generic', {}).get('vo2MaxValue'):
+                        metric.vo2_max = item['generic']['vo2MaxValue']
+                        break
+        except Exception as e:
+            raw_data['fitness_error'] = str(e)
+        
+        # HRV
         try:
             hrv = client.get_hrv_data(day_str)
             raw_data['hrv'] = hrv
-            
             if hrv:
                 hrv_summary = hrv.get('hrvSummary', hrv)
                 metric.hrv_weekly_avg = hrv_summary.get('weeklyAvg')
@@ -168,16 +167,17 @@ class GarminSyncService:
         except Exception as e:
             raw_data['hrv_error'] = str(e)
         
+        # SpO2
         try:
             spo2 = client.get_spo2_data(day_str)
             raw_data['spo2'] = spo2
-            
             if spo2:
                 metric.avg_spo2 = spo2.get('averageSpO2')
                 metric.min_spo2 = spo2.get('lowestSpO2')
         except Exception as e:
             raw_data['spo2_error'] = str(e)
         
+        # Calculate all scores
         self._calculate_scores(metric, user)
         
         metric.raw_json = json.dumps(raw_data, default=str)
@@ -213,8 +213,6 @@ class GarminSyncService:
             hr_zone_3=activity_data.get('hrTimeInZone_3'),
             hr_zone_4=activity_data.get('hrTimeInZone_4'),
             hr_zone_5=activity_data.get('hrTimeInZone_5'),
-            moderate_intensity_minutes=activity_data.get('moderateIntensityMinutes'),
-            vigorous_intensity_minutes=activity_data.get('vigorousIntensityMinutes'),
         )
         
         start_str = activity_data.get('startTimeLocal')
@@ -224,186 +222,163 @@ class GarminSyncService:
             except:
                 pass
         
-        end_str = activity_data.get('endTimeGMT')
-        if end_str:
-            try:
-                activity.end_time = datetime.strptime(end_str, '%Y-%m-%d %H:%M:%S')
-            except:
-                pass
-        
         activity.strain_score = self._calculate_activity_strain(activity_data)
-        
         db.session.add(activity)
         return True
     
     def _calculate_scores(self, metric: DailyMetric, user: User):
+        """Calculate Recovery, Strain, Sleep Performance, and Biological Age"""
+        
         # --- RECOVERY SCORE (0-100) ---
         recovery_components = []
         
         if metric.body_battery_high:
-            bb_score = min(100, metric.body_battery_high)
-            recovery_components.append(('body_battery', bb_score, 0.4))
+            recovery_components.append(min(100, metric.body_battery_high) * 0.4)
         
         if metric.resting_hr:
-            rhr_baseline = 60
-            rhr_diff = metric.resting_hr - rhr_baseline
-            rhr_score = max(0, min(100, 100 - (rhr_diff * 3)))
-            recovery_components.append(('rhr', rhr_score, 0.3))
+            rhr_score = max(0, min(100, 100 - (metric.resting_hr - 55) * 3))
+            recovery_components.append(rhr_score * 0.3)
         
         if metric.sleep_seconds:
             sleep_hours = metric.sleep_seconds / 3600
-            if sleep_hours >= 7:
-                sleep_duration_score = 100
-            elif sleep_hours >= 6:
-                sleep_duration_score = 80
-            elif sleep_hours >= 5:
-                sleep_duration_score = 60
-            else:
-                sleep_duration_score = max(0, sleep_hours / 5 * 60)
-            
-            if metric.deep_sleep_seconds and metric.rem_sleep_seconds:
-                quality_ratio = (metric.deep_sleep_seconds + metric.rem_sleep_seconds) / metric.sleep_seconds
-                quality_score = min(100, quality_ratio / 0.4 * 100)
-                sleep_score = (sleep_duration_score + quality_score) / 2
-            else:
-                sleep_score = sleep_duration_score
-            
-            recovery_components.append(('sleep', sleep_score, 0.3))
+            sleep_score = min(100, (sleep_hours / 8) * 100)
+            recovery_components.append(sleep_score * 0.3)
         
         if recovery_components:
-            total_weight = sum(c[2] for c in recovery_components)
-            weighted_sum = sum(c[1] * c[2] for c in recovery_components)
-            metric.recovery_score = int(weighted_sum / total_weight)
+            metric.recovery_score = int(sum(recovery_components))
         
         # --- STRAIN SCORE (0-21) ---
         strain = 0
-        
         moderate = metric.moderate_intensity_minutes or 0
         vigorous = metric.vigorous_intensity_minutes or 0
         strain += moderate * 0.05 + vigorous * 0.15
-        
         if metric.active_calories:
             strain += metric.active_calories / 100
-        
-        if metric.stress_avg and metric.stress_avg > 50:
-            strain += (metric.stress_avg - 50) / 50
-        
         metric.strain_score = min(21.0, round(strain, 1))
         
         # --- SLEEP PERFORMANCE (0-100) ---
         if metric.sleep_seconds:
             sleep_hours = metric.sleep_seconds / 3600
-            duration_pct = min(100, (sleep_hours / 8) * 100)
+            duration_score = min(100, (sleep_hours / 8) * 100)
             
-            quality_pct = 50
+            quality_score = 50
             if metric.deep_sleep_seconds and metric.rem_sleep_seconds and metric.sleep_seconds > 0:
                 deep_pct = metric.deep_sleep_seconds / metric.sleep_seconds
                 rem_pct = metric.rem_sleep_seconds / metric.sleep_seconds
-                deep_score = min(100, deep_pct / 0.175 * 100)
-                rem_score = min(100, rem_pct / 0.225 * 100)
-                quality_pct = (deep_score + rem_score) / 2
+                quality_score = min(100, ((deep_pct / 0.20) + (rem_pct / 0.25)) * 50)
             
-            metric.sleep_performance = int((duration_pct * 0.6) + (quality_pct * 0.4))
+            metric.sleep_performance = int(duration_score * 0.6 + quality_score * 0.4)
         
-        # --- BIOLOGICAL AGE ---
+        # --- BIOLOGICAL AGE (WHOOP-style) ---
         base_age = user.get_real_age()
-        bio_adjustment = 0
         
-        # RHR impact: ogni bpm sotto 55 = -0.3 anni, sopra 65 = +0.3 anni
+        # Initialize impacts
+        rhr_impact = 0
+        vo2_impact = 0
+        sleep_impact = 0
+        steps_impact = 0
+        stress_impact = 0
+        hrz_impact = 0
+        
+        # RHR Impact: 60 bpm = neutral, <50 = -2 years, >75 = +2 years
         if metric.resting_hr:
-            if metric.resting_hr < 55:
-                bio_adjustment -= (55 - metric.resting_hr) * 0.3
-            elif metric.resting_hr > 65:
-                bio_adjustment += (metric.resting_hr - 65) * 0.3
+            if metric.resting_hr <= 50:
+                rhr_impact = -2.0
+            elif metric.resting_hr <= 55:
+                rhr_impact = -1.0
+            elif metric.resting_hr <= 60:
+                rhr_impact = -0.5
+            elif metric.resting_hr <= 65:
+                rhr_impact = 0
+            elif metric.resting_hr <= 70:
+                rhr_impact = 0.5
+            elif metric.resting_hr <= 75:
+                rhr_impact = 1.0
+            else:
+                rhr_impact = 2.0
+        metric.bio_age_rhr_impact = rhr_impact
         
-        # Sleep impact
+        # VO2 Max Impact: 45+ = -2 years, 35-45 = -1, 30-35 = 0, <30 = +1
+        if metric.vo2_max:
+            if metric.vo2_max >= 50:
+                vo2_impact = -2.5
+            elif metric.vo2_max >= 45:
+                vo2_impact = -1.5
+            elif metric.vo2_max >= 40:
+                vo2_impact = -1.0
+            elif metric.vo2_max >= 35:
+                vo2_impact = -0.5
+            elif metric.vo2_max >= 30:
+                vo2_impact = 0
+            else:
+                vo2_impact = 1.0
+        metric.bio_age_vo2_impact = vo2_impact
+        
+        # Sleep Impact: 7-8h = -0.5, <6h = +1.5, >9h = +0.5
         if metric.sleep_seconds:
             sleep_h = metric.sleep_seconds / 3600
-            if sleep_h < 5:
-                bio_adjustment += 3
+            if 7 <= sleep_h <= 8.5:
+                sleep_impact = -0.5
+            elif 6.5 <= sleep_h < 7:
+                sleep_impact = 0
+            elif 6 <= sleep_h < 6.5:
+                sleep_impact = 0.5
             elif sleep_h < 6:
-                bio_adjustment += 1.5
-            elif 7 <= sleep_h <= 8.5:
-                bio_adjustment -= 1
+                sleep_impact = 1.5
             elif sleep_h > 9:
-                bio_adjustment += 0.5
+                sleep_impact = 0.3
+        metric.bio_age_sleep_impact = sleep_impact
         
-        # Steps impact
+        # Steps Impact: 10k+ = -1, 8k = -0.5, 5k = 0, <3k = +1
         if metric.steps:
-            if metric.steps < 3000:
-                bio_adjustment += 2
-            elif metric.steps < 5000:
-                bio_adjustment += 1
-            elif metric.steps >= 8000:
-                bio_adjustment -= 0.5
+            if metric.steps >= 12000:
+                steps_impact = -1.0
             elif metric.steps >= 10000:
-                bio_adjustment -= 1
+                steps_impact = -0.5
+            elif metric.steps >= 8000:
+                steps_impact = -0.3
+            elif metric.steps >= 5000:
+                steps_impact = 0
+            elif metric.steps >= 3000:
+                steps_impact = 0.5
+            else:
+                steps_impact = 1.0
+        metric.bio_age_steps_impact = steps_impact
         
-        # Stress impact
+        # Stress Impact
         if metric.stress_avg:
-            if metric.stress_avg > 60:
-                bio_adjustment += 1.5
-            elif metric.stress_avg > 40:
-                bio_adjustment += 0.5
-            elif metric.stress_avg < 25:
-                bio_adjustment -= 0.5
+            if metric.stress_avg <= 25:
+                stress_impact = -0.5
+            elif metric.stress_avg <= 35:
+                stress_impact = 0
+            elif metric.stress_avg <= 50:
+                stress_impact = 0.3
+            else:
+                stress_impact = 1.0
+        metric.bio_age_stress_impact = stress_impact
         
-        # Body Battery impact
-        if metric.body_battery_low and metric.body_battery_low < 15:
-            bio_adjustment += 1
-        if metric.body_battery_high and metric.body_battery_high > 90:
-            bio_adjustment -= 0.5
+        # HR Zones 4-5 (weekly high intensity) - from vigorous minutes
+        vigorous = metric.vigorous_intensity_minutes or 0
+        if vigorous >= 30:
+            hrz_impact = -1.0
+        elif vigorous >= 15:
+            hrz_impact = -0.5
+        elif vigorous >= 5:
+            hrz_impact = 0
+        else:
+            hrz_impact = 0.3
+        metric.bio_age_hrz_impact = hrz_impact
         
-        # Activity impact (intensity minutes)
-        total_intensity = (metric.moderate_intensity_minutes or 0) + (metric.vigorous_intensity_minutes or 0) * 2
-        if total_intensity >= 30:
-            bio_adjustment -= 1
-        elif total_intensity >= 15:
-            bio_adjustment -= 0.5
-        elif total_intensity == 0:
-            bio_adjustment += 0.5
-        
-        metric.biological_age = round(base_age + bio_adjustment, 1)
+        # Total biological age
+        total_impact = rhr_impact + vo2_impact + sleep_impact + steps_impact + stress_impact + hrz_impact
+        metric.biological_age = round(base_age + total_impact, 1)
     
     def _calculate_activity_strain(self, activity: dict) -> float:
         strain = 0
-        
         aerobic = activity.get('aerobicTrainingEffect', 0) or 0
         strain += aerobic * 2
-        
         anaerobic = activity.get('anaerobicTrainingEffect', 0) or 0
         strain += anaerobic * 1.5
-        
-        zone4 = activity.get('hrTimeInZone_4', 0) or 0
-        zone5 = activity.get('hrTimeInZone_5', 0) or 0
-        strain += (zone4 / 60) * 0.3 + (zone5 / 60) * 0.5
-        
         duration = activity.get('duration', 0) or 0
         strain += (duration / 3600) * 0.5
-        
         return min(21.0, round(strain, 1))
-
-
-def sync_all_users(app, encryption_key: str):
-    with app.app_context():
-        service = GarminSyncService(encryption_key)
-        users = User.query.filter_by(sync_enabled=True).all()
-        
-        results = []
-        for user in users:
-            try:
-                result = service.sync_user(user)
-                results.append({
-                    'user_id': user.id,
-                    'email': user.email,
-                    **result
-                })
-            except Exception as e:
-                results.append({
-                    'user_id': user.id,
-                    'email': user.email,
-                    'success': False,
-                    'error': str(e)
-                })
-        
-        return results

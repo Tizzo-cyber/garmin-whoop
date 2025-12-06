@@ -22,7 +22,6 @@ class User(db.Model):
     garmin_email = db.Column(db.String(255))
     garmin_password_encrypted = db.Column(db.Text)
     
-    # Profilo utente per calcolo età biologica
     birth_year = db.Column(db.Integer)
     
     last_sync = db.Column(db.DateTime)
@@ -47,7 +46,7 @@ class User(db.Model):
     def get_real_age(self):
         if self.birth_year:
             return datetime.now().year - self.birth_year
-        return 45  # Default
+        return 42
 
 
 class DailyMetric(db.Model):
@@ -57,19 +56,26 @@ class DailyMetric(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     date = db.Column(db.Date, nullable=False)
     
+    # Heart
     resting_hr = db.Column(db.Integer)
     min_hr = db.Column(db.Integer)
     max_hr = db.Column(db.Integer)
     avg_hr = db.Column(db.Integer)
     
+    # HRV
     hrv_weekly_avg = db.Column(db.Float)
     hrv_last_night = db.Column(db.Float)
     
+    # VO2 Max
+    vo2_max = db.Column(db.Float)
+    
+    # Body Battery
     body_battery_high = db.Column(db.Integer)
     body_battery_low = db.Column(db.Integer)
     body_battery_charged = db.Column(db.Integer)
     body_battery_drained = db.Column(db.Integer)
     
+    # Sleep
     sleep_seconds = db.Column(db.Integer)
     deep_sleep_seconds = db.Column(db.Integer)
     light_sleep_seconds = db.Column(db.Integer)
@@ -79,6 +85,7 @@ class DailyMetric(db.Model):
     sleep_start = db.Column(db.DateTime)
     sleep_end = db.Column(db.DateTime)
     
+    # Stress
     stress_avg = db.Column(db.Integer)
     stress_max = db.Column(db.Integer)
     rest_stress_duration = db.Column(db.Integer)
@@ -86,6 +93,7 @@ class DailyMetric(db.Model):
     medium_stress_duration = db.Column(db.Integer)
     high_stress_duration = db.Column(db.Integer)
     
+    # Activity
     steps = db.Column(db.Integer)
     total_calories = db.Column(db.Integer)
     active_calories = db.Column(db.Integer)
@@ -96,18 +104,35 @@ class DailyMetric(db.Model):
     active_seconds = db.Column(db.Integer)
     sedentary_seconds = db.Column(db.Integer)
     
+    # HR Zones (secondi per zona)
+    hr_zone_1_seconds = db.Column(db.Integer)
+    hr_zone_2_seconds = db.Column(db.Integer)
+    hr_zone_3_seconds = db.Column(db.Integer)
+    hr_zone_4_seconds = db.Column(db.Integer)
+    hr_zone_5_seconds = db.Column(db.Integer)
+    
+    # Respiration
     avg_respiration = db.Column(db.Float)
     min_respiration = db.Column(db.Float)
     max_respiration = db.Column(db.Float)
     
+    # SpO2
     avg_spo2 = db.Column(db.Float)
     min_spo2 = db.Column(db.Float)
     
-    # Metriche calcolate
+    # Calculated scores
     recovery_score = db.Column(db.Integer)
     strain_score = db.Column(db.Float)
     sleep_performance = db.Column(db.Integer)
     biological_age = db.Column(db.Float)
+    
+    # Biological age breakdown (contributo di ogni fattore in anni)
+    bio_age_rhr_impact = db.Column(db.Float)
+    bio_age_vo2_impact = db.Column(db.Float)
+    bio_age_sleep_impact = db.Column(db.Float)
+    bio_age_steps_impact = db.Column(db.Float)
+    bio_age_stress_impact = db.Column(db.Float)
+    bio_age_hrz_impact = db.Column(db.Float)  # HR zones 4-5 impact
     
     raw_json = db.Column(db.Text)
     
