@@ -481,9 +481,11 @@
             const [ready, setReady] = useState(false);
             const [showReset, setShowReset] = useState(false);
             const [playingAudio, setPlayingAudio] = useState(false);
+            const [isRecording, setIsRecording] = useState(false);
             const chatRef = useRef(null);
             const inputRef = useRef(null);
             const audioRef = useRef(null);
+            const recognitionRef = useRef(null);
             
             const isSakura = coach === 'sakura';
             const accent = isSakura ? 'var(--accent-pink)' : 'var(--accent-green)';
@@ -491,6 +493,55 @@
             const coachEmoji = isSakura ? '🌸' : '🥋';
             const coachTitle = isSakura ? 'Mental & Spiritual Coach' : 'Athletic Performance Coach';
             const bgClass = isSakura ? 'bg-gradient-sakura' : 'bg-gradient-sensei';
+            
+            const toggleRecording = () => {
+                if (isRecording) {
+                    // Stop recording
+                    if (recognitionRef.current) {
+                        recognitionRef.current.stop();
+                    }
+                    setIsRecording(false);
+                } else {
+                    // Start recording
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    if (!SpeechRecognition) {
+                        alert('Il tuo browser non supporta il riconoscimento vocale');
+                        return;
+                    }
+                    
+                    const recognition = new SpeechRecognition();
+                    recognition.lang = 'it-IT';
+                    recognition.continuous = false;
+                    recognition.interimResults = true;
+                    
+                    recognition.onresult = (event) => {
+                        const transcript = Array.from(event.results)
+                            .map(result => result[0].transcript)
+                            .join('');
+                        setInput(transcript);
+                    };
+                    
+                    recognition.onend = () => {
+                        setIsRecording(false);
+                        // Auto-invia se c'è del testo
+                        setTimeout(() => {
+                            const currentInput = document.querySelector('input[type="text"]')?.value;
+                            if (currentInput?.trim()) {
+                                document.querySelector('button:last-child')?.click();
+                            }
+                        }, 200);
+                    };
+                    
+                    recognition.onerror = (event) => {
+                        console.error('Speech recognition error:', event.error);
+                        setIsRecording(false);
+                    };
+                    
+                    recognitionRef.current = recognition;
+                    recognition.start();
+                    setIsRecording(true);
+                }
+            };
             
             const playAudio = async (text) => {
                 if (playingAudio) return;
@@ -546,6 +597,8 @@
                 const text = input.trim();
                 if (!text || loading) return;
                 
+                const wasVoiceInput = isRecording || recognitionRef.current;
+                
                 setInput('');
                 setMessages(prev => [...prev, { role: 'user', content: text }]);
                 setLoading(true);
@@ -557,7 +610,13 @@
                         body: JSON.stringify({ message: text, coach })
                     });
                     const data = await res.json();
-                    setMessages(prev => [...prev, { role: 'assistant', content: data.response || data.error || 'Errore' }]);
+                    const responseText = data.response || data.error || 'Errore';
+                    setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
+                    
+                    // Auto-play audio se era input vocale
+                    if (wasVoiceInput && responseText) {
+                        setTimeout(() => playAudio(responseText), 300);
+                    }
                 } catch {
                     setMessages(prev => [...prev, { role: 'assistant', content: 'Errore di connessione' }]);
                 }
@@ -681,15 +740,26 @@
                     {/* Input */}
                     <div className="p-4 border-t border-[var(--border)]">
                         <div className="max-w-4xl mx-auto flex gap-3">
+                            <button 
+                                onClick={toggleRecording}
+                                className={`px-4 rounded-2xl text-2xl transition-all ${
+                                    isRecording 
+                                        ? 'bg-[var(--accent-red)] animate-pulse' 
+                                        : 'bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)]'
+                                }`}
+                                title={isRecording ? 'Stop' : 'Parla'}
+                            >
+                                {isRecording ? '⏹️' : '🎤'}
+                            </button>
                             <input
                                 ref={inputRef}
                                 type="text"
                                 value={input}
                                 onChange={e => setInput(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
-                                placeholder={`Scrivi a ${coachName}...`}
+                                placeholder={isRecording ? 'Sto ascoltando...' : `Scrivi o parla con ${coachName}...`}
                                 className={`input-premium flex-1 px-5 py-4 rounded-2xl ${isSakura ? 'pink' : ''}`}
-                                disabled={loading}
+                                disabled={loading || isRecording}
                             />
                             <button onClick={send} disabled={loading || !input.trim()}
                                 className={`${isSakura ? 'btn-pink' : 'btn-primary'} px-8 rounded-2xl text-lg disabled:opacity-40`}>
