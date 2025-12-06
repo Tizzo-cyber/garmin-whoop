@@ -504,14 +504,28 @@ Rispondi in italiano, max 200 parole."""
     @token_required
     def recalculate_bio_age(current_user):
         """Ricalcola età biologica per tutti i dati esistenti"""
-        from app.garmin_sync import GarminSyncService
+        
+        # Prima assicuriamoci che le colonne esistano
+        try:
+            db.session.execute(db.text('''
+                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS biological_age FLOAT;
+                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_rhr_impact FLOAT;
+                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_vo2_impact FLOAT;
+                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_sleep_impact FLOAT;
+                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_steps_impact FLOAT;
+                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_stress_impact FLOAT;
+                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_hrz_impact FLOAT;
+                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS vo2_max FLOAT;
+            '''))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
         
         metrics = DailyMetric.query.filter_by(user_id=current_user.id).all()
         count = 0
+        real_age = current_user.get_real_age()
         
         for metric in metrics:
-            # Ricalcola biological age
-            real_age = current_user.get_real_age()
             total_impact = 0
             
             # RHR
@@ -525,6 +539,8 @@ Rispondi in italiano, max 200 parole."""
                 elif rhr < 75: metric.bio_age_rhr_impact = 1.0
                 else: metric.bio_age_rhr_impact = 1.5
                 total_impact += metric.bio_age_rhr_impact
+            else:
+                metric.bio_age_rhr_impact = 0.0
             
             # VO2 Max
             if metric.vo2_max:
@@ -539,8 +555,8 @@ Rispondi in italiano, max 200 parole."""
             else:
                 metric.bio_age_vo2_impact = 0.0
             
-            # Sleep
-            if metric.sleep_seconds:
+            # Sleep - GESTISCE ANCHE GIORNI VUOTI
+            if metric.sleep_seconds and metric.sleep_seconds > 0:
                 sleep_hours = metric.sleep_seconds / 3600
                 if 7.0 <= sleep_hours <= 8.5: metric.bio_age_sleep_impact = -0.8
                 elif 6.5 <= sleep_hours < 7.0 or 8.5 < sleep_hours <= 9.0: metric.bio_age_sleep_impact = -0.3
@@ -548,9 +564,11 @@ Rispondi in italiano, max 200 parole."""
                 elif 5.0 <= sleep_hours < 6.0: metric.bio_age_sleep_impact = 1.0
                 else: metric.bio_age_sleep_impact = 1.5
                 total_impact += metric.bio_age_sleep_impact
+            else:
+                metric.bio_age_sleep_impact = None  # Nessun dato, non conta
             
             # Steps
-            if metric.steps:
+            if metric.steps and metric.steps > 0:
                 steps = metric.steps
                 if steps >= 12000: metric.bio_age_steps_impact = -1.0
                 elif steps >= 10000: metric.bio_age_steps_impact = -0.5
@@ -558,9 +576,11 @@ Rispondi in italiano, max 200 parole."""
                 elif steps >= 5000: metric.bio_age_steps_impact = 0.5
                 else: metric.bio_age_steps_impact = 1.0
                 total_impact += metric.bio_age_steps_impact
+            else:
+                metric.bio_age_steps_impact = None
             
             # Stress
-            if metric.stress_avg:
+            if metric.stress_avg and metric.stress_avg > 0:
                 stress = metric.stress_avg
                 if stress < 25: metric.bio_age_stress_impact = -0.5
                 elif stress < 40: metric.bio_age_stress_impact = 0.0
@@ -568,23 +588,48 @@ Rispondi in italiano, max 200 parole."""
                 elif stress < 70: metric.bio_age_stress_impact = 0.7
                 else: metric.bio_age_stress_impact = 1.2
                 total_impact += metric.bio_age_stress_impact
+            else:
+                metric.bio_age_stress_impact = None
             
             # HR Zones
             moderate = metric.moderate_intensity_minutes or 0
             vigorous = metric.vigorous_intensity_minutes or 0
             intensity_minutes = moderate + vigorous * 2
-            if intensity_minutes >= 60: metric.bio_age_hrz_impact = -0.8
-            elif intensity_minutes >= 40: metric.bio_age_hrz_impact = -0.4
-            elif intensity_minutes >= 20: metric.bio_age_hrz_impact = 0.0
-            elif intensity_minutes >= 10: metric.bio_age_hrz_impact = 0.3
-            else: metric.bio_age_hrz_impact = 0.6
-            total_impact += metric.bio_age_hrz_impact
+            if intensity_minutes > 0:
+                if intensity_minutes >= 60: metric.bio_age_hrz_impact = -0.8
+                elif intensity_minutes >= 40: metric.bio_age_hrz_impact = -0.4
+                elif intensity_minutes >= 20: metric.bio_age_hrz_impact = 0.0
+                elif intensity_minutes >= 10: metric.bio_age_hrz_impact = 0.3
+                else: metric.bio_age_hrz_impact = 0.6
+                total_impact += metric.bio_age_hrz_impact
+            else:
+                metric.bio_age_hrz_impact = None
             
             metric.biological_age = round(real_age + total_impact, 1)
             count += 1
         
         db.session.commit()
-        return jsonify({'message': f'Ricalcolati {count} giorni', 'count': count})
+        return jsonify({'message': f'Ricalcolati {count} giorni', 'count': count, 'real_age': real_age})
+    
+    @app.route('/api/debug/bio', methods=['GET'])
+    @token_required
+    def debug_bio(current_user):
+        """Debug: mostra ultimi 5 giorni con tutti i valori"""
+        metrics = DailyMetric.query.filter_by(user_id=current_user.id).order_by(DailyMetric.date.desc()).limit(5).all()
+        return jsonify([{
+            'date': m.date.isoformat(),
+            'sleep_seconds': m.sleep_seconds,
+            'sleep_hours': round(m.sleep_seconds / 3600, 2) if m.sleep_seconds else None,
+            'resting_hr': m.resting_hr,
+            'steps': m.steps,
+            'stress_avg': m.stress_avg,
+            'bio_age_sleep_impact': m.bio_age_sleep_impact,
+            'bio_age_rhr_impact': m.bio_age_rhr_impact,
+            'bio_age_steps_impact': m.bio_age_steps_impact,
+            'bio_age_stress_impact': m.bio_age_stress_impact,
+            'bio_age_hrz_impact': m.bio_age_hrz_impact,
+            'biological_age': m.biological_age
+        } for m in metrics])
     
     return app
 
