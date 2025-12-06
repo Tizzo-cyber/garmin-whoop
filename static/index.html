@@ -2,8 +2,8 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENSEI & SAKURA — AI Coaches</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SENSEI & SAKURA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -12,82 +12,86 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
+        html, body, #root { height: 100%; overflow: hidden; }
+        body { font-family: 'Inter', sans-serif; background: #000; color: #fff; }
         
-        .bio-circle {
-            width: 180px; height: 180px; border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #1a3d2e 0%, #0d1f17 50%, #000 100%);
-            box-shadow: 0 0 60px rgba(0, 255, 128, 0.15);
-            position: relative;
-        }
-        .bio-circle::before {
-            content: ''; position: absolute; inset: 6px; border-radius: 50%;
-            border: 2px solid rgba(0, 255, 128, 0.2);
-        }
-        
-        .particle {
-            position: absolute; width: 3px; height: 3px; background: #00ff88;
-            border-radius: 50%; opacity: 0.5; animation: float 3s ease-in-out infinite;
-        }
-        @keyframes float {
-            0%, 100% { transform: translateY(0); opacity: 0.5; }
-            50% { transform: translateY(-15px); opacity: 1; }
-        }
-        
-        .card { background: #111; border: 1px solid #1a1a1a; border-radius: 16px; }
+        .card { background: #111; border: 1px solid #222; border-radius: 16px; }
         
         .input-dark {
-            background: #0a0a0a; border: 1px solid #222; color: #fff;
-            transition: all 0.3s;
+            background: #111; border: 1px solid #333; color: #fff;
+            font-size: 16px;
         }
-        .input-dark:focus { border-color: #00ff88; outline: none; box-shadow: 0 0 20px rgba(0,255,128,0.1); }
-        .input-sakura:focus { border-color: #ff88cc; box-shadow: 0 0 20px rgba(255,136,204,0.1); }
+        .input-dark:focus { border-color: #00ff88; outline: none; }
+        .input-dark.sakura:focus { border-color: #ff88cc; }
         
-        .btn-primary {
-            background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
+        .btn-green {
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
             color: #000; font-weight: 600;
         }
-        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 5px 20px rgba(0,255,128,0.3); }
-        .btn-primary:disabled { opacity: 0.5; transform: none; }
-        
-        .btn-sakura {
-            background: linear-gradient(135deg, #ff88cc 0%, #cc66aa 100%);
+        .btn-pink {
+            background: linear-gradient(135deg, #ff88cc, #cc66aa);
             color: #000; font-weight: 600;
         }
-        .btn-sakura:hover { transform: translateY(-1px); box-shadow: 0 5px 20px rgba(255,136,204,0.3); }
-        .btn-sakura:disabled { opacity: 0.5; transform: none; }
+        .btn-gray { background: #222; color: #888; }
+        .btn-gray:hover { background: #333; color: #fff; }
         
-        .btn-outline { background: transparent; border: 1px solid #333; color: #888; }
-        .btn-outline:hover { border-color: #00ff88; color: #00ff88; }
-        
-        /* SENSEI Chat */
-        .chat-sensei {
-            background: linear-gradient(135deg, #0d1f17 0%, #111 100%);
-            border-left: 3px solid #00ff88; border-radius: 0 16px 16px 0;
+        .chat-bubble {
+            max-width: 85%;
+            padding: 14px 18px;
+            border-radius: 20px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        .chat-ai-sensei {
+            background: linear-gradient(135deg, #0a1f12, #111);
+            border-left: 3px solid #00ff88;
+            border-radius: 4px 20px 20px 20px;
+        }
+        .chat-ai-sakura {
+            background: linear-gradient(135deg, #1f0a18, #111);
+            border-left: 3px solid #ff88cc;
+            border-radius: 4px 20px 20px 20px;
+        }
+        .chat-user {
+            background: #1a1a1a;
+            border-radius: 20px 20px 4px 20px;
         }
         
-        /* SAKURA Chat */
-        .chat-sakura {
-            background: linear-gradient(135deg, #1f0d1a 0%, #111 100%);
-            border-left: 3px solid #ff88cc; border-radius: 0 16px 16px 0;
+        .typing-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            animation: bounce 1.4s infinite;
         }
-        
-        .chat-user { background: #1a1a1a; border-radius: 16px 16px 4px 16px; }
-        
-        .typing-dot { animation: typing 1.4s infinite; }
         .typing-dot:nth-child(2) { animation-delay: 0.2s; }
         .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes typing { 0%, 60%, 100% { opacity: 0.3; } 30% { opacity: 1; } }
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-6px); opacity: 1; }
+        }
         
-        ::-webkit-scrollbar { width: 6px; }
+        .tab-active { border-bottom: 2px solid currentColor; }
+        
+        ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #222; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
         
-        .fade-in { animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.25s ease; }
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(8px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
         
-        /* Sakura theme background */
-        .sakura-bg { background: linear-gradient(180deg, #0a0a0a 0%, #150a12 100%); }
+        .bio-ring {
+            width: 160px; height: 160px;
+            border-radius: 50%;
+            background: conic-gradient(#00ff88 0%, #00ff88 var(--pct), #222 var(--pct));
+            display: flex; align-items: center; justify-content: center;
+        }
+        .bio-ring-inner {
+            width: 140px; height: 140px;
+            border-radius: 50%;
+            background: #000;
+            display: flex; align-items: center; justify-content: center; flex-direction: column;
+        }
     </style>
 </head>
 <body>
@@ -95,184 +99,82 @@
     
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
-        const API = window.location.origin;
+        const API = '';
         
-        // ============ COMPONENTS ============
-        
-        const Particles = ({ count = 12, color = '#00ff88' }) => {
-            const particles = Array.from({ length: count }, (_, i) => ({
-                id: i, left: Math.random() * 100, top: Math.random() * 100,
-                delay: Math.random() * 3, size: 2 + Math.random() * 2
-            }));
-            return <>{particles.map(p => (
-                <div key={p.id} className="particle" style={{
-                    left: `${p.left}%`, top: `${p.top}%`, width: p.size, height: p.size,
-                    animationDelay: `${p.delay}s`, background: color
-                }} />
-            ))}</>;
-        };
-        
-        const BioAgeCircle = ({ bioAge, realAge }) => {
-            const diff = (realAge && bioAge) ? (realAge - bioAge) : 0;
-            return (
-                <div className="flex flex-col items-center">
-                    <div className="bio-circle flex items-center justify-center">
-                        <Particles />
-                        <div className="text-center z-10">
-                            <div className="text-3xl font-bold">{bioAge?.toFixed(1) || '--'}</div>
-                            <div className="text-xs text-gray-500 uppercase tracking-wider">Bio Age</div>
-                            {diff !== 0 && (
-                                <div className={`text-sm font-medium mt-1 ${diff > 0 ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
-                                    {diff > 0 ? `${diff.toFixed(1)} younger` : `${Math.abs(diff).toFixed(1)} older`}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-        
-        const MetricCard = ({ icon, label, value, unit, color = '#00ff88' }) => (
-            <div className="card p-3 text-center">
-                <div className="text-lg">{icon}</div>
-                <div className="font-bold mt-1 text-xl" style={{ color }}>
-                    {value ?? '--'}{unit && <span className="text-xs text-gray-500 ml-1">{unit}</span>}
-                </div>
-                <div className="text-xs text-gray-500 uppercase">{label}</div>
-            </div>
-        );
-        
-        const ImpactBar = ({ label, value, icon }) => {
-            const isGood = value <= 0;
-            const pct = Math.min(Math.abs(value || 0) / 2.5 * 100, 100);
-            return (
-                <div className="card p-3">
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm text-gray-400">{icon} {label}</span>
-                        <span className={`font-medium ${isGood ? 'text-[#00ff88]' : 'text-[#ff6b35]'}`}>
-                            {value != null ? (isGood ? '' : '+') + value.toFixed(1) : '--'} yr
-                        </span>
-                    </div>
-                    <div className="h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500" style={{
-                            width: `${pct}%`, background: isGood ? '#00ff88' : '#ff6b35'
-                        }} />
-                    </div>
-                </div>
-            );
-        };
-        
-        const TrendChart = ({ data, realAge }) => {
-            const canvasRef = useRef(null);
-            const chartRef = useRef(null);
-            
-            useEffect(() => {
-                if (!canvasRef.current || !data?.length) return;
-                if (chartRef.current) chartRef.current.destroy();
-                
-                chartRef.current = new Chart(canvasRef.current.getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: data.map(d => new Date(d.date).toLocaleDateString('it', { day: '2-digit', month: 'short' })),
-                        datasets: [
-                            { label: 'Bio Age', data: data.map(d => d.biological_age), borderColor: '#00ff88', backgroundColor: 'rgba(0,255,136,0.1)', fill: true, tension: 0.4, pointRadius: 1 },
-                            { label: 'Real Age', data: data.map(() => realAge), borderColor: '#333', borderDash: [5, 5], pointRadius: 0 }
-                        ]
-                    },
-                    options: {
-                        responsive: true, maintainAspectRatio: false,
-                        plugins: { legend: { labels: { color: '#666', font: { size: 10 } } } },
-                        scales: {
-                            x: { grid: { color: '#1a1a1a' }, ticks: { color: '#444', font: { size: 9 } } },
-                            y: { grid: { color: '#1a1a1a' }, ticks: { color: '#444' }, suggestedMin: realAge - 8, suggestedMax: realAge + 4 }
-                        }
-                    }
-                });
-                return () => chartRef.current?.destroy();
-            }, [data, realAge]);
-            
-            return <div className="card p-4"><div style={{ height: 180 }}><canvas ref={canvasRef} /></div></div>;
-        };
+        // ==================== COMPONENTS ====================
         
         const Loading = () => (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="w-10 h-10 border-4 border-[#1a1a1a] border-t-[#00ff88] rounded-full animate-spin" />
+            <div className="h-full flex items-center justify-center">
+                <div className="w-10 h-10 border-4 border-[#222] border-t-[#00ff88] rounded-full animate-spin" />
             </div>
         );
         
-        // ============ DUAL COACH CHAT ============
-        
-        const ChatMessage = ({ message, coach }) => {
-            const isAI = message.role === 'assistant';
-            const isSakura = coach === 'sakura';
-            const accentColor = isSakura ? '#ff88cc' : '#00ff88';
-            const chatClass = isSakura ? 'chat-sakura' : 'chat-sensei';
-            const coachName = isSakura ? 'Sakura' : 'Sensei';
-            const coachEmoji = isSakura ? '🌸' : '🥋';
-            
+        const BioAgeRing = ({ bioAge, realAge }) => {
+            const diff = realAge && bioAge ? realAge - bioAge : 0;
+            const pct = Math.max(0, Math.min(100, 50 + diff * 5));
             return (
-                <div className={`flex ${isAI ? 'justify-start' : 'justify-end'} fade-in`}>
-                    <div className={`max-w-[85%] p-4 ${isAI ? chatClass : 'chat-user'}`}>
-                        {isAI && (
-                            <div className="flex items-center gap-2 mb-2">
-                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm" 
-                                    style={{ background: accentColor, color: '#000' }}>
-                                    {coachEmoji}
-                                </div>
-                                <span className="text-sm font-medium" style={{ color: accentColor }}>{coachName}</span>
+                <div className="bio-ring" style={{ '--pct': `${pct}%` }}>
+                    <div className="bio-ring-inner">
+                        <div className="text-3xl font-bold">{bioAge?.toFixed(1) || '--'}</div>
+                        <div className="text-xs text-gray-500 uppercase">Bio Age</div>
+                        {diff !== 0 && (
+                            <div className={`text-sm mt-1 ${diff > 0 ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
+                                {diff > 0 ? `-${diff.toFixed(1)}` : `+${Math.abs(diff).toFixed(1)}`} anni
                             </div>
                         )}
-                        <div className="text-base leading-relaxed whitespace-pre-wrap">{message.content}</div>
                     </div>
                 </div>
             );
         };
         
-        const TypingIndicator = ({ coach }) => {
-            const isSakura = coach === 'sakura';
-            const accentColor = isSakura ? '#ff88cc' : '#00ff88';
-            const chatClass = isSakura ? 'chat-sakura' : 'chat-sensei';
-            const coachEmoji = isSakura ? '🌸' : '🥋';
-            const coachName = isSakura ? 'Sakura' : 'Sensei';
-            
+        const MetricBox = ({ icon, label, value, unit, color }) => (
+            <div className="card p-3 text-center">
+                <div className="text-xl mb-1">{icon}</div>
+                <div className="text-xl font-bold" style={{ color }}>{value ?? '--'}</div>
+                <div className="text-[10px] text-gray-500 uppercase">{label}</div>
+            </div>
+        );
+        
+        const ImpactRow = ({ icon, label, value }) => {
+            const good = value <= 0;
             return (
-                <div className="flex justify-start fade-in">
-                    <div className={`${chatClass} p-4`}>
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm"
-                                style={{ background: accentColor, color: '#000' }}>
-                                {coachEmoji}
-                            </div>
-                            <span className="text-sm" style={{ color: accentColor }}>{coachName}</span>
-                        </div>
-                        <div className="flex gap-1">
-                            <div className="w-2 h-2 rounded-full typing-dot" style={{ background: accentColor }} />
-                            <div className="w-2 h-2 rounded-full typing-dot" style={{ background: accentColor }} />
-                            <div className="w-2 h-2 rounded-full typing-dot" style={{ background: accentColor }} />
-                        </div>
-                    </div>
+                <div className="flex items-center justify-between py-2 border-b border-[#1a1a1a]">
+                    <span className="text-sm text-gray-400">{icon} {label}</span>
+                    <span className={`font-medium ${good ? 'text-[#00ff88]' : 'text-[#ff6b35]'}`}>
+                        {value != null ? (good ? '' : '+') + value.toFixed(1) : '--'} yr
+                    </span>
                 </div>
             );
         };
         
-        const AIChat = ({ token, coach }) => {
+        // ==================== CHAT COMPONENT ====================
+        
+        const ChatView = ({ token, coach }) => {
             const [messages, setMessages] = useState([]);
             const [input, setInput] = useState('');
             const [loading, setLoading] = useState(false);
-            const [initialLoad, setInitialLoad] = useState(true);
+            const [ready, setReady] = useState(false);
             const chatRef = useRef(null);
+            const inputRef = useRef(null);
             
             const isSakura = coach === 'sakura';
-            const accentColor = isSakura ? '#ff88cc' : '#00ff88';
+            const accent = isSakura ? '#ff88cc' : '#00ff88';
+            const coachName = isSakura ? 'Sakura' : 'Sensei';
+            const coachEmoji = isSakura ? '🌸' : '🥋';
+            const coachDesc = isSakura 
+                ? 'Coach mentale e spirituale. Benessere, mindfulness, equilibrio emotivo.'
+                : 'Preparatore atletico. Allenamento, performance, recupero, dati Garmin.';
             
-            useEffect(() => { 
+            useEffect(() => {
                 setMessages([]);
-                setInitialLoad(true);
-                loadHistory(); 
+                setReady(false);
+                loadHistory();
             }, [coach]);
             
             useEffect(() => {
-                if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+                if (chatRef.current) {
+                    chatRef.current.scrollTop = chatRef.current.scrollHeight;
+                }
             }, [messages, loading]);
             
             const loadHistory = async () => {
@@ -280,91 +182,119 @@
                     const res = await fetch(`${API}/api/chat/history?coach=${coach}&limit=30`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
-                    const data = await res.json();
-                    if (Array.isArray(data)) setMessages(data);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (Array.isArray(data)) setMessages(data);
+                    }
                 } catch (e) {}
-                setInitialLoad(false);
+                setReady(true);
             };
             
-            const sendMessage = async () => {
-                if (!input.trim() || loading) return;
+            const send = async () => {
+                const text = input.trim();
+                if (!text || loading) return;
                 
-                const userMsg = input.trim();
                 setInput('');
-                setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+                setMessages(prev => [...prev, { role: 'user', content: text }]);
                 setLoading(true);
                 
                 try {
                     const res = await fetch(`${API}/api/chat`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({ message: userMsg, coach })
+                        body: JSON.stringify({ message: text, coach })
                     });
                     const data = await res.json();
-                    if (data.response) {
-                        setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
-                    } else if (data.error) {
-                        setMessages(prev => [...prev, { role: 'assistant', content: `Errore: ${data.error}` }]);
-                    }
-                } catch (e) {
-                    setMessages(prev => [...prev, { role: 'assistant', content: 'Errore di connessione. Riprova.' }]);
+                    setMessages(prev => [...prev, { 
+                        role: 'assistant', 
+                        content: data.response || data.error || 'Errore' 
+                    }]);
+                } catch {
+                    setMessages(prev => [...prev, { role: 'assistant', content: 'Errore di connessione' }]);
                 }
                 setLoading(false);
+                inputRef.current?.focus();
             };
             
-            const senseiSuggestions = ["Come sto oggi?", "Piano allenamento", "Analizza recovery", "Consigli per migliorare"];
-            const sakuraSuggestions = ["Come mi sento?", "Sono stressato", "Aiutami a rilassarmi", "Ho bisogno di motivazione"];
-            const suggestions = isSakura ? sakuraSuggestions : senseiSuggestions;
+            const suggestions = isSakura 
+                ? ['Come mi sento?', 'Sono stressato', 'Aiutami a rilassarmi']
+                : ['Come sto oggi?', 'Piano allenamento', 'Analizza i dati'];
             
-            const coachInfo = isSakura ? {
-                emoji: '🌸', name: 'Sakura', title: 'Coach Mentale & Spirituale',
-                desc: 'Benessere interiore, mindfulness, gestione stress e equilibrio emotivo.'
-            } : {
-                emoji: '🥋', name: 'Sensei', title: 'Preparatore Atletico',
-                desc: 'Allenamento, performance, recupero e analisi dati Garmin.'
-            };
-            
-            if (initialLoad) return <Loading />;
+            if (!ready) return <Loading />;
             
             return (
-                <div className={`flex flex-col h-full ${isSakura ? 'sakura-bg' : ''}`}>
+                <div className="flex flex-col h-full">
+                    {/* Chat Messages */}
                     <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {messages.length === 0 && (
-                            <div className="text-center py-8">
-                                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl"
-                                    style={{ background: `linear-gradient(135deg, ${accentColor} 0%, ${isSakura ? '#cc66aa' : '#00aa55'} 100%)` }}>
-                                    {coachInfo.emoji}
-                                </div>
-                                <h3 className="text-xl font-medium mb-1">{coachInfo.name}</h3>
-                                <p className="text-sm mb-1" style={{ color: accentColor }}>{coachInfo.title}</p>
-                                <p className="text-gray-500 text-sm mb-6 max-w-xs mx-auto">{coachInfo.desc}</p>
+                        {messages.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-center px-4">
+                                <div className="text-5xl mb-4">{coachEmoji}</div>
+                                <h2 className="text-2xl font-bold mb-2" style={{ color: accent }}>{coachName}</h2>
+                                <p className="text-gray-400 text-sm mb-8 max-w-xs">{coachDesc}</p>
                                 <div className="flex flex-wrap justify-center gap-2">
                                     {suggestions.map((s, i) => (
                                         <button key={i} onClick={() => setInput(s)}
-                                            className="px-4 py-2 bg-[#1a1a1a] rounded-full text-sm text-gray-400 hover:border-current border border-transparent transition-all"
-                                            style={{ '--tw-border-opacity': 1 }}
-                                            onMouseEnter={e => e.target.style.color = accentColor}
-                                            onMouseLeave={e => e.target.style.color = '#9ca3af'}>
+                                            className="px-4 py-2 rounded-full text-sm border border-[#333] text-gray-400 hover:border-current hover:text-white transition-colors">
                                             {s}
                                         </button>
                                     ))}
                                 </div>
                             </div>
+                        ) : (
+                            <>
+                                {messages.map((m, i) => (
+                                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} fade-in`}>
+                                        <div className={`chat-bubble ${
+                                            m.role === 'user' ? 'chat-user' : 
+                                            isSakura ? 'chat-ai-sakura' : 'chat-ai-sensei'
+                                        }`}>
+                                            {m.role === 'assistant' && (
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="text-lg">{coachEmoji}</span>
+                                                    <span className="text-sm font-medium" style={{ color: accent }}>{coachName}</span>
+                                                </div>
+                                            )}
+                                            <div className="whitespace-pre-wrap">{m.content}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {loading && (
+                                    <div className="flex justify-start fade-in">
+                                        <div className={`chat-bubble ${isSakura ? 'chat-ai-sakura' : 'chat-ai-sensei'}`}>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-lg">{coachEmoji}</span>
+                                                <span className="text-sm font-medium" style={{ color: accent }}>{coachName}</span>
+                                            </div>
+                                            <div className="flex gap-1">
+                                                <div className="typing-dot" style={{ background: accent }} />
+                                                <div className="typing-dot" style={{ background: accent }} />
+                                                <div className="typing-dot" style={{ background: accent }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         )}
-                        {messages.map((m, i) => <ChatMessage key={i} message={m} coach={coach} />)}
-                        {loading && <TypingIndicator coach={coach} />}
                     </div>
                     
-                    <div className="p-4 border-t border-[#1a1a1a]">
-                        <div className="flex gap-2">
-                            <input type="text" value={input} onChange={e => setInput(e.target.value)}
-                                onKeyPress={e => e.key === 'Enter' && sendMessage()}
-                                placeholder={isSakura ? "Parla con Sakura..." : "Parla con Sensei..."}
-                                className={`input-dark flex-1 px-4 py-3 rounded-xl text-base ${isSakura ? 'input-sakura' : ''}`}
-                                disabled={loading} />
-                            <button onClick={sendMessage} disabled={loading || !input.trim()}
-                                className={`${isSakura ? 'btn-sakura' : 'btn-primary'} px-6 py-3 rounded-xl text-lg transition-all`}>
-                                {loading ? '...' : '→'}
+                    {/* Input */}
+                    <div className="p-4 border-t border-[#1a1a1a] bg-black">
+                        <div className="flex gap-3">
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={input}
+                                onChange={e => setInput(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
+                                placeholder={`Scrivi a ${coachName}...`}
+                                className={`input-dark flex-1 px-4 py-3 rounded-2xl ${isSakura ? 'sakura' : ''}`}
+                                disabled={loading}
+                            />
+                            <button 
+                                onClick={send} 
+                                disabled={loading || !input.trim()}
+                                className={`${isSakura ? 'btn-pink' : 'btn-green'} px-6 rounded-2xl text-lg disabled:opacity-40`}>
+                                →
                             </button>
                         </div>
                     </div>
@@ -372,31 +302,159 @@
             );
         };
         
-        // ============ PROFILE PAGE ============
+        // ==================== DATA VIEW ====================
         
-        const ProfilePage = ({ token, user, onUpdate, onLogout }) => {
+        const DataView = ({ summary }) => {
+            const avgs = summary?.averages || {};
+            const impacts = avgs.bio_impacts || {};
+            const realAge = summary?.real_age || 42;
+            
+            return (
+                <div className="h-full overflow-y-auto p-4">
+                    <div className="max-w-md mx-auto">
+                        {/* Bio Age */}
+                        <div className="flex justify-center mb-6">
+                            <BioAgeRing bioAge={avgs.biological_age} realAge={realAge} />
+                        </div>
+                        
+                        {/* Metrics Grid */}
+                        <div className="grid grid-cols-3 gap-2 mb-6">
+                            <MetricBox icon="❤️" label="RHR" value={avgs.resting_hr?.toFixed(0)} color="#ff6b6b" />
+                            <MetricBox icon="🫁" label="VO2" value={avgs.vo2_max?.toFixed(0)} color="#00ff88" />
+                            <MetricBox icon="👣" label="Steps" value={avgs.steps ? (avgs.steps/1000).toFixed(1)+'k' : null} color="#ffd93d" />
+                            <MetricBox icon="😴" label="Sleep" value={avgs.sleep_hours?.toFixed(1)} color="#6c5ce7" />
+                            <MetricBox icon="⚡" label="Recovery" value={avgs.recovery?.toFixed(0)} color="#00ff88" />
+                            <MetricBox icon="🔥" label="Strain" value={avgs.strain?.toFixed(1)} color="#ff6b35" />
+                        </div>
+                        
+                        {/* Impacts */}
+                        <div className="card p-4">
+                            <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-2">Impatto sull'età biologica</h3>
+                            <ImpactRow icon="🫁" label="VO2 Max" value={impacts.vo2} />
+                            <ImpactRow icon="❤️" label="Frequenza cardiaca" value={impacts.rhr} />
+                            <ImpactRow icon="😴" label="Sonno" value={impacts.sleep} />
+                            <ImpactRow icon="👣" label="Passi" value={impacts.steps} />
+                            <ImpactRow icon="😤" label="Stress" value={impacts.stress} />
+                            <ImpactRow icon="🔥" label="Intensità" value={impacts.hrz} />
+                        </div>
+                        
+                        <p className="text-center text-xs text-gray-600 mt-4">
+                            Media ultimi 30 giorni
+                        </p>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== TREND VIEW ====================
+        
+        const TrendView = ({ trend, realAge }) => {
+            const canvasRef = useRef(null);
+            const chartRef = useRef(null);
+            
+            useEffect(() => {
+                if (!canvasRef.current || !trend?.data?.length) return;
+                if (chartRef.current) chartRef.current.destroy();
+                
+                chartRef.current = new Chart(canvasRef.current.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: trend.data.map(d => {
+                            const date = new Date(d.date);
+                            return date.toLocaleDateString('it', { day: '2-digit', month: 'short' });
+                        }),
+                        datasets: [
+                            { 
+                                label: 'Età Biologica', 
+                                data: trend.data.map(d => d.biological_age), 
+                                borderColor: '#00ff88', 
+                                backgroundColor: 'rgba(0,255,136,0.1)', 
+                                fill: true, 
+                                tension: 0.4, 
+                                pointRadius: 0 
+                            },
+                            { 
+                                label: 'Età Reale', 
+                                data: trend.data.map(() => realAge), 
+                                borderColor: '#444', 
+                                borderDash: [5, 5], 
+                                pointRadius: 0 
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { 
+                            legend: { 
+                                labels: { color: '#666', font: { size: 11 } } 
+                            } 
+                        },
+                        scales: {
+                            x: { 
+                                grid: { color: '#1a1a1a' }, 
+                                ticks: { color: '#555', font: { size: 10 }, maxTicksLimit: 8 } 
+                            },
+                            y: { 
+                                grid: { color: '#1a1a1a' }, 
+                                ticks: { color: '#555' },
+                                suggestedMin: realAge - 6,
+                                suggestedMax: realAge + 3
+                            }
+                        }
+                    }
+                });
+                
+                return () => chartRef.current?.destroy();
+            }, [trend, realAge]);
+            
+            if (!trend?.data?.length) {
+                return (
+                    <div className="h-full flex items-center justify-center">
+                        <p className="text-gray-500">Servono più dati per il trend</p>
+                    </div>
+                );
+            }
+            
+            const pace = trend.pace_of_aging;
+            
+            return (
+                <div className="h-full overflow-y-auto p-4">
+                    <div className="max-w-md mx-auto">
+                        <div className="card p-4 mb-4">
+                            <div style={{ height: 220 }}>
+                                <canvas ref={canvasRef} />
+                            </div>
+                        </div>
+                        
+                        <div className="card p-4">
+                            <div className="text-xs text-gray-500 uppercase mb-1">Pace of Aging</div>
+                            <div className={`text-3xl font-bold ${pace <= 0 ? 'text-[#00ff88]' : 'text-[#ff6b35]'}`}>
+                                {pace != null ? (pace <= 0 ? '' : '+') + pace.toFixed(1) : '--'}
+                                <span className="text-lg ml-1">anni/anno</span>
+                            </div>
+                            <div className="text-sm text-gray-500 mt-2">
+                                {pace < -0.3 ? '🎉 Stai ringiovanendo!' : 
+                                 pace < 0.3 ? '✨ Invecchiamento rallentato' : 
+                                 '⚠️ Invecchiamento accelerato'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== PROFILE VIEW ====================
+        
+        const ProfileView = ({ token, user, onUpdate, onLogout }) => {
             const [form, setForm] = useState({
                 name: user?.name || '',
-                birth_year: user?.birth_year || '',
-                sport_goals: ''
+                birth_year: user?.birth_year || ''
             });
             const [saving, setSaving] = useState(false);
             const [saved, setSaved] = useState(false);
-            const [memories, setMemories] = useState([]);
             
-            useEffect(() => { loadMemories(); }, []);
-            
-            const loadMemories = async () => {
-                try {
-                    const res = await fetch(`${API}/api/chat/memories`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    const data = await res.json();
-                    if (Array.isArray(data)) setMemories(data);
-                } catch {}
-            };
-            
-            const handleSave = async () => {
+            const save = async () => {
                 setSaving(true);
                 try {
                     const res = await fetch(`${API}/api/profile`, {
@@ -404,8 +462,7 @@
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({
                             name: form.name,
-                            birth_year: form.birth_year ? parseInt(form.birth_year) : null,
-                            sport_goals: form.sport_goals
+                            birth_year: form.birth_year ? parseInt(form.birth_year) : null
                         })
                     });
                     if (res.ok) {
@@ -419,117 +476,72 @@
                 setSaving(false);
             };
             
-            const deleteMemory = async (id) => {
-                try {
-                    await fetch(`${API}/api/chat/memories/${id}`, {
-                        method: 'DELETE',
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    setMemories(memories.filter(m => m.id !== id));
-                } catch {}
-            };
-            
-            const currentYear = new Date().getFullYear();
-            const age = form.birth_year ? currentYear - parseInt(form.birth_year) : null;
-            
-            const senseiMemories = memories.filter(m => m.coach === 'sensei' || !m.coach);
-            const sakuraMemories = memories.filter(m => m.coach === 'sakura');
+            const age = form.birth_year ? new Date().getFullYear() - parseInt(form.birth_year) : null;
             
             return (
-                <div className="flex-1 overflow-y-auto p-4 max-w-lg mx-auto w-full">
-                    <h2 className="text-xl font-bold mb-6">⚙️ Profilo</h2>
-                    
-                    <div className="card p-4 mb-4">
-                        <h3 className="text-sm text-gray-400 uppercase tracking-wider mb-4">Dati Personali</h3>
+                <div className="h-full overflow-y-auto p-4">
+                    <div className="max-w-md mx-auto">
+                        <h2 className="text-xl font-bold mb-6">Profilo</h2>
                         
-                        <div className="mb-4">
-                            <label className="text-xs text-gray-500 block mb-1">Nome</label>
-                            <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})}
-                                className="input-dark w-full px-4 py-3 rounded-lg" placeholder="Il tuo nome" />
+                        <div className="card p-4 mb-4">
+                            <div className="mb-4">
+                                <label className="text-xs text-gray-500 block mb-1">Nome</label>
+                                <input 
+                                    type="text" 
+                                    value={form.name} 
+                                    onChange={e => setForm({...form, name: e.target.value})}
+                                    className="input-dark w-full px-4 py-3 rounded-xl" 
+                                    placeholder="Il tuo nome" 
+                                />
+                            </div>
+                            
+                            <div className="mb-4">
+                                <label className="text-xs text-gray-500 block mb-1">Anno di nascita</label>
+                                <input 
+                                    type="number" 
+                                    value={form.birth_year} 
+                                    onChange={e => setForm({...form, birth_year: e.target.value})}
+                                    className="input-dark w-full px-4 py-3 rounded-xl" 
+                                    placeholder="1976" 
+                                />
+                                {age && <p className="text-xs text-gray-500 mt-1">Età: {age} anni</p>}
+                            </div>
+                            
+                            <button onClick={save} disabled={saving} className="btn-green w-full py-3 rounded-xl">
+                                {saving ? '...' : saved ? '✓ Salvato' : 'Salva'}
+                            </button>
                         </div>
                         
-                        <div className="mb-4">
-                            <label className="text-xs text-gray-500 block mb-1">Anno di nascita</label>
-                            <input type="number" value={form.birth_year} onChange={e => setForm({...form, birth_year: e.target.value})}
-                                className="input-dark w-full px-4 py-3 rounded-lg" placeholder="es. 1976" min="1940" max="2010" />
-                            {age && <div className="text-xs text-gray-500 mt-1">Età attuale: {age} anni</div>}
+                        <div className="card p-4 mb-4">
+                            <div className="text-sm text-gray-400 mb-2">
+                                <span className="text-gray-600">Email:</span> {user?.email}
+                            </div>
+                            <div className="text-sm text-gray-400">
+                                <span className="text-gray-600">Garmin:</span> {user?.garmin_connected ? '✅ Connesso' : '❌ Non connesso'}
+                            </div>
                         </div>
                         
-                        <div className="mb-4">
-                            <label className="text-xs text-gray-500 block mb-1">Obiettivi</label>
-                            <textarea value={form.sport_goals} onChange={e => setForm({...form, sport_goals: e.target.value})}
-                                className="input-dark w-full px-4 py-3 rounded-lg h-20 resize-none" 
-                                placeholder="es. Preparare una maratona, stare meglio mentalmente..." />
-                        </div>
-                        
-                        <button onClick={handleSave} disabled={saving} className="btn-primary w-full py-3 rounded-lg">
-                            {saving ? 'Salvataggio...' : saved ? '✓ Salvato!' : 'Salva modifiche'}
+                        <button onClick={onLogout} className="btn-gray w-full py-3 rounded-xl">
+                            Logout
                         </button>
                     </div>
-                    
-                    <div className="card p-4 mb-4">
-                        <h3 className="text-sm text-gray-400 uppercase tracking-wider mb-4">Account</h3>
-                        <div className="text-sm text-gray-400 mb-2">
-                            <span className="text-gray-500">Email:</span> {user?.email}
-                        </div>
-                        <div className="text-sm text-gray-400 mb-4">
-                            <span className="text-gray-500">Garmin:</span> {user?.garmin_connected ? '✅ Connesso' : '❌ Non connesso'}
-                        </div>
-                        <button onClick={onLogout} className="btn-outline w-full py-2 rounded-lg text-sm">Logout</button>
-                    </div>
-                    
-                    {/* Sensei Memories */}
-                    {senseiMemories.length > 0 && (
-                        <div className="card p-4 mb-4">
-                            <h3 className="text-sm text-[#00ff88] uppercase tracking-wider mb-3">🥋 Ricordi di Sensei</h3>
-                            <div className="space-y-2">
-                                {senseiMemories.map(m => (
-                                    <div key={m.id} className="flex justify-between items-start bg-[#0a0a0a] rounded-lg p-3">
-                                        <div className="flex-1">
-                                            <span className="text-xs px-2 py-0.5 rounded mr-2 bg-[#00ff88]/20 text-[#00ff88]">{m.category}</span>
-                                            <span className="text-sm">{m.content}</span>
-                                        </div>
-                                        <button onClick={() => deleteMemory(m.id)} className="text-gray-500 hover:text-red-400 ml-2">×</button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* Sakura Memories */}
-                    {sakuraMemories.length > 0 && (
-                        <div className="card p-4">
-                            <h3 className="text-sm text-[#ff88cc] uppercase tracking-wider mb-3">🌸 Ricordi di Sakura</h3>
-                            <div className="space-y-2">
-                                {sakuraMemories.map(m => (
-                                    <div key={m.id} className="flex justify-between items-start bg-[#0a0a0a] rounded-lg p-3">
-                                        <div className="flex-1">
-                                            <span className="text-xs px-2 py-0.5 rounded mr-2 bg-[#ff88cc]/20 text-[#ff88cc]">{m.category}</span>
-                                            <span className="text-sm">{m.content}</span>
-                                        </div>
-                                        <button onClick={() => deleteMemory(m.id)} className="text-gray-500 hover:text-red-400 ml-2">×</button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
             );
         };
         
-        // ============ AUTH PAGES ============
+        // ==================== AUTH PAGES ====================
         
         const LandingPage = ({ onNavigate }) => (
-            <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+            <div className="h-full flex flex-col items-center justify-center p-6">
                 <div className="flex gap-4 mb-6">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#00ff88] to-[#00aa55] flex items-center justify-center text-2xl">🥋</div>
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#ff88cc] to-[#cc66aa] flex items-center justify-center text-2xl">🌸</div>
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#00ff88] to-[#00aa55] flex items-center justify-center text-3xl">🥋</div>
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#ff88cc] to-[#cc66aa] flex items-center justify-center text-3xl">🌸</div>
                 </div>
                 <h1 className="text-3xl font-bold mb-2">SENSEI & SAKURA</h1>
-                <p className="text-gray-500 text-sm mb-8">Corpo e Mente in Equilibrio</p>
+                <p className="text-gray-500 mb-8">Corpo e Mente in Equilibrio</p>
                 <div className="flex gap-3">
-                    <button onClick={() => onNavigate('login')} className="btn-primary px-6 py-3 rounded-xl">Login</button>
-                    <button onClick={() => onNavigate('register')} className="btn-outline px-6 py-3 rounded-xl">Register</button>
+                    <button onClick={() => onNavigate('login')} className="btn-green px-8 py-3 rounded-xl">Login</button>
+                    <button onClick={() => onNavigate('register')} className="btn-gray px-8 py-3 rounded-xl">Registrati</button>
                 </div>
             </div>
         );
@@ -540,9 +552,10 @@
             const [error, setError] = useState('');
             const [loading, setLoading] = useState(false);
             
-            const handleSubmit = async (e) => {
+            const submit = async (e) => {
                 e.preventDefault();
                 setLoading(true);
+                setError('');
                 try {
                     const res = await fetch(`${API}/api/login`, {
                         method: 'POST',
@@ -554,25 +567,46 @@
                         localStorage.setItem('token', data.token);
                         localStorage.setItem('user', JSON.stringify(data.user));
                         onLogin(data);
-                    } else setError(data.error || 'Login fallito');
-                } catch { setError('Errore di connessione'); }
+                    } else {
+                        setError(data.error || 'Login fallito');
+                    }
+                } catch {
+                    setError('Errore di connessione');
+                }
                 setLoading(false);
             };
             
             return (
-                <div className="min-h-screen flex items-center justify-center p-6">
-                    <div className="w-full max-w-sm">
+                <div className="h-full flex items-center justify-center p-6">
+                    <form onSubmit={submit} className="w-full max-w-sm">
                         <h1 className="text-2xl font-bold text-center mb-6">Login</h1>
-                        <form onSubmit={handleSubmit} className="card p-6">
-                            {error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4 text-red-400 text-sm">{error}</div>}
-                            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg mb-3" placeholder="Email" required />
-                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg mb-4" placeholder="Password" required />
-                            <button type="submit" disabled={loading} className="btn-primary w-full py-3 rounded-lg">{loading ? '...' : 'Login'}</button>
-                        </form>
-                        <p className="text-center mt-4 text-gray-500 text-sm">
-                            No account? <button onClick={() => onNavigate('register')} className="text-[#00ff88]">Register</button>
+                        
+                        {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-4 text-red-400 text-sm">{error}</div>}
+                        
+                        <input 
+                            type="email" 
+                            value={email} 
+                            onChange={e => setEmail(e.target.value)}
+                            className="input-dark w-full px-4 py-3 rounded-xl mb-3" 
+                            placeholder="Email" 
+                            required 
+                        />
+                        <input 
+                            type="password" 
+                            value={password} 
+                            onChange={e => setPassword(e.target.value)}
+                            className="input-dark w-full px-4 py-3 rounded-xl mb-4" 
+                            placeholder="Password" 
+                            required 
+                        />
+                        <button type="submit" disabled={loading} className="btn-green w-full py-3 rounded-xl mb-4">
+                            {loading ? '...' : 'Accedi'}
+                        </button>
+                        
+                        <p className="text-center text-gray-500 text-sm">
+                            Non hai un account? <button type="button" onClick={() => onNavigate('register')} className="text-[#00ff88]">Registrati</button>
                         </p>
-                    </div>
+                    </form>
                 </div>
             );
         };
@@ -583,10 +617,14 @@
             const [success, setSuccess] = useState(false);
             const [loading, setLoading] = useState(false);
             
-            const handleSubmit = async (e) => {
+            const submit = async (e) => {
                 e.preventDefault();
-                if (!form.birth_year) { setError('Anno di nascita richiesto'); return; }
+                if (!form.birth_year) {
+                    setError('Anno di nascita richiesto');
+                    return;
+                }
                 setLoading(true);
+                setError('');
                 try {
                     const res = await fetch(`${API}/api/register`, {
                         method: 'POST',
@@ -594,38 +632,75 @@
                         body: JSON.stringify({ ...form, birth_year: parseInt(form.birth_year) })
                     });
                     const data = await res.json();
-                    if (data.user_id) setSuccess(true);
-                    else setError(data.error || 'Errore');
-                } catch { setError('Errore di connessione'); }
+                    if (data.user_id) {
+                        setSuccess(true);
+                    } else {
+                        setError(data.error || 'Errore');
+                    }
+                } catch {
+                    setError('Errore di connessione');
+                }
                 setLoading(false);
             };
             
-            if (success) return (
-                <div className="min-h-screen flex items-center justify-center p-6">
-                    <div className="card p-8 text-center">
-                        <div className="text-4xl mb-4">✓</div>
-                        <h2 className="text-xl font-bold text-[#00ff88] mb-4">Account creato!</h2>
-                        <button onClick={() => onNavigate('login')} className="btn-primary px-6 py-2 rounded-lg">Login</button>
+            if (success) {
+                return (
+                    <div className="h-full flex items-center justify-center p-6">
+                        <div className="text-center">
+                            <div className="text-5xl mb-4">✓</div>
+                            <h2 className="text-xl font-bold text-[#00ff88] mb-4">Account creato!</h2>
+                            <button onClick={() => onNavigate('login')} className="btn-green px-8 py-3 rounded-xl">Accedi</button>
+                        </div>
                     </div>
-                </div>
-            );
+                );
+            }
             
             return (
-                <div className="min-h-screen flex items-center justify-center p-6">
-                    <div className="w-full max-w-sm">
+                <div className="h-full flex items-center justify-center p-6">
+                    <form onSubmit={submit} className="w-full max-w-sm">
                         <h1 className="text-2xl font-bold text-center mb-6">Registrazione</h1>
-                        <form onSubmit={handleSubmit} className="card p-6">
-                            {error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4 text-red-400 text-sm">{error}</div>}
-                            <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-dark w-full px-4 py-3 rounded-lg mb-3" placeholder="Nome" />
-                            <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="input-dark w-full px-4 py-3 rounded-lg mb-3" placeholder="Email" required />
-                            <input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} className="input-dark w-full px-4 py-3 rounded-lg mb-3" placeholder="Password (min 6)" required minLength="6" />
-                            <input type="number" value={form.birth_year} onChange={e => setForm({...form, birth_year: e.target.value})} className="input-dark w-full px-4 py-3 rounded-lg mb-4" placeholder="Anno nascita *" required />
-                            <button type="submit" disabled={loading} className="btn-primary w-full py-3 rounded-lg">{loading ? '...' : 'Registrati'}</button>
-                        </form>
-                        <p className="text-center mt-4 text-gray-500 text-sm">
-                            Hai un account? <button onClick={() => onNavigate('login')} className="text-[#00ff88]">Login</button>
+                        
+                        {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-4 text-red-400 text-sm">{error}</div>}
+                        
+                        <input 
+                            value={form.name} 
+                            onChange={e => setForm({...form, name: e.target.value})}
+                            className="input-dark w-full px-4 py-3 rounded-xl mb-3" 
+                            placeholder="Nome" 
+                        />
+                        <input 
+                            type="email" 
+                            value={form.email} 
+                            onChange={e => setForm({...form, email: e.target.value})}
+                            className="input-dark w-full px-4 py-3 rounded-xl mb-3" 
+                            placeholder="Email" 
+                            required 
+                        />
+                        <input 
+                            type="password" 
+                            value={form.password} 
+                            onChange={e => setForm({...form, password: e.target.value})}
+                            className="input-dark w-full px-4 py-3 rounded-xl mb-3" 
+                            placeholder="Password" 
+                            required 
+                            minLength="6"
+                        />
+                        <input 
+                            type="number" 
+                            value={form.birth_year} 
+                            onChange={e => setForm({...form, birth_year: e.target.value})}
+                            className="input-dark w-full px-4 py-3 rounded-xl mb-4" 
+                            placeholder="Anno di nascita *" 
+                            required
+                        />
+                        <button type="submit" disabled={loading} className="btn-green w-full py-3 rounded-xl mb-4">
+                            {loading ? '...' : 'Registrati'}
+                        </button>
+                        
+                        <p className="text-center text-gray-500 text-sm">
+                            Hai già un account? <button type="button" onClick={() => onNavigate('login')} className="text-[#00ff88]">Accedi</button>
                         </p>
-                    </div>
+                    </form>
                 </div>
             );
         };
@@ -636,7 +711,7 @@
             const [step, setStep] = useState(1);
             const [loading, setLoading] = useState(false);
             
-            const handleConnect = async (e) => {
+            const connect = async (e) => {
                 e.preventDefault();
                 setLoading(true);
                 setError('');
@@ -656,55 +731,80 @@
                         });
                         setStep(3);
                         setTimeout(onComplete, 1500);
-                    } else setError(data.error || 'Errore');
-                } catch { setError('Errore di connessione'); }
+                    } else {
+                        setError(data.error || 'Errore');
+                    }
+                } catch {
+                    setError('Errore di connessione');
+                }
                 setLoading(false);
             };
             
-            if (step >= 2) return (
-                <div className="min-h-screen flex items-center justify-center">
-                    <div className="text-center">
-                        {step === 2 && <div className="w-10 h-10 border-4 border-[#1a1a1a] border-t-[#00ff88] rounded-full animate-spin mx-auto mb-4" />}
-                        {step === 3 && <div className="text-4xl mb-4">✓</div>}
-                        <div className="text-[#00ff88]">{step === 2 ? 'Sincronizzazione...' : 'Pronto!'}</div>
+            if (step >= 2) {
+                return (
+                    <div className="h-full flex items-center justify-center">
+                        <div className="text-center">
+                            {step === 2 && <div className="w-10 h-10 border-4 border-[#222] border-t-[#00ff88] rounded-full animate-spin mx-auto mb-4" />}
+                            {step === 3 && <div className="text-5xl mb-4">✓</div>}
+                            <div className="text-[#00ff88]">{step === 2 ? 'Sincronizzazione in corso...' : 'Pronto!'}</div>
+                        </div>
                     </div>
-                </div>
-            );
+                );
+            }
             
             return (
-                <div className="min-h-screen flex items-center justify-center p-6">
-                    <div className="w-full max-w-sm">
+                <div className="h-full flex items-center justify-center p-6">
+                    <form onSubmit={connect} className="w-full max-w-sm">
                         <h1 className="text-2xl font-bold text-center mb-2">Connetti Garmin</h1>
                         <p className="text-gray-500 text-center text-sm mb-6">Per personalizzare i tuoi coach</p>
-                        <form onSubmit={handleConnect} className="card p-6">
-                            {error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4 text-red-400 text-sm">{error}</div>}
-                            <div className="bg-[#0a0a0a] rounded-lg p-3 mb-4 text-xs text-gray-500">🔒 Credenziali criptate</div>
-                            <input type="email" value={garmin.email} onChange={e => setGarmin({...garmin, email: e.target.value})} className="input-dark w-full px-4 py-3 rounded-lg mb-3" placeholder="Email Garmin" required />
-                            <input type="password" value={garmin.password} onChange={e => setGarmin({...garmin, password: e.target.value})} className="input-dark w-full px-4 py-3 rounded-lg mb-4" placeholder="Password Garmin" required />
-                            <button type="submit" disabled={loading} className="btn-primary w-full py-3 rounded-lg">{loading ? 'Connessione...' : 'Connetti'}</button>
-                        </form>
-                    </div>
+                        
+                        {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-4 text-red-400 text-sm">{error}</div>}
+                        
+                        <div className="card p-3 mb-4 text-xs text-gray-500">🔒 Le credenziali sono criptate</div>
+                        
+                        <input 
+                            type="email" 
+                            value={garmin.email} 
+                            onChange={e => setGarmin({...garmin, email: e.target.value})}
+                            className="input-dark w-full px-4 py-3 rounded-xl mb-3" 
+                            placeholder="Email Garmin" 
+                            required 
+                        />
+                        <input 
+                            type="password" 
+                            value={garmin.password} 
+                            onChange={e => setGarmin({...garmin, password: e.target.value})}
+                            className="input-dark w-full px-4 py-3 rounded-xl mb-4" 
+                            placeholder="Password Garmin" 
+                            required 
+                        />
+                        <button type="submit" disabled={loading} className="btn-green w-full py-3 rounded-xl">
+                            {loading ? 'Connessione...' : 'Connetti'}
+                        </button>
+                    </form>
                 </div>
             );
         };
         
-        // ============ DASHBOARD ============
+        // ==================== MAIN DASHBOARD ====================
         
         const Dashboard = ({ token, user, onLogout, onUserUpdate }) => {
+            const [tab, setTab] = useState('sensei');
             const [summary, setSummary] = useState(null);
             const [trend, setTrend] = useState(null);
             const [loading, setLoading] = useState(true);
             const [syncing, setSyncing] = useState(false);
-            const [tab, setTab] = useState('sensei');
             
-            useEffect(() => { fetchData(); }, []);
+            useEffect(() => {
+                fetchData();
+            }, []);
             
             const fetchData = async () => {
-                const headers = { 'Authorization': `Bearer ${token}` };
                 try {
+                    const headers = { 'Authorization': `Bearer ${token}` };
                     const [s, t] = await Promise.all([
-                        fetch(`${API}/api/metrics/summary?days=30`, { headers }).then(r => r.json()),
-                        fetch(`${API}/api/metrics/trend?days=90`, { headers }).then(r => r.json())
+                        fetch(`${API}/api/metrics/summary?days=30`, { headers }).then(r => r.ok ? r.json() : {}),
+                        fetch(`${API}/api/metrics/trend?days=90`, { headers }).then(r => r.ok ? r.json() : {})
                     ]);
                     setSummary(s);
                     setTrend(t);
@@ -712,120 +812,72 @@
                 setLoading(false);
             };
             
-            const handleSync = async () => {
+            const sync = async () => {
                 setSyncing(true);
-                await fetch(`${API}/api/sync`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ days_back: 14 })
-                });
-                await fetchData();
+                try {
+                    await fetch(`${API}/api/sync`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ days_back: 14 })
+                    });
+                    await fetchData();
+                } catch {}
                 setSyncing(false);
             };
             
             if (loading) return <Loading />;
             
-            const avgs = summary?.averages || {};
-            const impacts = avgs.bio_impacts || {};
-            const realAge = summary?.real_age || 42;
+            const tabs = [
+                { id: 'sensei', icon: '🥋', color: '#00ff88' },
+                { id: 'sakura', icon: '🌸', color: '#ff88cc' },
+                { id: 'data', icon: '📊', color: '#fff' },
+                { id: 'trend', icon: '📈', color: '#fff' },
+                { id: 'profile', icon: '⚙️', color: '#fff' }
+            ];
             
             return (
-                <div className="min-h-screen flex flex-col">
+                <div className="h-full flex flex-col">
                     {/* Header */}
                     <header className="flex justify-between items-center px-4 py-3 border-b border-[#1a1a1a]">
-                        <h1 className="font-bold text-sm">
-                            {tab === 'sensei' && <span className="text-[#00ff88]">🥋 SENSEI</span>}
-                            {tab === 'sakura' && <span className="text-[#ff88cc]">🌸 SAKURA</span>}
-                            {tab === 'data' && <span>📊 DATI</span>}
-                            {tab === 'trend' && <span>📈 TREND</span>}
-                            {tab === 'profile' && <span>⚙️ PROFILO</span>}
-                        </h1>
-                        <button onClick={handleSync} disabled={syncing} className="btn-outline px-3 py-1.5 rounded-lg text-xs">
+                        <div className="font-bold">
+                            {tab === 'sensei' && <span className="text-[#00ff88]">🥋 Sensei</span>}
+                            {tab === 'sakura' && <span className="text-[#ff88cc]">🌸 Sakura</span>}
+                            {tab === 'data' && <span>📊 Dati</span>}
+                            {tab === 'trend' && <span>📈 Trend</span>}
+                            {tab === 'profile' && <span>⚙️ Profilo</span>}
+                        </div>
+                        <button onClick={sync} disabled={syncing} className="btn-gray px-3 py-1.5 rounded-lg text-xs">
                             {syncing ? '⟳' : '⟳ Sync'}
                         </button>
                     </header>
                     
-                    {/* Tabs */}
-                    <div className="flex border-b border-[#1a1a1a]">
-                        {[
-                            { id: 'sensei', icon: '🥋', color: '#00ff88' },
-                            { id: 'sakura', icon: '🌸', color: '#ff88cc' },
-                            { id: 'data', icon: '📊', color: '#fff' },
-                            { id: 'trend', icon: '📈', color: '#fff' },
-                            { id: 'profile', icon: '⚙️', color: '#fff' }
-                        ].map(t => (
-                            <button key={t.id} onClick={() => setTab(t.id)}
-                                className={`flex-1 py-3 text-lg ${tab === t.id ? 'border-b-2' : 'opacity-50'}`}
-                                style={{ borderColor: tab === t.id ? t.color : 'transparent' }}>
+                    {/* Content */}
+                    <main className="flex-1 overflow-hidden">
+                        {tab === 'sensei' && <ChatView token={token} coach="sensei" />}
+                        {tab === 'sakura' && <ChatView token={token} coach="sakura" />}
+                        {tab === 'data' && <DataView summary={summary} />}
+                        {tab === 'trend' && <TrendView trend={trend} realAge={summary?.real_age || 42} />}
+                        {tab === 'profile' && <ProfileView token={token} user={user} onUpdate={onUserUpdate} onLogout={onLogout} />}
+                    </main>
+                    
+                    {/* Tab Bar */}
+                    <nav className="flex border-t border-[#1a1a1a] bg-black">
+                        {tabs.map(t => (
+                            <button 
+                                key={t.id} 
+                                onClick={() => setTab(t.id)}
+                                className={`flex-1 py-4 text-xl transition-all ${tab === t.id ? 'tab-active' : 'opacity-40'}`}
+                                style={{ color: tab === t.id ? t.color : '#fff' }}
+                            >
                                 {t.icon}
                             </button>
                         ))}
-                    </div>
-                    
-                    {/* Content */}
-                    <div className="flex-1 overflow-hidden flex flex-col">
-                        {tab === 'sensei' && <AIChat token={token} coach="sensei" />}
-                        {tab === 'sakura' && <AIChat token={token} coach="sakura" />}
-                        
-                        {tab === 'data' && (
-                            <div className="flex-1 overflow-y-auto p-4 max-w-lg mx-auto w-full">
-                                <div className="flex justify-center py-4">
-                                    <BioAgeCircle bioAge={avgs.biological_age} realAge={realAge} />
-                                </div>
-                                
-                                <div className="grid grid-cols-3 gap-2 mb-3">
-                                    <MetricCard icon="❤️" label="RHR" value={avgs.resting_hr?.toFixed(0)} unit="bpm" color="#ff6b6b" />
-                                    <MetricCard icon="🫁" label="VO2" value={avgs.vo2_max?.toFixed(0)} color="#00ff88" />
-                                    <MetricCard icon="👣" label="Steps" value={avgs.steps ? Math.round(avgs.steps/1000) + 'k' : null} color="#ffd93d" />
-                                </div>
-                                <div className="grid grid-cols-3 gap-2 mb-4">
-                                    <MetricCard icon="😴" label="Sleep" value={avgs.sleep_hours?.toFixed(1)} unit="h" color="#6c5ce7" />
-                                    <MetricCard icon="⚡" label="Recovery" value={avgs.recovery?.toFixed(0)} color="#00ff88" />
-                                    <MetricCard icon="🔥" label="Strain" value={avgs.strain?.toFixed(1)} color="#ff6b35" />
-                                </div>
-                                
-                                <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-2">Impatto sull'età</h3>
-                                <div className="space-y-2">
-                                    <ImpactBar icon="🫁" label="VO2 Max" value={impacts.vo2} />
-                                    <ImpactBar icon="❤️" label="RHR" value={impacts.rhr} />
-                                    <ImpactBar icon="😴" label="Sonno" value={impacts.sleep} />
-                                    <ImpactBar icon="👣" label="Passi" value={impacts.steps} />
-                                    <ImpactBar icon="😤" label="Stress" value={impacts.stress} />
-                                    <ImpactBar icon="🔥" label="Intensità" value={impacts.hrz} />
-                                </div>
-                            </div>
-                        )}
-                        
-                        {tab === 'trend' && (
-                            <div className="flex-1 overflow-y-auto p-4 max-w-lg mx-auto w-full">
-                                {trend?.data?.length > 0 ? (
-                                    <>
-                                        <TrendChart data={trend.data} realAge={realAge} />
-                                        <div className="card p-4 mt-4">
-                                            <div className="text-xs text-gray-500 uppercase">Pace of Aging</div>
-                                            <div className={`text-2xl font-bold ${trend.pace_of_aging <= 0 ? 'text-[#00ff88]' : 'text-[#ff6b35]'}`}>
-                                                {trend.pace_of_aging != null ? (trend.pace_of_aging <= 0 ? '' : '+') + trend.pace_of_aging.toFixed(1) + 'x' : '--'}
-                                            </div>
-                                            <div className="text-xs text-gray-500 mt-1">
-                                                {trend.pace_of_aging < -0.3 ? 'Stai ringiovanendo!' : trend.pace_of_aging < 0.3 ? 'Stabile' : 'Invecchiamento accelerato'}
-                                            </div>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="text-center text-gray-500 py-10">Servono 30+ giorni</div>
-                                )}
-                            </div>
-                        )}
-                        
-                        {tab === 'profile' && (
-                            <ProfilePage token={token} user={user} onUpdate={onUserUpdate} onLogout={onLogout} />
-                        )}
-                    </div>
+                    </nav>
                 </div>
             );
         };
         
-        // ============ MAIN APP ============
+        // ==================== APP ====================
         
         const App = () => {
             const [page, setPage] = useState('landing');
@@ -833,7 +885,9 @@
             const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
             
             useEffect(() => {
-                if (token && user) setPage(user.garmin_connected ? 'dashboard' : 'setup');
+                if (token && user) {
+                    setPage(user.garmin_connected ? 'dashboard' : 'setup');
+                }
             }, []);
             
             const handleLogin = (data) => {
@@ -857,13 +911,13 @@
             };
             
             return (
-                <>
+                <div className="h-full">
                     {page === 'landing' && <LandingPage onNavigate={setPage} />}
                     {page === 'login' && <LoginPage onNavigate={setPage} onLogin={handleLogin} />}
                     {page === 'register' && <RegisterPage onNavigate={setPage} />}
                     {page === 'setup' && <SetupPage token={token} onComplete={handleSetupComplete} />}
                     {page === 'dashboard' && <Dashboard token={token} user={user} onLogout={handleLogout} onUserUpdate={setUser} />}
-                </>
+                </div>
             );
         };
         
