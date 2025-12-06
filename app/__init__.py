@@ -337,10 +337,12 @@ def create_app():
         age = user.get_real_age()
         memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else ""
         
-        return f"""Sei SENSEI, un preparatore atletico italiano con 25 anni di esperienza.
+        return f"""Sei SENSEI (Dr. Sensei), un preparatore atletico italiano con 25 anni di esperienza nel Performance Lab.
 Parli con {name}, {age} anni.
 
 CARATTERE: Diretto, pragmatico, motivante. Parli come un vero coach italiano.
+
+LA TUA COLLEGA: Lavori insieme a Dr. Sakura, una coach mentale specializzata in psicologia dello sport e mindfulness. Se l'utente ti chiede di temi emotivi, stress, ansia, motivazione personale o equilibrio vita-lavoro, suggerisci gentilmente: "Per questi aspetti ti consiglio di parlare con la mia collega Sakura, è la sua specialità."
 
 DATI GARMIN (30 giorni):
 - Età biologica: {context.get('biological_age', 'N/D')} (reale: {age})
@@ -355,9 +357,8 @@ DATI GARMIN (30 giorni):
 
 MEMORIE: {memories_text}
 
-FOCUS: Allenamento, performance, recupero, prevenzione infortuni, nutrizione sportiva.
+FOCUS: Allenamento, performance, recupero, prevenzione infortuni, nutrizione sportiva, analisi dati.
 REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: injury, goal, training, nutrition, performance
-NON parlare di aspetti emotivi/mentali (quello è Sakura).
 Rispondi in italiano, max 200 parole."""
 
     def _get_sakura_prompt(user, context, memories):
@@ -365,10 +366,12 @@ Rispondi in italiano, max 200 parole."""
         age = user.get_real_age()
         memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else ""
         
-        return f"""Sei SAKURA, una coach mentale con background in psicologia e mindfulness.
+        return f"""Sei SAKURA (Dr. Sakura), una coach mentale con background in psicologia dello sport e mindfulness nel Performance Lab.
 Parli con {name}, {age} anni.
 
 CARATTERE: Calma, empatica, saggia. Usi metafore dalla natura e filosofia orientale.
+
+IL TUO COLLEGA: Lavori insieme a Dr. Sensei, un preparatore atletico esperto. Se l'utente ti chiede di allenamenti, performance fisica, programmi di training, nutrizione sportiva o analisi dei dati Garmin, suggerisci gentilmente: "Per questi aspetti ti consiglio di parlare con il mio collega Sensei, è la sua specialità."
 
 DATI BENESSERE:
 - Stress medio: {context.get('stress_avg', 'N/D')}
@@ -378,9 +381,8 @@ DATI BENESSERE:
 
 MEMORIE: {memories_text}
 
-FOCUS: Benessere mentale, gestione stress, mindfulness, equilibrio vita-sport, motivazione.
+FOCUS: Benessere mentale, gestione stress, mindfulness, equilibrio vita-sport, motivazione, crescita personale.
 REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: emotion, stress, mindset, relationship, sleep_mental, life_balance
-NON parlare di allenamento/performance fisica (quello è Sensei).
 Rispondi in italiano, max 200 parole."""
 
     def _build_context(user):
@@ -613,6 +615,76 @@ Rispondi in italiano, max 200 parole."""
             'bio_age_hrz_impact': m.bio_age_hrz_impact,
             'biological_age': m.biological_age
         } for m in metrics])
+    
+    @app.route('/api/activities', methods=['GET'])
+    @token_required
+    def get_activities(current_user):
+        """Recupera le attività degli ultimi N giorni"""
+        days = request.args.get('days', 7, type=int)
+        since = datetime.utcnow() - timedelta(days=days)
+        
+        activities = Activity.query.filter(
+            Activity.user_id == current_user.id,
+            Activity.start_time >= since
+        ).order_by(Activity.start_time.desc()).all()
+        
+        return jsonify([{
+            'id': a.id,
+            'activity_name': a.activity_name,
+            'activity_type': a.activity_type,
+            'start_time': a.start_time.isoformat() if a.start_time else None,
+            'duration_seconds': a.duration_seconds,
+            'distance_meters': a.distance_meters,
+            'calories': a.calories,
+            'avg_hr': a.avg_hr,
+            'max_hr': a.max_hr,
+            'strain_score': a.strain_score,
+            'aerobic_effect': a.aerobic_effect,
+            'anaerobic_effect': a.anaerobic_effect
+        } for a in activities])
+    
+    @app.route('/api/activity/<int:activity_id>/comment', methods=['POST'])
+    @token_required
+    def get_activity_comment(current_user, activity_id):
+        """Genera un commento AI per un'attività"""
+        if not openai_client:
+            return jsonify({'error': 'OpenAI non configurato'}), 500
+        
+        activity = Activity.query.filter_by(id=activity_id, user_id=current_user.id).first()
+        if not activity:
+            return jsonify({'error': 'Attività non trovata'}), 404
+        
+        # Prepara il contesto dell'attività
+        duration_min = round(activity.duration_seconds / 60) if activity.duration_seconds else 0
+        distance_km = round(activity.distance_meters / 1000, 2) if activity.distance_meters else 0
+        
+        prompt = f"""Analizza brevemente questa attività sportiva e dai un commento motivazionale/tecnico in 2-3 frasi.
+
+Attività: {activity.activity_name or activity.activity_type}
+Durata: {duration_min} minuti
+Distanza: {distance_km} km
+Calorie: {activity.calories or 'N/A'}
+HR Media: {activity.avg_hr or 'N/A'} bpm
+HR Max: {activity.max_hr or 'N/A'} bpm
+Effetto Aerobico: {activity.aerobic_effect or 'N/A'}
+Strain: {activity.strain_score or 'N/A'}/21
+
+Rispondi in italiano, in modo diretto e motivante."""
+
+        try:
+            response = openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Sei Sensei, un coach sportivo esperto. Dai feedback brevi e motivanti sulle attività."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=150,
+                temperature=0.7
+            )
+            comment = response.choices[0].message.content
+            return jsonify({'comment': comment})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
     
     @app.route('/api/tts', methods=['POST'])
     @token_required
