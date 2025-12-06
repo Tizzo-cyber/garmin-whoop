@@ -224,9 +224,7 @@
             const [initialLoad, setInitialLoad] = useState(true);
             const chatRef = useRef(null);
             
-            useEffect(() => {
-                loadHistory();
-            }, []);
+            useEffect(() => { loadHistory(); }, []);
             
             useEffect(() => {
                 if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
@@ -269,18 +267,12 @@
                 setLoading(false);
             };
             
-            const suggestions = [
-                "Come sto oggi?",
-                "Cosa mi consigli per oggi?",
-                "Come posso dormire meglio?",
-                "Analizza i miei dati"
-            ];
+            const suggestions = ["Come sto oggi?", "Cosa mi consigli?", "Come dormire meglio?", "Analizza i miei dati"];
             
             if (initialLoad) return <Loading />;
             
             return (
-                <div className="flex flex-col h-[calc(100vh-56px)]">
-                    {/* Messages */}
+                <div className="flex flex-col h-full">
                     <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-4">
                         {messages.length === 0 && (
                             <div className="text-center py-10">
@@ -288,43 +280,170 @@
                                     <span className="text-2xl">🩺</span>
                                 </div>
                                 <h3 className="text-lg font-medium mb-2">Dr. Sensei</h3>
-                                <p className="text-gray-500 text-sm mb-6">
-                                    Il tuo medico sportivo personale.<br/>
-                                    Conosco i tuoi dati Garmin e ricordo le nostre conversazioni.
-                                </p>
+                                <p className="text-gray-500 text-sm mb-6">Il tuo medico sportivo personale.<br/>Conosco i tuoi dati e ricordo tutto.</p>
                                 <div className="flex flex-wrap justify-center gap-2">
                                     {suggestions.map((s, i) => (
-                                        <button key={i} onClick={() => { setInput(s); }}
-                                            className="px-4 py-2 bg-[#1a1a1a] rounded-full text-sm text-gray-400 hover:text-[#00ff88] hover:border-[#00ff88] border border-transparent transition-all">
+                                        <button key={i} onClick={() => setInput(s)}
+                                            className="px-3 py-2 bg-[#1a1a1a] rounded-full text-xs text-gray-400 hover:text-[#00ff88] hover:border-[#00ff88] border border-transparent">
                                             {s}
                                         </button>
                                     ))}
                                 </div>
                             </div>
                         )}
-                        
                         {messages.map((m, i) => <ChatMessage key={i} message={m} />)}
                         {loading && <TypingIndicator />}
                     </div>
                     
-                    {/* Input */}
                     <div className="p-4 border-t border-[#1a1a1a]">
                         <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={input}
-                                onChange={e => setInput(e.target.value)}
+                            <input type="text" value={input} onChange={e => setInput(e.target.value)}
                                 onKeyPress={e => e.key === 'Enter' && sendMessage()}
-                                placeholder="Scrivi al Dr. Sensei..."
-                                className="input-dark flex-1 px-4 py-3 rounded-xl text-sm"
-                                disabled={loading}
-                            />
-                            <button onClick={sendMessage} disabled={loading || !input.trim()}
-                                className="btn-primary px-5 py-3 rounded-xl transition-all">
+                                placeholder="Scrivi al Dr. Sensei..." className="input-dark flex-1 px-4 py-3 rounded-xl text-sm" disabled={loading} />
+                            <button onClick={sendMessage} disabled={loading || !input.trim()} className="btn-primary px-5 py-3 rounded-xl">
                                 {loading ? '...' : '→'}
                             </button>
                         </div>
                     </div>
+                </div>
+            );
+        };
+        
+        // ============ PROFILE PAGE ============
+        
+        const ProfilePage = ({ token, user, onUpdate, onLogout }) => {
+            const [form, setForm] = useState({
+                name: user?.name || '',
+                birth_year: user?.birth_year || '',
+                sport_goals: ''
+            });
+            const [saving, setSaving] = useState(false);
+            const [saved, setSaved] = useState(false);
+            const [memories, setMemories] = useState([]);
+            
+            useEffect(() => { loadMemories(); }, []);
+            
+            const loadMemories = async () => {
+                try {
+                    const res = await fetch(`${API}/api/chat/memories`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    if (Array.isArray(data)) setMemories(data);
+                } catch {}
+            };
+            
+            const handleSave = async () => {
+                setSaving(true);
+                try {
+                    const res = await fetch(`${API}/api/profile`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({
+                            name: form.name,
+                            birth_year: form.birth_year ? parseInt(form.birth_year) : null,
+                            sport_goals: form.sport_goals
+                        })
+                    });
+                    if (res.ok) {
+                        setSaved(true);
+                        setTimeout(() => setSaved(false), 2000);
+                        // Update local user
+                        const updated = { ...user, name: form.name, birth_year: parseInt(form.birth_year) };
+                        localStorage.setItem('user', JSON.stringify(updated));
+                        onUpdate(updated);
+                    }
+                } catch {}
+                setSaving(false);
+            };
+            
+            const deleteMemory = async (id) => {
+                try {
+                    await fetch(`${API}/api/chat/memories/${id}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    setMemories(memories.filter(m => m.id !== id));
+                } catch {}
+            };
+            
+            const currentYear = new Date().getFullYear();
+            const age = form.birth_year ? currentYear - parseInt(form.birth_year) : null;
+            
+            return (
+                <div className="flex-1 overflow-y-auto p-4 max-w-lg mx-auto w-full">
+                    <h2 className="text-xl font-bold mb-6">⚙️ Profilo</h2>
+                    
+                    {/* Profile Form */}
+                    <div className="card p-4 mb-4">
+                        <h3 className="text-sm text-gray-400 uppercase tracking-wider mb-4">Dati Personali</h3>
+                        
+                        <div className="mb-4">
+                            <label className="text-xs text-gray-500 block mb-1">Nome</label>
+                            <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})}
+                                className="input-dark w-full px-4 py-3 rounded-lg" placeholder="Il tuo nome" />
+                        </div>
+                        
+                        <div className="mb-4">
+                            <label className="text-xs text-gray-500 block mb-1">Anno di nascita</label>
+                            <input type="number" value={form.birth_year} onChange={e => setForm({...form, birth_year: e.target.value})}
+                                className="input-dark w-full px-4 py-3 rounded-lg" placeholder="es. 1976" min="1940" max="2010" />
+                            {age && <div className="text-xs text-gray-500 mt-1">Età attuale: {age} anni</div>}
+                        </div>
+                        
+                        <div className="mb-4">
+                            <label className="text-xs text-gray-500 block mb-1">Obiettivi sportivi</label>
+                            <textarea value={form.sport_goals} onChange={e => setForm({...form, sport_goals: e.target.value})}
+                                className="input-dark w-full px-4 py-3 rounded-lg h-24 resize-none" 
+                                placeholder="es. Preparare una maratona, perdere peso, migliorare resistenza..." />
+                        </div>
+                        
+                        <button onClick={handleSave} disabled={saving} className="btn-primary w-full py-3 rounded-lg">
+                            {saving ? 'Salvataggio...' : saved ? '✓ Salvato!' : 'Salva modifiche'}
+                        </button>
+                    </div>
+                    
+                    {/* Account Info */}
+                    <div className="card p-4 mb-4">
+                        <h3 className="text-sm text-gray-400 uppercase tracking-wider mb-4">Account</h3>
+                        <div className="text-sm text-gray-400 mb-2">
+                            <span className="text-gray-500">Email:</span> {user?.email}
+                        </div>
+                        <div className="text-sm text-gray-400 mb-4">
+                            <span className="text-gray-500">Garmin:</span> {user?.garmin_connected ? '✅ Connesso' : '❌ Non connesso'}
+                        </div>
+                        <button onClick={onLogout} className="btn-outline w-full py-2 rounded-lg text-sm">
+                            Logout
+                        </button>
+                    </div>
+                    
+                    {/* AI Memories */}
+                    {memories.length > 0 && (
+                        <div className="card p-4">
+                            <h3 className="text-sm text-gray-400 uppercase tracking-wider mb-4">🧠 Cosa ricorda Dr. Sensei</h3>
+                            <div className="space-y-2">
+                                {memories.map(m => (
+                                    <div key={m.id} className="flex justify-between items-start bg-[#0a0a0a] rounded-lg p-3">
+                                        <div className="flex-1">
+                                            <span className={`text-xs px-2 py-0.5 rounded mr-2 ${
+                                                m.category === 'injury' ? 'bg-red-500/20 text-red-400' :
+                                                m.category === 'goal' ? 'bg-blue-500/20 text-blue-400' :
+                                                m.category === 'health' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                'bg-gray-500/20 text-gray-400'
+                                            }`}>
+                                                {m.category}
+                                            </span>
+                                            <span className="text-sm">{m.content}</span>
+                                        </div>
+                                        <button onClick={() => deleteMemory(m.id)} className="text-gray-500 hover:text-red-400 ml-2">×</button>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="text-xs text-gray-600 mt-3">
+                                Il Dr. Sensei ricorda queste informazioni dalle vostre conversazioni.
+                            </p>
+                        </div>
+                    )}
                 </div>
             );
         };
@@ -397,12 +516,16 @@
             
             const handleSubmit = async (e) => {
                 e.preventDefault();
+                if (!form.birth_year) {
+                    setError('Anno di nascita richiesto per calcolare l\'età biologica');
+                    return;
+                }
                 setLoading(true);
                 try {
                     const res = await fetch(`${API}/api/register`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ...form, birth_year: form.birth_year ? parseInt(form.birth_year) : null })
+                        body: JSON.stringify({ ...form, birth_year: parseInt(form.birth_year) })
                     });
                     const data = await res.json();
                     if (data.user_id) setSuccess(true);
@@ -427,10 +550,10 @@
                         <h1 className="text-2xl font-bold text-center mb-6">Registrazione</h1>
                         <form onSubmit={handleSubmit} className="card p-6">
                             {error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4 text-red-400 text-sm">{error}</div>}
-                            <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-dark w-full px-4 py-3 rounded-lg mb-3" placeholder="Nome (opzionale)" />
+                            <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-dark w-full px-4 py-3 rounded-lg mb-3" placeholder="Nome" />
                             <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="input-dark w-full px-4 py-3 rounded-lg mb-3" placeholder="Email" required />
                             <input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} className="input-dark w-full px-4 py-3 rounded-lg mb-3" placeholder="Password (min 6)" required minLength="6" />
-                            <input type="number" value={form.birth_year} onChange={e => setForm({...form, birth_year: e.target.value})} className="input-dark w-full px-4 py-3 rounded-lg mb-4" placeholder="Anno nascita (es. 1976)" />
+                            <input type="number" value={form.birth_year} onChange={e => setForm({...form, birth_year: e.target.value})} className="input-dark w-full px-4 py-3 rounded-lg mb-4" placeholder="Anno nascita (es. 1976) *" required />
                             <button type="submit" disabled={loading} className="btn-primary w-full py-3 rounded-lg">{loading ? '...' : 'Registrati'}</button>
                         </form>
                         <p className="text-center mt-4 text-gray-500 text-sm">
@@ -499,7 +622,7 @@
             );
         };
         
-        const Dashboard = ({ token, user, onLogout }) => {
+        const Dashboard = ({ token, user, onLogout, onUserUpdate }) => {
             const [summary, setSummary] = useState(null);
             const [trend, setTrend] = useState(null);
             const [loading, setLoading] = useState(true);
@@ -543,12 +666,9 @@
                     {/* Header */}
                     <header className="flex justify-between items-center px-4 py-3 border-b border-[#1a1a1a]">
                         <h1 className="font-bold">SENSEI</h1>
-                        <div className="flex items-center gap-2">
-                            <button onClick={handleSync} disabled={syncing} className="btn-outline px-3 py-1.5 rounded-lg text-xs">
-                                {syncing ? '⟳' : '⟳ Sync'}
-                            </button>
-                            <button onClick={onLogout} className="text-gray-500 text-xs">Exit</button>
-                        </div>
+                        <button onClick={handleSync} disabled={syncing} className="btn-outline px-3 py-1.5 rounded-lg text-xs">
+                            {syncing ? '⟳' : '⟳ Sync'}
+                        </button>
                     </header>
                     
                     {/* Tabs */}
@@ -556,7 +676,8 @@
                         {[
                             { id: 'chat', icon: '💬', label: 'Coach' },
                             { id: 'data', icon: '📊', label: 'Dati' },
-                            { id: 'trend', icon: '📈', label: 'Trend' }
+                            { id: 'trend', icon: '📈', label: 'Trend' },
+                            { id: 'profile', icon: '⚙️', label: 'Profilo' }
                         ].map(t => (
                             <button key={t.id} onClick={() => setTab(t.id)}
                                 className={`flex-1 py-3 text-xs ${tab === t.id ? 'text-[#00ff88] border-b-2 border-[#00ff88]' : 'text-gray-500'}`}>
@@ -566,61 +687,67 @@
                     </div>
                     
                     {/* Content */}
-                    {tab === 'chat' && <AIChat token={token} />}
-                    
-                    {tab === 'data' && (
-                        <div className="flex-1 overflow-y-auto p-4 max-w-lg mx-auto w-full">
-                            <div className="flex justify-center py-4">
-                                <BioAgeCircle bioAge={avgs.biological_age} realAge={realAge} />
+                    <div className="flex-1 overflow-hidden flex flex-col">
+                        {tab === 'chat' && <AIChat token={token} />}
+                        
+                        {tab === 'data' && (
+                            <div className="flex-1 overflow-y-auto p-4 max-w-lg mx-auto w-full">
+                                <div className="flex justify-center py-4">
+                                    <BioAgeCircle bioAge={avgs.biological_age} realAge={realAge} />
+                                </div>
+                                
+                                <div className="grid grid-cols-3 gap-2 mb-3">
+                                    <MetricCard icon="❤️" label="RHR" value={avgs.resting_hr?.toFixed(0)} unit="bpm" color="#ff6b6b" small />
+                                    <MetricCard icon="🫁" label="VO2" value={avgs.vo2_max?.toFixed(0)} color="#00ff88" small />
+                                    <MetricCard icon="👣" label="Steps" value={avgs.steps ? Math.round(avgs.steps/1000) + 'k' : null} color="#ffd93d" small />
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 mb-4">
+                                    <MetricCard icon="😴" label="Sleep" value={avgs.sleep_hours?.toFixed(1)} unit="h" color="#6c5ce7" small />
+                                    <MetricCard icon="⚡" label="Recovery" value={avgs.recovery?.toFixed(0)} color="#00ff88" small />
+                                    <MetricCard icon="🔥" label="Strain" value={avgs.strain?.toFixed(1)} color="#ff6b35" small />
+                                </div>
+                                
+                                <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-2">Impatto sull'età</h3>
+                                <div className="space-y-2">
+                                    <ImpactBar icon="🫁" label="VO2 Max" value={impacts.vo2} />
+                                    <ImpactBar icon="❤️" label="RHR" value={impacts.rhr} />
+                                    <ImpactBar icon="😴" label="Sonno" value={impacts.sleep} />
+                                    <ImpactBar icon="👣" label="Passi" value={impacts.steps} />
+                                    <ImpactBar icon="😤" label="Stress" value={impacts.stress} />
+                                    <ImpactBar icon="🔥" label="Intensità" value={impacts.hrz} />
+                                </div>
+                                
+                                <div className="text-center text-xs text-gray-600 mt-4">
+                                    Media 30 giorni • {summary?.period?.days_with_data || 0} giorni
+                                </div>
                             </div>
-                            
-                            <div className="grid grid-cols-3 gap-2 mb-3">
-                                <MetricCard icon="❤️" label="RHR" value={avgs.resting_hr?.toFixed(0)} unit="bpm" color="#ff6b6b" small />
-                                <MetricCard icon="🫁" label="VO2" value={avgs.vo2_max?.toFixed(0)} color="#00ff88" small />
-                                <MetricCard icon="👣" label="Steps" value={avgs.steps ? Math.round(avgs.steps/1000) + 'k' : null} color="#ffd93d" small />
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 mb-4">
-                                <MetricCard icon="😴" label="Sleep" value={avgs.sleep_hours?.toFixed(1)} unit="h" color="#6c5ce7" small />
-                                <MetricCard icon="⚡" label="Recovery" value={avgs.recovery?.toFixed(0)} color="#00ff88" small />
-                                <MetricCard icon="🔥" label="Strain" value={avgs.strain?.toFixed(1)} color="#ff6b35" small />
-                            </div>
-                            
-                            <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-2">Impatto sull'età</h3>
-                            <div className="space-y-2">
-                                <ImpactBar icon="🫁" label="VO2 Max" value={impacts.vo2} />
-                                <ImpactBar icon="❤️" label="RHR" value={impacts.rhr} />
-                                <ImpactBar icon="😴" label="Sonno" value={impacts.sleep} />
-                                <ImpactBar icon="👣" label="Passi" value={impacts.steps} />
-                                <ImpactBar icon="😤" label="Stress" value={impacts.stress} />
-                                <ImpactBar icon="🔥" label="Intensità" value={impacts.hrz} />
-                            </div>
-                            
-                            <div className="text-center text-xs text-gray-600 mt-4">
-                                Media 30 giorni • {summary?.period?.days_with_data || 0} giorni
-                            </div>
-                        </div>
-                    )}
-                    
-                    {tab === 'trend' && (
-                        <div className="flex-1 overflow-y-auto p-4 max-w-lg mx-auto w-full">
-                            {trend?.data?.length > 0 ? (
-                                <>
-                                    <TrendChart data={trend.data} realAge={realAge} />
-                                    <div className="card p-4 mt-4">
-                                        <div className="text-xs text-gray-500 uppercase">Pace of Aging</div>
-                                        <div className={`text-2xl font-bold ${trend.pace_of_aging <= 0 ? 'text-[#00ff88]' : 'text-[#ff6b35]'}`}>
-                                            {trend.pace_of_aging != null ? (trend.pace_of_aging <= 0 ? '' : '+') + trend.pace_of_aging.toFixed(1) + 'x' : '--'}
+                        )}
+                        
+                        {tab === 'trend' && (
+                            <div className="flex-1 overflow-y-auto p-4 max-w-lg mx-auto w-full">
+                                {trend?.data?.length > 0 ? (
+                                    <>
+                                        <TrendChart data={trend.data} realAge={realAge} />
+                                        <div className="card p-4 mt-4">
+                                            <div className="text-xs text-gray-500 uppercase">Pace of Aging</div>
+                                            <div className={`text-2xl font-bold ${trend.pace_of_aging <= 0 ? 'text-[#00ff88]' : 'text-[#ff6b35]'}`}>
+                                                {trend.pace_of_aging != null ? (trend.pace_of_aging <= 0 ? '' : '+') + trend.pace_of_aging.toFixed(1) + 'x' : '--'}
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                {trend.pace_of_aging < -0.3 ? 'Stai ringiovanendo!' : trend.pace_of_aging < 0.3 ? 'Stabile' : 'Invecchiamento accelerato'}
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-gray-500 mt-1">
-                                            {trend.pace_of_aging < -0.3 ? 'Stai ringiovanendo!' : trend.pace_of_aging < 0.3 ? 'Stabile' : 'Invecchiamento accelerato'}
-                                        </div>
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="text-center text-gray-500 py-10">Servono 30+ giorni per il trend</div>
-                            )}
-                        </div>
-                    )}
+                                    </>
+                                ) : (
+                                    <div className="text-center text-gray-500 py-10">Servono 30+ giorni per il trend</div>
+                                )}
+                            </div>
+                        )}
+                        
+                        {tab === 'profile' && (
+                            <ProfilePage token={token} user={user} onUpdate={onUserUpdate} onLogout={onLogout} />
+                        )}
+                    </div>
                 </div>
             );
         };
@@ -656,13 +783,17 @@
                 setPage('dashboard');
             };
             
+            const handleUserUpdate = (updated) => {
+                setUser(updated);
+            };
+            
             return (
                 <>
                     {page === 'landing' && <LandingPage onNavigate={setPage} />}
                     {page === 'login' && <LoginPage onNavigate={setPage} onLogin={handleLogin} />}
                     {page === 'register' && <RegisterPage onNavigate={setPage} />}
                     {page === 'setup' && <SetupPage token={token} onComplete={handleSetupComplete} />}
-                    {page === 'dashboard' && <Dashboard token={token} user={user} onLogout={handleLogout} />}
+                    {page === 'dashboard' && <Dashboard token={token} user={user} onLogout={handleLogout} onUserUpdate={handleUserUpdate} />}
                 </>
             );
         };
