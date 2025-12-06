@@ -24,6 +24,14 @@ def create_app():
     
     with app.app_context():
         db.create_all()
+ from sqlalchemy import text
+        try:
+            db.session.execute(text('ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_year INTEGER'))
+            db.session.execute(text('ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS biological_age FLOAT'))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Migration note: {e}")
     
     def token_required(f):
         @wraps(f)
