@@ -185,30 +185,29 @@ class SyncLog(db.Model):
 
 
 class ChatMessage(db.Model):
-    """Cronologia conversazioni"""
     __tablename__ = 'chat_messages'
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     role = db.Column(db.String(20), nullable=False)
     content = db.Column(db.Text, nullable=False)
+    coach = db.Column(db.String(20))
     context_summary = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class UserMemory(db.Model):
-    """Memoria persistente - fatti importanti sull'utente"""
     __tablename__ = 'user_memories'
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
-    category = db.Column(db.String(50))  # injury, goal, preference, health, lifestyle
+    category = db.Column(db.String(50))
     content = db.Column(db.Text, nullable=False)
+    coach = db.Column(db.String(20))
     
-    # Per tracking
-    is_active = db.Column(db.Boolean, default=True)  # False se risolto (es. infortunio guarito)
-    source_message_id = db.Column(db.Integer)  # Da quale messaggio viene
+    is_active = db.Column(db.Boolean, default=True)
+    source_message_id = db.Column(db.Integer)
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

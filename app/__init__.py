@@ -7,7 +7,7 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, date, timedelta
 from functools import wraps
-from sqlalchemy import text
+from sqlalchemy import text, or_
 import jwt
 import os
 import json
@@ -47,6 +47,7 @@ def create_app():
             'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_stress_impact FLOAT',
             'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_hrz_impact FLOAT',
             'ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS coach VARCHAR(20)',
+            'ALTER TABLE user_memories ADD COLUMN IF NOT EXISTS coach VARCHAR(20)',
         ]
         for sql in migrations:
             try:
@@ -275,7 +276,6 @@ def create_app():
     # ==================== DUAL AI COACH ====================
     
     def _get_sensei_prompt(user, context, memories):
-        """SENSEI - Preparatore atletico"""
         name = user.name or "atleta"
         age = user.get_real_age()
         
@@ -325,7 +325,6 @@ REGOLE:
 """
 
     def _get_sakura_prompt(user, context, memories):
-        """SAKURA - Coach mentale e spirituale"""
         name = user.name or "amico"
         age = user.get_real_age()
         
@@ -350,7 +349,6 @@ DATI BENESSERE (indicatori di stress/recupero):
 - Qualità sonno: {context.get('sleep_hours', 'N/D')} ore
 - Recovery (energia): {context.get('recovery', 'N/D')}%
 - HRV (equilibrio nervoso): {context.get('hrv', 'N/D')} ms
-- Body Battery: indica l'energia mentale/fisica
 {memories_text}
 
 IL TUO FOCUS:
@@ -425,23 +423,31 @@ REGOLE:
         
         data = request.get_json()
         user_message = data.get('message', '').strip()
-        coach = data.get('coach', 'sensei')  # 'sensei' o 'sakura'
+        coach = data.get('coach', 'sensei')
         
         if not user_message:
             return jsonify({'error': 'Messaggio vuoto'}), 400
         
         context = _build_context(current_user)
         
-        # Get memories (all, both coaches share memories)
+        # Get all memories (both coaches share)
         memories = UserMemory.query.filter_by(user_id=current_user.id, is_active=True)\
             .order_by(UserMemory.created_at.desc()).limit(20).all()
         
-        # Get chat history for this specific coach
-        recent_messages = ChatMessage.query.filter_by(user_id=current_user.id, coach=coach)\
-            .order_by(ChatMessage.created_at.desc()).limit(10).all()
+        # Get chat history for this coach
+        if coach == 'sensei':
+            recent_messages = ChatMessage.query.filter(
+                ChatMessage.user_id == current_user.id,
+                or_(ChatMessage.coach == 'sensei', ChatMessage.coach == None)
+            ).order_by(ChatMessage.created_at.desc()).limit(10).all()
+        else:
+            recent_messages = ChatMessage.query.filter(
+                ChatMessage.user_id == current_user.id,
+                ChatMessage.coach == coach
+            ).order_by(ChatMessage.created_at.desc()).limit(10).all()
+        
         recent_messages.reverse()
         
-        # Select prompt based on coach
         if coach == 'sakura':
             system_prompt = _get_sakura_prompt(current_user, context, memories)
         else:
@@ -493,8 +499,18 @@ REGOLE:
     def get_chat_history(current_user):
         coach = request.args.get('coach', 'sensei')
         limit = request.args.get('limit', 50, type=int)
-        messages = ChatMessage.query.filter_by(user_id=current_user.id, coach=coach)\
-            .order_by(ChatMessage.created_at.desc()).limit(limit).all()
+        
+        if coach == 'sensei':
+            messages = ChatMessage.query.filter(
+                ChatMessage.user_id == current_user.id,
+                or_(ChatMessage.coach == 'sensei', ChatMessage.coach == None)
+            ).order_by(ChatMessage.created_at.desc()).limit(limit).all()
+        else:
+            messages = ChatMessage.query.filter(
+                ChatMessage.user_id == current_user.id,
+                ChatMessage.coach == coach
+            ).order_by(ChatMessage.created_at.desc()).limit(limit).all()
+        
         messages.reverse()
         return jsonify([{'role': m.role, 'content': m.content, 'created_at': m.created_at.isoformat()} for m in messages])
     
@@ -505,7 +521,7 @@ REGOLE:
             .order_by(UserMemory.created_at.desc()).all()
         return jsonify([{
             'id': m.id, 'category': m.category, 'content': m.content, 
-            'coach': m.coach, 'created_at': m.created_at.isoformat()
+            'coach': m.coach or 'sensei', 'created_at': m.created_at.isoformat()
         } for m in memories])
     
     @app.route('/api/chat/memories/<int:memory_id>', methods=['DELETE'])
