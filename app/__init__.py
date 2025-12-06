@@ -947,17 +947,15 @@ Rispondi in italiano, in modo diretto e motivante."""
     @app.route('/api/tts', methods=['POST'])
     @token_required
     def text_to_speech(current_user):
-        """Converte testo in audio usando ElevenLabs TTS"""
-        import requests
-        import base64
-        import re
+        """Converte testo in audio usando OpenAI TTS"""
+        if not openai_client:
+            return jsonify({'error': 'OpenAI non configurato'}), 500
         
-        ELEVENLABS_API_KEY = os.environ.get('ELEVENLABS_API_KEY')
-        if not ELEVENLABS_API_KEY:
-            return jsonify({'error': 'ElevenLabs non configurato'}), 500
+        import re
+        import base64
         
         data = request.get_json()
-        text = data.get('text', '')[:2000]  # Max 2000 caratteri
+        text = data.get('text', '')[:2000]
         coach = data.get('coach', 'sensei')
         
         if not text:
@@ -965,52 +963,29 @@ Rispondi in italiano, in modo diretto e motivante."""
         
         # Pulisci testo da formattazioni markdown
         clean_text = text
-        clean_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', clean_text)  # Rimuovi **bold**
-        clean_text = re.sub(r'\*([^*]+)\*', r'\1', clean_text)      # Rimuovi *italic*
-        clean_text = re.sub(r'#{1,6}\s*', '', clean_text)           # Rimuovi headers
-        clean_text = re.sub(r'---+', '', clean_text)                # Rimuovi linee
-        clean_text = re.sub(r'\[PAUSA:\d+\]', '', clean_text)       # Rimuovi marker pause
+        clean_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', clean_text)
+        clean_text = re.sub(r'\*([^*]+)\*', r'\1', clean_text)
+        clean_text = re.sub(r'#{1,6}\s*', '', clean_text)
+        clean_text = re.sub(r'---+', '', clean_text)
+        clean_text = re.sub(r'\[PAUSA:\d+\]', '', clean_text)
         clean_text = clean_text.strip()
         
         if not clean_text:
             return jsonify({'error': 'Testo vuoto dopo pulizia'}), 400
         
-        # Voci ElevenLabs italiane
-        # Sensei: voce maschile profonda italiana (da configurare)
-        # Sakura: Aida - Deep female Italian voice
-        VOICE_IDS = {
-            'sensei': os.environ.get('ELEVENLABS_VOICE_SENSEI', '1wg2wOjdEWKA7yQD8Kca'),  # Italian deep male
-            'sakura': os.environ.get('ELEVENLABS_VOICE_SAKURA', 'CiwzbDpaN3pQXjTgx3ML')   # Aida - Italian deep female
-        }
-        
-        voice_id = VOICE_IDS.get(coach, VOICE_IDS['sensei'])
+        # Voci OpenAI gpt-4o-mini-tts
+        # Sensei: onyx (profonda, maschile)
+        # Sakura: nova (naturale, femminile)
+        voice = 'onyx' if coach == 'sensei' else 'nova'
         
         try:
-            url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+            response = openai_client.audio.speech.create(
+                model="gpt-4o-mini-tts",
+                voice=voice,
+                input=clean_text,
+                response_format="mp3"
+            )
             
-            headers = {
-                "Accept": "audio/mpeg",
-                "Content-Type": "application/json",
-                "xi-api-key": ELEVENLABS_API_KEY
-            }
-            
-            payload = {
-                "text": clean_text,
-                "model_id": "eleven_multilingual_v2",
-                "voice_settings": {
-                    "stability": 0.5,
-                    "similarity_boost": 0.75,
-                    "style": 0.3,
-                    "use_speaker_boost": True
-                }
-            }
-            
-            response = requests.post(url, json=payload, headers=headers)
-            
-            if response.status_code != 200:
-                return jsonify({'error': f'ElevenLabs error: {response.text}'}), response.status_code
-            
-            # Ritorna audio come base64
             audio_b64 = base64.b64encode(response.content).decode('utf-8')
             return jsonify({'audio': audio_b64, 'format': 'mp3'})
             
