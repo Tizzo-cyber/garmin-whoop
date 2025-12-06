@@ -431,16 +431,17 @@ INTERPRETAZIONE DATI:
 
 ═══ MODALITÀ MEDITAZIONE GUIDATA ═══
 Quando l'utente chiede una meditazione, respirazione guidata, o rilassamento:
-- Usa il marker [PAUSA:XX] dove XX sono i secondi di silenzio (es: [PAUSA:30])
-- Struttura tipica:
-  1. Introduzione breve
-  2. [PAUSA:5] per prepararsi
-  3. Istruzione (inspira, espira, visualizza...)
-  4. [PAUSA:15] o [PAUSA:30] per eseguire
-  5. Ripeti il ciclo
-  6. Chiusura gentile
-- Esempio: "Inspira profondamente dal naso... [PAUSA:5] Trattieni... [PAUSA:3] Espira lentamente dalla bocca... [PAUSA:5]"
-- Per meditazioni lunghe usa pause di 20-30 secondi tra le istruzioni
+- IMPORTANTE: Usa ESATTAMENTE questo formato per le pause: [PAUSA:XX] dove XX sono i secondi
+- NON scrivere "Pausa (20 sec)" o "**Pausa**" - scrivi SOLO [PAUSA:20]
+- NON usare asterischi ** o formattazione markdown
+- Parla in modo lento, calmo, con frasi brevi
+- Usa molti "..." per creare ritmo lento
+
+ESEMPIO CORRETTO di meditazione:
+"Chiudi gli occhi... trova una posizione comoda... [PAUSA:10] Inspira profondamente dal naso... senti l'aria che riempie i polmoni... [PAUSA:20] Espira lentamente dalla bocca... lascia andare ogni tensione... [PAUSA:20] Continua a respirare... con calma... [PAUSA:30]"
+
+ESEMPIO SBAGLIATO (non fare così):
+"**Inizio** Chiudi gli occhi **Pausa (20 sec)**" ← NO!
 
 FOCUS: Benessere mentale, gestione stress, mindfulness, equilibrio vita-sport, motivazione, crescita personale.
 REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: emotion, stress, mindset, relationship, sleep_mental, life_balance
@@ -785,20 +786,28 @@ Rispondi in italiano, in modo diretto e motivante."""
             return jsonify({'error': 'OpenAI non configurato'}), 500
         
         data = request.get_json()
-        text = data.get('text', '')[:1000]  # Max 1000 caratteri
+        text = data.get('text', '')[:1500]  # Max 1500 caratteri per meditazioni
         coach = data.get('coach', 'sensei')
         
         if not text:
             return jsonify({'error': 'Testo vuoto'}), 400
         
-        # Voci diverse per i coach
-        voice = 'onyx' if coach == 'sensei' else 'nova'  # onyx=maschile, nova=femminile
+        # Voci e velocità diverse per i coach
+        # Sensei: onyx (profonda, maschile), velocità normale
+        # Sakura: shimmer (soft, femminile), velocità lenta per meditazioni
+        if coach == 'sensei':
+            voice = 'onyx'
+            speed = 1.0
+        else:
+            voice = 'shimmer'  # Più soft di nova
+            speed = 0.85  # Più lenta, perfetta per meditazioni
         
         try:
             response = openai_client.audio.speech.create(
                 model="tts-1-hd",
                 voice=voice,
                 input=text,
+                speed=speed,
                 response_format="mp3"
             )
             
