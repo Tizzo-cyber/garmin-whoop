@@ -8,437 +8,303 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --gold: #D4AF37;
-            --gold-light: #F4E4BC;
-            --crimson: #DC143C;
-            --zen-green: #2D5A3D;
-            --deep-black: #0A0A0A;
-            --smoke: #1A1A1A;
-            --mist: #2A2A2A;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --gold: #FFD700;
+            --crimson: #FF3D00;
+            --zen: #00E676;
+            --blue: #00B0FF;
+            --purple: #D500F9;
+            --bg: #0a0a0f;
+            --card: #12121a;
+            --card-border: #1f1f2e;
         }
         
         body {
-            font-family: 'Quicksand', sans-serif;
-            background: var(--deep-black);
-            color: #E5E5E5;
+            font-family: 'Rajdhani', sans-serif;
+            background: var(--bg);
+            color: #fff;
             min-height: 100vh;
-            overflow-x: hidden;
         }
         
-        .font-cinzel {
-            font-family: 'Cinzel', serif;
+        .font-orbitron { font-family: 'Orbitron', monospace; }
+        
+        .bg-grid {
+            background-image: 
+                linear-gradient(rgba(255,215,0,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,215,0,0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
         }
         
-        /* Animated background */
-        .bg-pattern {
-            background: 
-                radial-gradient(ellipse at 20% 20%, rgba(212, 175, 55, 0.03) 0%, transparent 50%),
-                radial-gradient(ellipse at 80% 80%, rgba(45, 90, 61, 0.05) 0%, transparent 50%),
-                radial-gradient(ellipse at 50% 50%, rgba(220, 20, 60, 0.02) 0%, transparent 70%),
-                var(--deep-black);
+        .glow-gold { text-shadow: 0 0 30px rgba(255,215,0,0.5); }
+        .glow-zen { text-shadow: 0 0 30px rgba(0,230,118,0.5); }
+        .glow-crimson { text-shadow: 0 0 30px rgba(255,61,0,0.5); }
+        
+        .card {
+            background: linear-gradient(145deg, var(--card) 0%, #0d0d14 100%);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
         }
         
-        /* Glowing text */
-        .glow-gold {
-            text-shadow: 0 0 20px rgba(212, 175, 55, 0.5), 0 0 40px rgba(212, 175, 55, 0.3);
+        .card-glow-gold { box-shadow: 0 0 40px rgba(255,215,0,0.1), inset 0 0 40px rgba(255,215,0,0.02); }
+        .card-glow-zen { box-shadow: 0 0 40px rgba(0,230,118,0.1), inset 0 0 40px rgba(0,230,118,0.02); }
+        .card-glow-crimson { box-shadow: 0 0 40px rgba(255,61,0,0.1), inset 0 0 40px rgba(255,61,0,0.02); }
+        
+        .bio-age-ring {
+            background: conic-gradient(var(--zen) calc(var(--progress) * 1%), #1a1a2e calc(var(--progress) * 1%));
+            border-radius: 50%;
+            padding: 8px;
         }
         
-        .glow-crimson {
-            text-shadow: 0 0 20px rgba(220, 20, 60, 0.5), 0 0 40px rgba(220, 20, 60, 0.3);
+        .gauge-svg { transform: rotate(-90deg); }
+        
+        .input-dark {
+            background: #1a1a2e;
+            border: 1px solid #2a2a4e;
+            transition: all 0.3s;
         }
-        
-        .glow-zen {
-            text-shadow: 0 0 20px rgba(45, 90, 61, 0.5), 0 0 40px rgba(45, 90, 61, 0.3);
-        }
-        
-        /* Circular gauge */
-        .gauge-ring {
-            stroke-linecap: round;
-            transform: rotate(-90deg);
-            transform-origin: center;
-            transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        /* Pulse animation */
-        @keyframes pulse-slow {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.8; transform: scale(1.02); }
-        }
-        
-        .pulse-slow {
-            animation: pulse-slow 3s ease-in-out infinite;
-        }
-        
-        /* Breathe animation */
-        @keyframes breathe {
-            0%, 100% { transform: scale(1); opacity: 0.6; }
-            50% { transform: scale(1.1); opacity: 1; }
-        }
-        
-        .breathe {
-            animation: breathe 4s ease-in-out infinite;
-        }
-        
-        /* Float animation */
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
-        }
-        
-        .float {
-            animation: float 6s ease-in-out infinite;
-        }
-        
-        /* Fade in up */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .fade-in-up {
-            animation: fadeInUp 0.8s ease-out forwards;
-        }
-        
-        .delay-1 { animation-delay: 0.1s; opacity: 0; }
-        .delay-2 { animation-delay: 0.2s; opacity: 0; }
-        .delay-3 { animation-delay: 0.3s; opacity: 0; }
-        .delay-4 { animation-delay: 0.4s; opacity: 0; }
-        .delay-5 { animation-delay: 0.5s; opacity: 0; }
-        .delay-6 { animation-delay: 0.6s; opacity: 0; }
-        
-        /* Zen border */
-        .zen-border {
-            border: 1px solid rgba(212, 175, 55, 0.2);
-            background: linear-gradient(135deg, rgba(26, 26, 26, 0.9) 0%, rgba(10, 10, 10, 0.95) 100%);
-            backdrop-filter: blur(10px);
-        }
-        
-        /* Input styling */
-        .zen-input {
-            background: rgba(42, 42, 42, 0.5);
-            border: 1px solid rgba(212, 175, 55, 0.3);
-            transition: all 0.3s ease;
-        }
-        
-        .zen-input:focus {
+        .input-dark:focus {
             border-color: var(--gold);
-            box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
+            box-shadow: 0 0 20px rgba(255,215,0,0.2);
             outline: none;
         }
         
-        /* Button styling */
-        .btn-warrior {
-            background: linear-gradient(135deg, var(--crimson) 0%, #8B0000 100%);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
+        .btn-gold {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA000 100%);
+            color: #000;
+            font-weight: 700;
+            transition: all 0.3s;
         }
+        .btn-gold:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(255,215,0,0.3); }
         
-        .btn-warrior:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(220, 20, 60, 0.4);
-        }
-        
-        .btn-warrior:active {
-            transform: translateY(0);
-        }
-        
-        .btn-zen {
-            background: linear-gradient(135deg, var(--zen-green) 0%, #1a3d28 100%);
-            transition: all 0.3s ease;
-        }
-        
-        .btn-zen:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(45, 90, 61, 0.4);
-        }
-        
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: var(--deep-black);
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: var(--gold);
-            border-radius: 3px;
-        }
-        
-        /* Card hover */
-        .card-hover {
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .card-hover:hover {
-            transform: translateY(-5px) scale(1.02);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-        }
-        
-        /* Quote marks */
-        .quote-mark {
-            font-size: 4rem;
-            line-height: 1;
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--gold);
             color: var(--gold);
-            opacity: 0.3;
+            transition: all 0.3s;
         }
+        .btn-outline:hover { background: var(--gold); color: #000; }
+        
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .animate-pulse-slow { animation: pulse 3s infinite; }
+        .animate-float { animation: float 4s ease-in-out infinite; }
+        .animate-fadeIn { animation: fadeIn 0.6s ease-out forwards; }
+        
+        .delay-100 { animation-delay: 0.1s; opacity: 0; }
+        .delay-200 { animation-delay: 0.2s; opacity: 0; }
+        .delay-300 { animation-delay: 0.3s; opacity: 0; }
+        .delay-400 { animation-delay: 0.4s; opacity: 0; }
+        
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        
+        .advice-card { border-left: 4px solid; }
+        .advice-success { border-color: var(--zen); background: rgba(0,230,118,0.05); }
+        .advice-warning { border-color: var(--gold); background: rgba(255,215,0,0.05); }
+        .advice-danger { border-color: var(--crimson); background: rgba(255,61,0,0.05); }
     </style>
 </head>
-<body class="bg-pattern">
+<body class="bg-grid">
     <div id="root"></div>
     
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
+        const API_URL = window.location.origin;
         
-        // ============== CONFIG ==============
-        const API_URL = 'https://web-production-266a.up.railway.app';
+        // ==================== COMPONENTS ====================
         
-        // ============== WISDOM DATABASE ==============
-        const WISDOM = {
-            recovery: {
-                high: [
-                    { coach: "SEI UNA MACCHINA DA GUERRA! 💪", zen: "L'energia scorre potente attraverso di te. Oggi puoi spostare montagne." },
-                    { coach: "BESTIA! IL TUO CORPO È PRONTO A DOMINARE!", zen: "Come la tigre dopo il riposo, sei pronto a balzare." },
-                    { coach: "RECOVERY AL TOP! SPACCA TUTTO!", zen: "Il fiume è in piena. Lascia che la forza fluisca nelle tue azioni." },
-                ],
-                medium: [
-                    { coach: "Buon recupero, ma ascolta il tuo corpo.", zen: "La via di mezzo è la via del saggio. Procedi con consapevolezza." },
-                    { coach: "Sei in zona verde. Allenamento moderato oggi.", zen: "Come l'albero che oscilla nel vento, sii flessibile oggi." },
-                    { coach: "Il tuo corpo sta parlando. Stai ascoltando?", zen: "Nel silenzio tra i battiti, trova la tua verità." },
-                ],
-                low: [
-                    { coach: "STOP. Il riposo È allenamento.", zen: "Anche il guerriero più forte deve affilare la spada in silenzio." },
-                    { coach: "Oggi il tuo corpo chiede pace. Dagliela.", zen: "La luna non brilla ogni notte. Anche tu hai diritto all'ombra." },
-                    { coach: "Recovery basso. Riposo attivo o niente.", zen: "Il bambù si piega nella tempesta per non spezzarsi. Piegati oggi." },
-                ]
-            },
-            sleep: {
-                high: [
-                    { coach: "Sonno da campione! Il recupero avviene nel buio.", zen: "Hai onorato il tempio del riposo. I tuoi sogni hanno costruito forza." },
-                    { coach: "QUESTO è dormire! Il tuo corpo ti ringrazia.", zen: "Come la notte nutre le stelle, il sonno ha nutrito la tua essenza." },
-                ],
-                medium: [
-                    { coach: "Sonno discreto. Punta a 7-8 ore.", zen: "Il riposo incompleto lascia ombre nella mente. Cerca la profondità." },
-                    { coach: "Puoi fare di meglio. Il letto è il tuo alleato.", zen: "La rugiada del mattino è più dolce dopo una notte completa." },
-                ],
-                low: [
-                    { coach: "ALLARME SONNO! Stai sabotando i tuoi progressi.", zen: "Un lago agitato non riflette le stelle. Trova la quiete stanotte." },
-                    { coach: "Il debito di sonno si paga caro. Investi nel riposo.", zen: "La mente stanca vede nemici ovunque. Riposa, guerriero." },
-                ]
-            },
-            strain: {
-                high: [
-                    { coach: "HAI DATO TUTTO! Rispetta il lavoro con il recupero.", zen: "Il fuoco che brucia forte ha bisogno di nuova legna. Ricaricati." },
-                    { coach: "Strain epico! Ora merita riposo epico.", zen: "Hai scalato la montagna. Ora siediti e contempla la vista." },
-                ],
-                medium: [
-                    { coach: "Buon lavoro oggi. Costanza batte intensità.", zen: "La goccia scava la pietra non con la forza, ma con la persistenza." },
-                    { coach: "Strain equilibrato. Sei sulla strada giusta.", zen: "Il sentiero del guerriero è fatto di passi, non di salti." },
-                ],
-                low: [
-                    { coach: "Giornata leggera. Va bene se era pianificata.", zen: "Anche il riposo è una forma di allenamento per l'anima." },
-                    { coach: "Poco movimento oggi. Il corpo è fatto per muoversi.", zen: "L'acqua ferma diventa stagnante. Domani, fluisci." },
-                ]
-            },
-            general: {
-                morning: [
-                    "Il sole sorge. Con esso, le tue possibilità.",
-                    "Ogni alba è una pagina bianca. Cosa scriverai oggi?",
-                    "Il guerriero si alza prima del sole. Tu sei già in piedi.",
-                ],
-                afternoon: [
-                    "Il giorno è a metà. La tua determinazione è intatta?",
-                    "Pomeriggio: momento di consolidare o rilanciare.",
-                    "Il sole è alto. Anche la tua energia dovrebbe esserlo.",
-                ],
-                evening: [
-                    "La sera porta riflessione. Cosa hai conquistato oggi?",
-                    "Il tramonto chiude un capitolo. Preparati per il prossimo.",
-                    "La notte si avvicina. Il riposo è la tua prossima missione.",
-                ]
-            }
-        };
-        
-        const getWisdom = (type, level) => {
-            const wisdoms = WISDOM[type][level];
-            return wisdoms[Math.floor(Math.random() * wisdoms.length)];
-        };
-        
-        const getTimeOfDay = () => {
-            const hour = new Date().getHours();
-            if (hour < 12) return 'morning';
-            if (hour < 18) return 'afternoon';
-            return 'evening';
-        };
-        
-        const getGeneralWisdom = () => {
-            const timeWisdoms = WISDOM.general[getTimeOfDay()];
-            return timeWisdoms[Math.floor(Math.random() * timeWisdoms.length)];
-        };
-        
-        // ============== COMPONENTS ==============
-        
-        // Circular Gauge Component
-        const CircularGauge = ({ value, max, color, label, sublabel, size = 180 }) => {
-            const radius = (size - 20) / 2;
+        const CircularGauge = ({ value, max, size = 160, color = '#FFD700', label, sublabel }) => {
+            const radius = (size - 16) / 2;
             const circumference = 2 * Math.PI * radius;
-            const progress = Math.min(value / max, 1);
+            const progress = Math.min((value || 0) / max, 1);
             const offset = circumference - (progress * circumference);
             
-            const getColor = () => {
-                if (color) return color;
-                if (progress >= 0.7) return '#D4AF37';
-                if (progress >= 0.4) return '#2D5A3D';
-                return '#DC143C';
-            };
-            
             return (
-                <div className="relative flex flex-col items-center">
-                    <svg width={size} height={size} className="transform -rotate-90">
-                        {/* Background circle */}
-                        <circle
-                            cx={size/2}
-                            cy={size/2}
-                            r={radius}
-                            fill="none"
-                            stroke="rgba(255,255,255,0.1)"
-                            strokeWidth="8"
-                        />
-                        {/* Progress circle */}
-                        <circle
-                            cx={size/2}
-                            cy={size/2}
-                            r={radius}
-                            fill="none"
-                            stroke={getColor()}
-                            strokeWidth="8"
-                            strokeDasharray={circumference}
-                            strokeDashoffset={offset}
-                            className="gauge-ring"
-                            style={{
-                                filter: `drop-shadow(0 0 10px ${getColor()})`
-                            }}
-                        />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-4xl font-bold font-cinzel" style={{ color: getColor() }}>
-                            {typeof value === 'number' ? Math.round(value) : '--'}
-                        </span>
-                        <span className="text-xs text-gray-400 uppercase tracking-widest">{label}</span>
+                <div className="flex flex-col items-center">
+                    <div className="relative" style={{ width: size, height: size }}>
+                        <svg width={size} height={size} className="gauge-svg">
+                            <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="#1a1a2e" strokeWidth="8" />
+                            <circle 
+                                cx={size/2} cy={size/2} r={radius} fill="none" 
+                                stroke={color} strokeWidth="8" strokeLinecap="round"
+                                strokeDasharray={circumference} strokeDashoffset={offset}
+                                style={{ transition: 'stroke-dashoffset 1s ease', filter: `drop-shadow(0 0 10px ${color})` }}
+                            />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <span className="font-orbitron text-4xl font-bold" style={{ color }}>{value ?? '--'}</span>
+                            {sublabel && <span className="text-xs text-gray-500 uppercase tracking-wider">{sublabel}</span>}
+                        </div>
                     </div>
-                    {sublabel && (
-                        <span className="mt-2 text-sm text-gray-500">{sublabel}</span>
-                    )}
+                    {label && <span className="mt-2 text-sm text-gray-400 uppercase tracking-wider">{label}</span>}
                 </div>
             );
         };
         
-        // Wisdom Card Component
-        const WisdomCard = ({ coach, zen, delay = 0 }) => (
-            <div className={`zen-border rounded-2xl p-6 card-hover fade-in-up delay-${delay}`}>
-                <div className="flex items-start gap-4">
-                    <span className="quote-mark font-cinzel">"</span>
-                    <div className="flex-1">
-                        <p className="text-lg font-bold text-[#DC143C] mb-2">{coach}</p>
-                        <p className="text-gray-300 italic">{zen}</p>
+        const BioAgeDisplay = ({ bioAge, realAge }) => {
+            const diff = bioAge && realAge ? realAge - bioAge : 0;
+            const isYounger = diff > 0;
+            const color = diff >= 3 ? '#00E676' : diff >= 0 ? '#FFD700' : '#FF3D00';
+            
+            return (
+                <div className="card card-glow-zen p-8 text-center">
+                    <h3 className="text-gray-400 uppercase tracking-widest text-sm mb-4">Età Biologica</h3>
+                    <div className="relative inline-block">
+                        <div className="w-48 h-48 rounded-full border-8 border-[#1a1a2e] flex items-center justify-center relative"
+                             style={{ boxShadow: `0 0 60px ${color}40, inset 0 0 40px ${color}20` }}>
+                            <div className="text-center">
+                                <div className="font-orbitron text-6xl font-bold" style={{ color }}>
+                                    {bioAge?.toFixed(0) ?? '--'}
+                                </div>
+                                <div className="text-gray-500 text-sm">anni</div>
+                            </div>
+                        </div>
+                        {diff !== 0 && (
+                            <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-sm font-bold ${isYounger ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                {isYounger ? `−${diff.toFixed(0)}` : `+${Math.abs(diff).toFixed(0)}`} anni
+                            </div>
+                        )}
+                    </div>
+                    <div className="mt-6 text-gray-500">
+                        Età anagrafica: <span className="text-white font-bold">{realAge ?? '--'}</span> anni
+                    </div>
+                    <div className="mt-4 text-sm" style={{ color }}>
+                        {diff >= 5 ? '🏆 ECCEZIONALE! Stai ringiovanendo!' :
+                         diff >= 2 ? '💪 Ottimo! Sei più giovane della tua età' :
+                         diff >= 0 ? '👍 Bene, mantieni queste abitudini' :
+                         diff >= -2 ? '⚠️ Attenzione, puoi migliorare' :
+                         '🚨 Il tuo corpo ha bisogno di più cura'}
+                    </div>
+                </div>
+            );
+        };
+        
+        const TrendChart = ({ data, title, dataKey, color = '#FFD700', unit = '' }) => {
+            const canvasRef = useRef(null);
+            const chartRef = useRef(null);
+            
+            useEffect(() => {
+                if (!canvasRef.current || !data?.length) return;
+                
+                if (chartRef.current) chartRef.current.destroy();
+                
+                const ctx = canvasRef.current.getContext('2d');
+                chartRef.current = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.map(d => new Date(d.date).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })),
+                        datasets: [{
+                            data: data.map(d => d[dataKey]),
+                            borderColor: color,
+                            backgroundColor: color + '20',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 3,
+                            pointBackgroundColor: color
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { 
+                                grid: { color: '#1f1f2e' },
+                                ticks: { color: '#666', maxRotation: 45 }
+                            },
+                            y: { 
+                                grid: { color: '#1f1f2e' },
+                                ticks: { color: '#666', callback: v => v + unit }
+                            }
+                        }
+                    }
+                });
+                
+                return () => { if (chartRef.current) chartRef.current.destroy(); };
+            }, [data, dataKey, color]);
+            
+            return (
+                <div className="card p-6">
+                    <h4 className="text-gray-400 uppercase tracking-wider text-sm mb-4">{title}</h4>
+                    <div style={{ height: 200 }}>
+                        <canvas ref={canvasRef}></canvas>
+                    </div>
+                </div>
+            );
+        };
+        
+        const AdviceCard = ({ advice }) => {
+            const priorityClass = {
+                success: 'advice-success',
+                warning: 'advice-warning',
+                danger: 'advice-danger'
+            }[advice.priority] || 'advice-warning';
+            
+            return (
+                <div className={`card p-5 ${priorityClass} advice-card animate-fadeIn`}>
+                    <div className="text-lg font-bold mb-2">{advice.coach}</div>
+                    <div className="text-gray-400 italic mb-3">{advice.zen}</div>
+                    <div className="bg-black/30 rounded-lg px-4 py-2 text-sm">
+                        <span className="text-gray-500">→</span> {advice.action}
+                    </div>
+                </div>
+            );
+        };
+        
+        const MetricBox = ({ icon, label, value, unit, color = '#FFD700' }) => (
+            <div className="card p-4 flex items-center gap-4">
+                <span className="text-3xl">{icon}</span>
+                <div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wider">{label}</div>
+                    <div className="font-orbitron text-2xl font-bold" style={{ color }}>
+                        {value ?? '--'}{unit && <span className="text-sm text-gray-500 ml-1">{unit}</span>}
                     </div>
                 </div>
             </div>
         );
         
-        // Metric Card Component
-        const MetricCard = ({ icon, label, value, unit, trend, delay = 0 }) => (
-            <div className={`zen-border rounded-xl p-4 card-hover fade-in-up delay-${delay}`}>
-                <div className="flex items-center gap-3 mb-2">
-                    <span className="text-2xl">{icon}</span>
-                    <span className="text-sm text-gray-400 uppercase tracking-wider">{label}</span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold font-cinzel text-white">{value || '--'}</span>
-                    {unit && <span className="text-gray-500">{unit}</span>}
-                </div>
-                {trend && (
-                    <div className={`mt-2 text-sm ${trend > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}% vs ieri
-                    </div>
-                )}
+        const LoadingScreen = () => (
+            <div className="min-h-screen flex flex-col items-center justify-center">
+                <div className="w-20 h-20 border-4 border-[#1a1a2e] border-t-[#FFD700] rounded-full animate-spin mb-6"></div>
+                <div className="font-orbitron text-xl text-gray-400 animate-pulse-slow">CARICAMENTO DATI...</div>
             </div>
         );
         
-        // Loading Spinner
-        const LoadingSpinner = () => (
-            <div className="flex flex-col items-center justify-center py-20">
-                <div className="relative">
-                    <div className="w-20 h-20 border-4 border-[#1A1A1A] rounded-full"></div>
-                    <div className="w-20 h-20 border-4 border-transparent border-t-[#D4AF37] rounded-full absolute top-0 left-0 animate-spin"></div>
-                </div>
-                <p className="mt-6 text-gray-400 font-cinzel tracking-widest">CARICAMENTO...</p>
-            </div>
-        );
+        // ==================== PAGES ====================
         
-        // ============== PAGES ==============
-        
-        // Landing Page
         const LandingPage = ({ onNavigate }) => (
             <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-                <div className="float mb-8">
-                    <div className="text-8xl mb-4">🥋</div>
+                <div className="animate-float mb-8">
+                    <div className="text-8xl">🥋</div>
                 </div>
-                
-                <h1 className="font-cinzel text-6xl md:text-8xl font-bold mb-4 fade-in-up">
-                    <span className="glow-gold text-[#D4AF37]">SENSEI</span>
+                <h1 className="font-orbitron text-6xl md:text-8xl font-black mb-4 glow-gold text-[#FFD700] animate-fadeIn">
+                    SENSEI
                 </h1>
-                
-                <p className="text-xl md:text-2xl text-gray-400 mb-2 fade-in-up delay-1 font-cinzel tracking-widest">
-                    IL TUO COACH INTERIORE
+                <p className="text-xl text-gray-400 mb-2 animate-fadeIn delay-100">IL TUO COACH INTERIORE</p>
+                <p className="text-gray-600 max-w-lg mb-12 animate-fadeIn delay-200">
+                    La grinta del guerriero. La saggezza del monaco.<br/>
+                    I tuoi dati Garmin trasformati in guida per la vita.
                 </p>
-                
-                <p className="text-gray-500 max-w-xl mb-12 fade-in-up delay-2">
-                    Unisce la grinta del guerriero e la saggezza del monaco.
-                    <br />Trasforma i tuoi dati Garmin in guida spirituale e motivazione pura.
-                </p>
-                
-                <div className="flex flex-col sm:flex-row gap-4 fade-in-up delay-3">
-                    <button
-                        onClick={() => onNavigate('login')}
-                        className="btn-warrior px-10 py-4 rounded-xl font-cinzel text-white font-bold tracking-wider"
-                    >
+                <div className="flex flex-col sm:flex-row gap-4 animate-fadeIn delay-300">
+                    <button onClick={() => onNavigate('login')} className="btn-gold px-10 py-4 rounded-xl font-orbitron tracking-wider">
                         ENTRA
                     </button>
-                    <button
-                        onClick={() => onNavigate('register')}
-                        className="btn-zen px-10 py-4 rounded-xl font-cinzel text-white font-bold tracking-wider"
-                    >
-                        INIZIA IL PERCORSO
+                    <button onClick={() => onNavigate('register')} className="btn-outline px-10 py-4 rounded-xl font-orbitron tracking-wider">
+                        INIZIA ORA
                     </button>
-                </div>
-                
-                <div className="mt-20 text-gray-600 text-sm fade-in-up delay-4">
-                    <p className="italic">"Il maestro appare quando l'allievo è pronto"</p>
                 </div>
             </div>
         );
         
-        // Login Page
         const LoginPage = ({ onNavigate, onLogin }) => {
             const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
@@ -449,7 +315,6 @@
                 e.preventDefault();
                 setLoading(true);
                 setError('');
-                
                 try {
                     const res = await fetch(`${API_URL}/api/login`, {
                         method: 'POST',
@@ -457,13 +322,12 @@
                         body: JSON.stringify({ email, password })
                     });
                     const data = await res.json();
-                    
                     if (data.token) {
                         localStorage.setItem('token', data.token);
                         localStorage.setItem('user', JSON.stringify(data.user));
                         onLogin(data);
                     } else {
-                        setError(data.error || 'Errore di login');
+                        setError(data.error || 'Errore');
                     }
                 } catch (err) {
                     setError('Errore di connessione');
@@ -477,107 +341,56 @@
                     <div className="w-full max-w-md">
                         <div className="text-center mb-10">
                             <div className="text-6xl mb-4">⚔️</div>
-                            <h1 className="font-cinzel text-4xl font-bold text-[#D4AF37] glow-gold mb-2">
-                                ACCESSO GUERRIERO
-                            </h1>
-                            <p className="text-gray-500">Entra nel dojo</p>
+                            <h1 className="font-orbitron text-3xl font-bold text-[#FFD700] glow-gold">ACCEDI</h1>
                         </div>
-                        
-                        <form onSubmit={handleSubmit} className="zen-border rounded-2xl p-8">
-                            {error && (
-                                <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 mb-6 text-red-300">
-                                    {error}
-                                </div>
-                            )}
-                            
+                        <form onSubmit={handleSubmit} className="card p-8">
+                            {error && <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-6 text-red-300">{error}</div>}
                             <div className="mb-6">
                                 <label className="block text-sm text-gray-400 mb-2 uppercase tracking-wider">Email</label>
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="zen-input w-full px-4 py-3 rounded-lg text-white"
-                                    placeholder="guerriero@email.com"
-                                    required
-                                />
+                                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                                       className="input-dark w-full px-4 py-3 rounded-lg text-white" required />
                             </div>
-                            
                             <div className="mb-8">
                                 <label className="block text-sm text-gray-400 mb-2 uppercase tracking-wider">Password</label>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="zen-input w-full px-4 py-3 rounded-lg text-white"
-                                    placeholder="••••••••"
-                                    required
-                                />
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                                       className="input-dark w-full px-4 py-3 rounded-lg text-white" required />
                             </div>
-                            
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="btn-warrior w-full py-4 rounded-xl font-cinzel text-white font-bold tracking-wider disabled:opacity-50"
-                            >
-                                {loading ? 'ENTRANDO...' : 'ENTRA'}
+                            <button type="submit" disabled={loading} className="btn-gold w-full py-4 rounded-xl font-orbitron disabled:opacity-50">
+                                {loading ? 'ACCESSO...' : 'ENTRA'}
                             </button>
                         </form>
-                        
                         <p className="text-center mt-6 text-gray-500">
-                            Non hai un account?{' '}
-                            <button onClick={() => onNavigate('register')} className="text-[#D4AF37] hover:underline">
-                                Inizia il percorso
-                            </button>
+                            Non hai un account? <button onClick={() => onNavigate('register')} className="text-[#FFD700] hover:underline">Registrati</button>
                         </p>
-                        
-                        <button
-                            onClick={() => onNavigate('landing')}
-                            className="w-full mt-4 text-gray-600 hover:text-gray-400 transition"
-                        >
-                            ← Torna indietro
-                        </button>
+                        <button onClick={() => onNavigate('landing')} className="w-full mt-4 text-gray-600 hover:text-gray-400">← Indietro</button>
                     </div>
                 </div>
             );
         };
         
-        // Register Page
         const RegisterPage = ({ onNavigate }) => {
             const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
-            const [confirmPassword, setConfirmPassword] = useState('');
+            const [birthYear, setBirthYear] = useState('');
             const [error, setError] = useState('');
             const [success, setSuccess] = useState(false);
             const [loading, setLoading] = useState(false);
             
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                setError('');
-                
-                if (password !== confirmPassword) {
-                    setError('Le password non coincidono');
-                    return;
-                }
-                
-                if (password.length < 6) {
-                    setError('Password troppo corta (min 6 caratteri)');
-                    return;
-                }
-                
                 setLoading(true);
-                
+                setError('');
                 try {
                     const res = await fetch(`${API_URL}/api/register`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email, password })
+                        body: JSON.stringify({ email, password, birth_year: birthYear ? parseInt(birthYear) : null })
                     });
                     const data = await res.json();
-                    
                     if (data.user_id) {
                         setSuccess(true);
                     } else {
-                        setError(data.error || 'Errore di registrazione');
+                        setError(data.error || 'Errore');
                     }
                 } catch (err) {
                     setError('Errore di connessione');
@@ -588,21 +401,12 @@
             
             if (success) {
                 return (
-                    <div className="min-h-screen flex items-center justify-center p-6 text-center">
-                        <div className="zen-border rounded-2xl p-10 max-w-md">
+                    <div className="min-h-screen flex items-center justify-center p-6">
+                        <div className="card p-10 text-center max-w-md">
                             <div className="text-6xl mb-6">🎯</div>
-                            <h2 className="font-cinzel text-3xl font-bold text-[#D4AF37] mb-4">
-                                BENVENUTO, GUERRIERO
-                            </h2>
-                            <p className="text-gray-400 mb-8">
-                                Il tuo percorso inizia ora. Accedi per connettere il tuo Garmin e ricevere la guida del Sensei.
-                            </p>
-                            <button
-                                onClick={() => onNavigate('login')}
-                                className="btn-warrior px-8 py-4 rounded-xl font-cinzel text-white font-bold"
-                            >
-                                ACCEDI ORA
-                            </button>
+                            <h2 className="font-orbitron text-2xl font-bold text-[#00E676] glow-zen mb-4">BENVENUTO GUERRIERO</h2>
+                            <p className="text-gray-400 mb-8">Account creato. Ora accedi per iniziare il tuo percorso.</p>
+                            <button onClick={() => onNavigate('login')} className="btn-gold px-8 py-4 rounded-xl font-orbitron">ACCEDI</button>
                         </div>
                     </div>
                 );
@@ -613,146 +417,73 @@
                     <div className="w-full max-w-md">
                         <div className="text-center mb-10">
                             <div className="text-6xl mb-4">🏯</div>
-                            <h1 className="font-cinzel text-4xl font-bold text-[#2D5A3D] glow-zen mb-2">
-                                INIZIA IL PERCORSO
-                            </h1>
-                            <p className="text-gray-500">Ogni maestro è stato prima un allievo</p>
+                            <h1 className="font-orbitron text-3xl font-bold text-[#00E676] glow-zen">REGISTRATI</h1>
                         </div>
-                        
-                        <form onSubmit={handleSubmit} className="zen-border rounded-2xl p-8">
-                            {error && (
-                                <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 mb-6 text-red-300">
-                                    {error}
-                                </div>
-                            )}
-                            
+                        <form onSubmit={handleSubmit} className="card p-8">
+                            {error && <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-6 text-red-300">{error}</div>}
                             <div className="mb-6">
                                 <label className="block text-sm text-gray-400 mb-2 uppercase tracking-wider">Email</label>
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="zen-input w-full px-4 py-3 rounded-lg text-white"
-                                    placeholder="guerriero@email.com"
-                                    required
-                                />
+                                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                                       className="input-dark w-full px-4 py-3 rounded-lg text-white" required />
                             </div>
-                            
                             <div className="mb-6">
                                 <label className="block text-sm text-gray-400 mb-2 uppercase tracking-wider">Password</label>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="zen-input w-full px-4 py-3 rounded-lg text-white"
-                                    placeholder="••••••••"
-                                    required
-                                />
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                                       className="input-dark w-full px-4 py-3 rounded-lg text-white" required minLength="6" />
                             </div>
-                            
                             <div className="mb-8">
-                                <label className="block text-sm text-gray-400 mb-2 uppercase tracking-wider">Conferma Password</label>
-                                <input
-                                    type="password"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="zen-input w-full px-4 py-3 rounded-lg text-white"
-                                    placeholder="••••••••"
-                                    required
-                                />
+                                <label className="block text-sm text-gray-400 mb-2 uppercase tracking-wider">Anno di nascita (per età biologica)</label>
+                                <input type="number" value={birthYear} onChange={e => setBirthYear(e.target.value)}
+                                       className="input-dark w-full px-4 py-3 rounded-lg text-white" placeholder="es. 1985" min="1940" max="2010" />
                             </div>
-                            
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="btn-zen w-full py-4 rounded-xl font-cinzel text-white font-bold tracking-wider disabled:opacity-50"
-                            >
+                            <button type="submit" disabled={loading} className="btn-gold w-full py-4 rounded-xl font-orbitron disabled:opacity-50">
                                 {loading ? 'CREAZIONE...' : 'CREA ACCOUNT'}
                             </button>
                         </form>
-                        
                         <p className="text-center mt-6 text-gray-500">
-                            Hai già un account?{' '}
-                            <button onClick={() => onNavigate('login')} className="text-[#D4AF37] hover:underline">
-                                Accedi
-                            </button>
+                            Hai già un account? <button onClick={() => onNavigate('login')} className="text-[#FFD700] hover:underline">Accedi</button>
                         </p>
-                        
-                        <button
-                            onClick={() => onNavigate('landing')}
-                            className="w-full mt-4 text-gray-600 hover:text-gray-400 transition"
-                        >
-                            ← Torna indietro
-                        </button>
+                        <button onClick={() => onNavigate('landing')} className="w-full mt-4 text-gray-600 hover:text-gray-400">← Indietro</button>
                     </div>
                 </div>
             );
         };
         
-        // Setup Garmin Page
-        const SetupGarminPage = ({ token, onComplete, onNavigate }) => {
+        const SetupPage = ({ token, onComplete }) => {
             const [garminEmail, setGarminEmail] = useState('');
             const [garminPassword, setGarminPassword] = useState('');
             const [error, setError] = useState('');
-            const [loading, setLoading] = useState(false);
             const [step, setStep] = useState(1);
+            const [loading, setLoading] = useState(false);
             
             const handleConnect = async (e) => {
                 e.preventDefault();
                 setLoading(true);
                 setError('');
-                
                 try {
                     const res = await fetch(`${API_URL}/api/garmin/connect`, {
                         method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({ 
-                            garmin_email: garminEmail, 
-                            garmin_password: garminPassword 
-                        })
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ garmin_email: garminEmail, garmin_password: garminPassword })
                     });
                     const data = await res.json();
-                    
-                    if (data.message === 'Account Garmin collegato') {
+                    if (data.message?.includes('collegato')) {
                         setStep(2);
                         // Auto sync
-                        await handleSync();
+                        const syncRes = await fetch(`${API_URL}/api/sync`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ days_back: 14 })
+                        });
+                        setStep(3);
+                        setTimeout(() => onComplete(), 2000);
                     } else {
-                        setError(data.error || 'Errore connessione Garmin');
+                        setError(data.error || 'Errore');
                     }
                 } catch (err) {
                     setError('Errore di connessione');
                 } finally {
                     setLoading(false);
-                }
-            };
-            
-            const handleSync = async () => {
-                setStep(3);
-                try {
-                    const res = await fetch(`${API_URL}/api/sync`, {
-                        method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({ days_back: 14 })
-                    });
-                    const data = await res.json();
-                    
-                    if (data.success) {
-                        setStep(4);
-                        setTimeout(() => onComplete(), 2000);
-                    } else {
-                        setError('Errore sincronizzazione');
-                        setStep(1);
-                    }
-                } catch (err) {
-                    setError('Errore di connessione');
-                    setStep(1);
                 }
             };
             
@@ -763,93 +494,45 @@
                             <>
                                 <div className="text-center mb-10">
                                     <div className="text-6xl mb-4">⌚</div>
-                                    <h1 className="font-cinzel text-4xl font-bold text-[#D4AF37] glow-gold mb-2">
-                                        CONNETTI GARMIN
-                                    </h1>
-                                    <p className="text-gray-500">Il Sensei ha bisogno di vedere i tuoi dati</p>
+                                    <h1 className="font-orbitron text-3xl font-bold text-[#FFD700] glow-gold">CONNETTI GARMIN</h1>
+                                    <p className="text-gray-500 mt-2">Il Sensei ha bisogno di vedere i tuoi dati</p>
                                 </div>
-                                
-                                <form onSubmit={handleConnect} className="zen-border rounded-2xl p-8">
-                                    {error && (
-                                        <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 mb-6 text-red-300">
-                                            {error}
-                                        </div>
-                                    )}
-                                    
-                                    <div className="bg-[#1A1A1A] rounded-lg p-4 mb-6 text-sm text-gray-400">
-                                        <p className="flex items-start gap-2">
-                                            <span>🔒</span>
-                                            <span>Le tue credenziali Garmin sono criptate e usate solo per sincronizzare i dati.</span>
-                                        </p>
+                                <form onSubmit={handleConnect} className="card p-8">
+                                    {error && <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-6 text-red-300">{error}</div>}
+                                    <div className="bg-[#1a1a2e] rounded-lg p-4 mb-6 text-sm text-gray-400">
+                                        🔒 Le credenziali sono criptate e usate solo per sincronizzare i dati.
                                     </div>
-                                    
                                     <div className="mb-6">
-                                        <label className="block text-sm text-gray-400 mb-2 uppercase tracking-wider">Email Garmin Connect</label>
-                                        <input
-                                            type="email"
-                                            value={garminEmail}
-                                            onChange={(e) => setGarminEmail(e.target.value)}
-                                            className="zen-input w-full px-4 py-3 rounded-lg text-white"
-                                            placeholder="garmin@email.com"
-                                            required
-                                        />
+                                        <label className="block text-sm text-gray-400 mb-2 uppercase tracking-wider">Email Garmin</label>
+                                        <input type="email" value={garminEmail} onChange={e => setGarminEmail(e.target.value)}
+                                               className="input-dark w-full px-4 py-3 rounded-lg text-white" required />
                                     </div>
-                                    
                                     <div className="mb-8">
-                                        <label className="block text-sm text-gray-400 mb-2 uppercase tracking-wider">Password Garmin Connect</label>
-                                        <input
-                                            type="password"
-                                            value={garminPassword}
-                                            onChange={(e) => setGarminPassword(e.target.value)}
-                                            className="zen-input w-full px-4 py-3 rounded-lg text-white"
-                                            placeholder="••••••••"
-                                            required
-                                        />
+                                        <label className="block text-sm text-gray-400 mb-2 uppercase tracking-wider">Password Garmin</label>
+                                        <input type="password" value={garminPassword} onChange={e => setGarminPassword(e.target.value)}
+                                               className="input-dark w-full px-4 py-3 rounded-lg text-white" required />
                                     </div>
-                                    
-                                    <button
-                                        type="submit"
-                                        disabled={loading}
-                                        className="btn-warrior w-full py-4 rounded-xl font-cinzel text-white font-bold tracking-wider disabled:opacity-50"
-                                    >
+                                    <button type="submit" disabled={loading} className="btn-gold w-full py-4 rounded-xl font-orbitron disabled:opacity-50">
                                         {loading ? 'CONNESSIONE...' : 'CONNETTI GARMIN'}
                                     </button>
                                 </form>
                             </>
                         )}
-                        
                         {step === 2 && (
-                            <div className="text-center zen-border rounded-2xl p-10">
-                                <div className="text-6xl mb-6 breathe">✓</div>
-                                <h2 className="font-cinzel text-2xl font-bold text-[#2D5A3D] mb-4">
-                                    GARMIN CONNESSO
-                                </h2>
-                                <p className="text-gray-400">Sincronizzazione in corso...</p>
-                            </div>
-                        )}
-                        
-                        {step === 3 && (
-                            <div className="text-center zen-border rounded-2xl p-10">
-                                <div className="text-6xl mb-6 breathe">📊</div>
-                                <h2 className="font-cinzel text-2xl font-bold text-[#D4AF37] mb-4">
-                                    SCARICANDO I TUOI DATI
-                                </h2>
-                                <p className="text-gray-400">Il Sensei sta studiando il tuo corpo...</p>
-                                <div className="mt-6">
-                                    <div className="w-full bg-[#1A1A1A] rounded-full h-2">
-                                        <div className="bg-[#D4AF37] h-2 rounded-full animate-pulse" style={{width: '60%'}}></div>
-                                    </div>
+                            <div className="card p-10 text-center">
+                                <div className="text-6xl mb-6 animate-pulse-slow">📊</div>
+                                <h2 className="font-orbitron text-2xl font-bold text-[#FFD700]">SINCRONIZZAZIONE...</h2>
+                                <p className="text-gray-400 mt-4">Il Sensei sta studiando il tuo corpo</p>
+                                <div className="mt-6 h-2 bg-[#1a1a2e] rounded-full overflow-hidden">
+                                    <div className="h-full bg-[#FFD700] animate-pulse" style={{ width: '70%' }}></div>
                                 </div>
                             </div>
                         )}
-                        
-                        {step === 4 && (
-                            <div className="text-center zen-border rounded-2xl p-10">
-                                <div className="text-6xl mb-6 float">🥋</div>
-                                <h2 className="font-cinzel text-2xl font-bold text-[#D4AF37] glow-gold mb-4">
-                                    IL SENSEI È PRONTO
-                                </h2>
-                                <p className="text-gray-400">Entrando nel dojo...</p>
+                        {step === 3 && (
+                            <div className="card p-10 text-center">
+                                <div className="text-6xl mb-6 animate-float">🥋</div>
+                                <h2 className="font-orbitron text-2xl font-bold text-[#00E676] glow-zen">SENSEI PRONTO</h2>
+                                <p className="text-gray-400 mt-4">Entrando nel dojo...</p>
                             </div>
                         )}
                     </div>
@@ -857,48 +540,34 @@
             );
         };
         
-        // Main Dashboard
         const Dashboard = ({ token, user, onLogout }) => {
             const [data, setData] = useState(null);
+            const [trend, setTrend] = useState(null);
+            const [advice, setAdvice] = useState([]);
             const [activities, setActivities] = useState([]);
             const [loading, setLoading] = useState(true);
             const [syncing, setSyncing] = useState(false);
-            const [wisdom, setWisdom] = useState({});
             
-            useEffect(() => {
-                fetchData();
-            }, []);
+            useEffect(() => { fetchAll(); }, []);
             
-            const fetchData = async () => {
+            const fetchAll = async () => {
                 try {
-                    const [summaryRes, activitiesRes] = await Promise.all([
-                        fetch(`${API_URL}/api/metrics/summary`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        }),
-                        fetch(`${API_URL}/api/activities?limit=5`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        })
+                    const headers = { 'Authorization': `Bearer ${token}` };
+                    const [summaryRes, trendRes, adviceRes, actRes] = await Promise.all([
+                        fetch(`${API_URL}/api/metrics/summary`, { headers }),
+                        fetch(`${API_URL}/api/metrics/trend?days=14`, { headers }),
+                        fetch(`${API_URL}/api/metrics/advice`, { headers }),
+                        fetch(`${API_URL}/api/activities?limit=5`, { headers })
                     ]);
                     
-                    const summaryData = await summaryRes.json();
-                    const activitiesData = await activitiesRes.json();
+                    const [summaryData, trendData, adviceData, actData] = await Promise.all([
+                        summaryRes.json(), trendRes.json(), adviceRes.json(), actRes.json()
+                    ]);
                     
                     setData(summaryData);
-                    setActivities(activitiesData);
-                    
-                    // Generate wisdom based on data
-                    if (summaryData.today) {
-                        const recovery = summaryData.today.scores.recovery;
-                        const sleep = summaryData.today.scores.sleep_performance;
-                        const strain = summaryData.today.scores.strain;
-                        
-                        setWisdom({
-                            recovery: getWisdom('recovery', recovery >= 70 ? 'high' : recovery >= 40 ? 'medium' : 'low'),
-                            sleep: getWisdom('sleep', sleep >= 80 ? 'high' : sleep >= 50 ? 'medium' : 'low'),
-                            strain: getWisdom('strain', strain >= 14 ? 'high' : strain >= 7 ? 'medium' : 'low'),
-                            general: getGeneralWisdom()
-                        });
-                    }
+                    setTrend(trendData);
+                    setAdvice(adviceData.advice || []);
+                    setActivities(actData);
                 } catch (err) {
                     console.error(err);
                 } finally {
@@ -911,174 +580,106 @@
                 try {
                     await fetch(`${API_URL}/api/sync`, {
                         method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}` 
-                        },
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({ days_back: 7 })
                     });
-                    await fetchData();
-                } catch (err) {
-                    console.error(err);
+                    await fetchAll();
                 } finally {
                     setSyncing(false);
                 }
             };
             
-            if (loading) return <LoadingSpinner />;
+            if (loading) return <LoadingScreen />;
             
             const today = data?.today || {};
-            const averages = data?.averages || {};
+            const scores = today.scores || {};
+            const realAge = user?.birth_year ? new Date().getFullYear() - user.birth_year : 45;
             
             return (
                 <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto">
                     {/* Header */}
-                    <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 fade-in-up">
+                    <header className="flex justify-between items-center mb-8">
                         <div>
-                            <h1 className="font-cinzel text-3xl md:text-4xl font-bold text-[#D4AF37] glow-gold">
-                                SENSEI
-                            </h1>
-                            <p className="text-gray-500">Il tuo coach interiore</p>
+                            <h1 className="font-orbitron text-3xl font-bold text-[#FFD700] glow-gold">SENSEI</h1>
+                            <p className="text-gray-500 text-sm">Il tuo coach interiore</p>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <button
-                                onClick={handleSync}
-                                disabled={syncing}
-                                className="btn-zen px-6 py-2 rounded-lg text-white text-sm font-bold disabled:opacity-50"
-                            >
+                        <div className="flex gap-4">
+                            <button onClick={handleSync} disabled={syncing} className="btn-outline px-4 py-2 rounded-lg text-sm disabled:opacity-50">
                                 {syncing ? '⟳ Sync...' : '⟳ Sync'}
                             </button>
-                            <button
-                                onClick={onLogout}
-                                className="text-gray-500 hover:text-white transition"
-                            >
-                                Esci
-                            </button>
+                            <button onClick={onLogout} className="text-gray-500 hover:text-white">Esci</button>
                         </div>
                     </header>
                     
-                    {/* Main Wisdom */}
-                    <div className="zen-border rounded-3xl p-8 mb-8 fade-in-up delay-1">
-                        <div className="text-center mb-6">
-                            <span className="text-5xl mb-4 block float">🥋</span>
-                            <p className="text-gray-400 italic text-lg">{wisdom.general}</p>
-                        </div>
-                    </div>
-                    
-                    {/* Main Metrics */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    {/* Main Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                        {/* Biological Age - Main Focus */}
+                        <BioAgeDisplay bioAge={scores.biological_age} realAge={realAge} />
+                        
                         {/* Recovery */}
-                        <div className="zen-border rounded-3xl p-6 text-center fade-in-up delay-2">
-                            <h3 className="font-cinzel text-sm uppercase tracking-widest text-gray-500 mb-4">Recovery</h3>
-                            <CircularGauge 
-                                value={today.scores?.recovery || 0} 
-                                max={100}
-                                label="punti"
-                                size={200}
-                            />
-                            {wisdom.recovery && (
-                                <div className="mt-6 text-left">
-                                    <p className="text-[#DC143C] font-bold text-sm mb-1">{wisdom.recovery.coach}</p>
-                                    <p className="text-gray-400 text-sm italic">{wisdom.recovery.zen}</p>
-                                </div>
-                            )}
+                        <div className="card card-glow-gold p-6 text-center">
+                            <CircularGauge value={scores.recovery} max={100} color="#FFD700" label="Recovery" sublabel="/ 100" />
+                            <div className="mt-4 text-sm text-gray-500">
+                                {scores.recovery >= 80 ? '🔥 Pronto per dare tutto!' :
+                                 scores.recovery >= 50 ? '💪 Buono, allenamento moderato' :
+                                 '😴 Riposa oggi'}
+                            </div>
                         </div>
                         
                         {/* Strain */}
-                        <div className="zen-border rounded-3xl p-6 text-center fade-in-up delay-3">
-                            <h3 className="font-cinzel text-sm uppercase tracking-widest text-gray-500 mb-4">Strain</h3>
-                            <CircularGauge 
-                                value={today.scores?.strain || 0} 
-                                max={21}
-                                color="#DC143C"
-                                label="/ 21"
-                                size={200}
-                            />
-                            {wisdom.strain && (
-                                <div className="mt-6 text-left">
-                                    <p className="text-[#DC143C] font-bold text-sm mb-1">{wisdom.strain.coach}</p>
-                                    <p className="text-gray-400 text-sm italic">{wisdom.strain.zen}</p>
-                                </div>
-                            )}
-                        </div>
-                        
-                        {/* Sleep */}
-                        <div className="zen-border rounded-3xl p-6 text-center fade-in-up delay-4">
-                            <h3 className="font-cinzel text-sm uppercase tracking-widest text-gray-500 mb-4">Sleep</h3>
-                            <CircularGauge 
-                                value={today.scores?.sleep_performance || 0} 
-                                max={100}
-                                color="#2D5A3D"
-                                label="%"
-                                size={200}
-                            />
-                            {wisdom.sleep && (
-                                <div className="mt-6 text-left">
-                                    <p className="text-[#2D5A3D] font-bold text-sm mb-1">{wisdom.sleep.coach}</p>
-                                    <p className="text-gray-400 text-sm italic">{wisdom.sleep.zen}</p>
-                                </div>
-                            )}
+                        <div className="card card-glow-crimson p-6 text-center">
+                            <CircularGauge value={scores.strain?.toFixed(1)} max={21} color="#FF3D00" label="Strain" sublabel="/ 21" />
+                            <div className="mt-4 text-sm text-gray-500">
+                                {scores.strain >= 15 ? '🔥 Allenamento intenso!' :
+                                 scores.strain >= 8 ? '💪 Buona attività' :
+                                 '🚶 Giornata leggera'}
+                            </div>
                         </div>
                     </div>
                     
-                    {/* Detailed Metrics */}
+                    {/* Metrics Row */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                        <MetricCard icon="❤️" label="RHR" value={today.heart?.resting_hr} unit="bpm" delay={2} />
-                        <MetricCard icon="😴" label="Sonno" value={today.sleep?.total_hours?.toFixed(1)} unit="ore" delay={3} />
-                        <MetricCard icon="🔋" label="Body Battery" value={today.body_battery?.high} unit="max" delay={4} />
-                        <MetricCard icon="😤" label="Stress" value={today.stress?.average} unit="avg" delay={5} />
-                        <MetricCard icon="👣" label="Passi" value={today.activity?.steps?.toLocaleString()} delay={2} />
-                        <MetricCard icon="🔥" label="Calorie" value={today.activity?.active_calories} unit="attive" delay={3} />
-                        <MetricCard icon="🫁" label="SpO2" value={today.spo2?.average?.toFixed(0)} unit="%" delay={4} />
-                        <MetricCard icon="🌬️" label="Respiro" value={today.respiration?.average?.toFixed(0)} unit="/min" delay={5} />
+                        <MetricBox icon="❤️" label="RHR" value={today.heart?.resting_hr} unit="bpm" color="#FF3D00" />
+                        <MetricBox icon="😴" label="Sonno" value={today.sleep?.total_hours?.toFixed(1)} unit="h" color="#00B0FF" />
+                        <MetricBox icon="👣" label="Passi" value={today.activity?.steps?.toLocaleString()} color="#00E676" />
+                        <MetricBox icon="😤" label="Stress" value={today.stress?.average} color="#D500F9" />
                     </div>
                     
-                    {/* Weekly Averages */}
-                    <div className="zen-border rounded-2xl p-6 mb-8 fade-in-up delay-5">
-                        <h3 className="font-cinzel text-lg uppercase tracking-widest text-gray-500 mb-6">
-                            📊 Media Settimanale
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                            <div className="text-center">
-                                <div className="text-3xl font-bold text-[#D4AF37]">{averages.recovery?.toFixed(0) || '--'}</div>
-                                <div className="text-sm text-gray-500">Recovery</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-3xl font-bold text-[#DC143C]">{averages.strain?.toFixed(1) || '--'}</div>
-                                <div className="text-sm text-gray-500">Strain</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-3xl font-bold text-[#2D5A3D]">{averages.sleep_performance?.toFixed(0) || '--'}%</div>
-                                <div className="text-sm text-gray-500">Sleep</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-3xl font-bold text-white">{averages.sleep_hours?.toFixed(1) || '--'}h</div>
-                                <div className="text-sm text-gray-500">Ore sonno</div>
+                    {/* Advice Section */}
+                    {advice.length > 0 && (
+                        <div className="mb-8">
+                            <h3 className="font-orbitron text-xl text-gray-400 mb-4">🥋 IL SENSEI DICE:</h3>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {advice.slice(0, 4).map((a, i) => <AdviceCard key={i} advice={a} />)}
                             </div>
                         </div>
-                    </div>
+                    )}
                     
-                    {/* Recent Activities */}
+                    {/* Trend Charts */}
+                    {trend?.data?.length > 0 && (
+                        <div className="grid md:grid-cols-2 gap-6 mb-8">
+                            <TrendChart data={trend.data} title="📊 Trend Età Biologica" dataKey="biological_age" color="#00E676" unit=" anni" />
+                            <TrendChart data={trend.data} title="❤️ Trend Recovery" dataKey="recovery" color="#FFD700" unit="" />
+                        </div>
+                    )}
+                    
+                    {/* Activities */}
                     {activities.length > 0 && (
-                        <div className="zen-border rounded-2xl p-6 fade-in-up delay-6">
-                            <h3 className="font-cinzel text-lg uppercase tracking-widest text-gray-500 mb-6">
-                                ⚡ Attività Recenti
-                            </h3>
-                            <div className="space-y-4">
-                                {activities.map((act, i) => (
-                                    <div key={act.id} className="flex items-center justify-between p-4 bg-[#1A1A1A] rounded-xl">
+                        <div className="card p-6">
+                            <h3 className="font-orbitron text-lg text-gray-400 mb-4">⚡ ATTIVITÀ RECENTI</h3>
+                            <div className="space-y-3">
+                                {activities.map((a, i) => (
+                                    <div key={i} className="flex justify-between items-center p-4 bg-black/30 rounded-xl">
                                         <div>
-                                            <div className="font-bold text-white">{act.name || act.type}</div>
+                                            <div className="font-bold">{a.name || a.type}</div>
                                             <div className="text-sm text-gray-500">
-                                                {act.start_time ? new Date(act.start_time).toLocaleDateString('it-IT') : '--'}
-                                                {act.duration_minutes && ` • ${Math.round(act.duration_minutes)} min`}
+                                                {a.start_time && new Date(a.start_time).toLocaleDateString('it-IT')}
+                                                {a.duration_minutes && ` • ${Math.round(a.duration_minutes)} min`}
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <div className="text-[#DC143C] font-bold">{act.strain?.toFixed(1) || '--'} strain</div>
-                                            <div className="text-sm text-gray-500">
-                                                {act.calories && `${act.calories} kcal`}
-                                            </div>
+                                            <div className="font-orbitron text-[#FF3D00]">{a.strain?.toFixed(1) || '--'} strain</div>
+                                            {a.calories && <div className="text-sm text-gray-500">{a.calories} kcal</div>}
                                         </div>
                                     </div>
                                 ))}
@@ -1086,56 +687,44 @@
                         </div>
                     )}
                     
-                    {/* Footer Quote */}
-                    <div className="text-center mt-12 mb-8 fade-in-up delay-6">
-                        <p className="text-gray-600 italic">
-                            "Il corpo raggiunge ciò che la mente crede"
-                        </p>
-                        <p className="text-gray-700 text-sm mt-2">— Il Sensei</p>
+                    {/* Footer */}
+                    <div className="text-center mt-12 text-gray-600 text-sm">
+                        "Il corpo raggiunge ciò che la mente crede" — Il Sensei
                     </div>
                 </div>
             );
         };
         
-        // ============== MAIN APP ==============
+        // ==================== MAIN APP ====================
+        
         const App = () => {
             const [page, setPage] = useState('landing');
             const [token, setToken] = useState(localStorage.getItem('token'));
             const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
             
             useEffect(() => {
-                // Check if logged in
                 if (token && user) {
-                    if (user.garmin_connected) {
-                        setPage('dashboard');
-                    } else {
-                        setPage('setup');
-                    }
+                    setPage(user.garmin_connected ? 'dashboard' : 'setup');
                 }
             }, []);
             
             const handleLogin = (data) => {
                 setToken(data.token);
                 setUser(data.user);
-                if (data.user.garmin_connected) {
-                    setPage('dashboard');
-                } else {
-                    setPage('setup');
-                }
+                setPage(data.user.garmin_connected ? 'dashboard' : 'setup');
             };
             
             const handleLogout = () => {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
+                localStorage.clear();
                 setToken(null);
                 setUser(null);
                 setPage('landing');
             };
             
             const handleSetupComplete = () => {
-                const updatedUser = { ...user, garmin_connected: true };
-                setUser(updatedUser);
-                localStorage.setItem('user', JSON.stringify(updatedUser));
+                const updated = { ...user, garmin_connected: true };
+                setUser(updated);
+                localStorage.setItem('user', JSON.stringify(updated));
                 setPage('dashboard');
             };
             
@@ -1144,7 +733,7 @@
                     {page === 'landing' && <LandingPage onNavigate={setPage} />}
                     {page === 'login' && <LoginPage onNavigate={setPage} onLogin={handleLogin} />}
                     {page === 'register' && <RegisterPage onNavigate={setPage} />}
-                    {page === 'setup' && <SetupGarminPage token={token} onComplete={handleSetupComplete} onNavigate={setPage} />}
+                    {page === 'setup' && <SetupPage token={token} onComplete={handleSetupComplete} />}
                     {page === 'dashboard' && <Dashboard token={token} user={user} onLogout={handleLogout} />}
                 </>
             );
