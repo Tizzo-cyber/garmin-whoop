@@ -947,7 +947,7 @@ Rispondi in italiano, in modo diretto e motivante."""
     @app.route('/api/tts', methods=['POST'])
     @token_required
     def text_to_speech(current_user):
-        """Converte testo in audio usando OpenAI TTS"""
+        """Converte testo in audio usando OpenAI TTS con istruzioni vocali"""
         if not openai_client:
             return jsonify({'error': 'OpenAI non configurato'}), 500
         
@@ -973,16 +973,30 @@ Rispondi in italiano, in modo diretto e motivante."""
         if not clean_text:
             return jsonify({'error': 'Testo vuoto dopo pulizia'}), 400
         
-        # Voci OpenAI gpt-4o-mini-tts
-        # Sensei: onyx (profonda, maschile)
-        # Sakura: nova (naturale, femminile)
-        voice = 'onyx' if coach == 'sensei' else 'nova'
+        # Configurazione voci con istruzioni
+        if coach == 'sensei':
+            voice = 'ash'
+            instructions = """Voice Affect: Calm, confident, grounded; embody expertise and trust.
+Tone: Warm, motivating, reassuring; convey genuine support and professionalism.
+Pacing: Measured, steady, natural; pause briefly after key points to let advice sink in.
+Emotion: Encouraging and supportive; express genuine care for the listener's progress.
+Pronunciation: Clear, precise Italian articulation, natural flow.
+Pauses: Use brief pauses after important recommendations, enhancing clarity and impact."""
+        else:
+            voice = 'nova'
+            instructions = """Voice Affect: Soft, gentle, soothing; embody tranquility.
+Tone: Calm, reassuring, peaceful; convey genuine warmth and serenity.
+Pacing: Slow, deliberate, and unhurried; pause gently after instructions to allow the listener time to relax and follow along.
+Emotion: Deeply soothing and comforting; express genuine kindness and care.
+Pronunciation: Smooth, soft articulation, slightly elongating vowels to create a sense of ease.
+Pauses: Use thoughtful pauses, especially between breathing instructions and visualization guidance, enhancing relaxation and mindfulness."""
         
         try:
             response = openai_client.audio.speech.create(
                 model="gpt-4o-mini-tts",
                 voice=voice,
                 input=clean_text,
+                instructions=instructions,
                 response_format="mp3"
             )
             
