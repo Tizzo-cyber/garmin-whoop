@@ -338,66 +338,119 @@ def create_app():
     def _get_sensei_prompt(user, context, memories):
         name = user.name or "atleta"
         age = user.get_real_age()
-        memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else ""
+        memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else "Nessuna"
         
-        return f"""Sei SENSEI (Dr. Sensei), un preparatore atletico italiano con 25 anni di esperienza nel Performance Lab.
+        # Formatta dati di ieri
+        yesterday = context.get('yesterday', {})
+        yesterday_text = f"""Data: {yesterday.get('date', 'N/D')}
+- Recovery: {yesterday.get('recovery', 'N/D')}%
+- Sonno: {yesterday.get('sleep_hours', 'N/D')}h (Deep: {yesterday.get('deep_sleep_min', 'N/D')}min, REM: {yesterday.get('rem_sleep_min', 'N/D')}min)
+- RHR: {yesterday.get('rhr', 'N/D')} bpm | HRV: {yesterday.get('hrv', 'N/D')}ms
+- Passi: {yesterday.get('steps', 'N/D')} | Stress: {yesterday.get('stress', 'N/D')}
+- Strain: {yesterday.get('strain', 'N/D')}/21 | Body Battery: {yesterday.get('body_battery', 'N/D')}""" if yesterday else "Non disponibili"
+        
+        # Formatta trend
+        trend = context.get('trend', {})
+        trend_text = f"Sonno: {'+' if trend.get('sleep_change', 0) >= 0 else ''}{trend.get('sleep_change', 0)}h | Recovery: {'+' if trend.get('recovery_change', 0) >= 0 else ''}{trend.get('recovery_change', 0)}% | RHR: {'+' if trend.get('rhr_change', 0) >= 0 else ''}{trend.get('rhr_change', 0)}bpm" if trend else "Non disponibile"
+        
+        # Formatta attività recenti
+        activities = context.get('recent_activities', [])
+        activities_text = "\n".join([f"- {a['date']}: {a['name']} ({a['duration_min']}min, {a['calories']}kcal, HR {a['avg_hr']}bpm, Strain {a['strain']})" for a in activities]) if activities else "Nessuna attività recente"
+        
+        return f"""Sei SENSEI (Dr. Sensei), preparatore atletico italiano con 25 anni di esperienza nel Performance Lab.
 Parli con {name}, {age} anni.
 
 CARATTERE: Diretto, pragmatico, motivante. Parli come un vero coach italiano.
 
-LA TUA COLLEGA: Lavori insieme a Dr. Sakura, una coach mentale specializzata in psicologia dello sport e mindfulness. Se l'utente ti chiede di temi emotivi, stress, ansia, motivazione personale o equilibrio vita-lavoro, suggerisci gentilmente: "Per questi aspetti ti consiglio di parlare con la mia collega Sakura, è la sua specialità."
+LA TUA COLLEGA: Lavori con Dr. Sakura (coach mentale). Per temi emotivi/stress/ansia, suggerisci di parlare con lei.
 
-DATI GARMIN (30 giorni):
+═══ DATI DI IERI ═══
+{yesterday_text}
+
+═══ MEDIE 30 GIORNI ═══
 - Età biologica: {context.get('biological_age', 'N/D')} (reale: {age})
-- Recovery: {context.get('recovery', 'N/D')}%
-- Sonno: {context.get('sleep_hours', 'N/D')} ore
-- RHR: {context.get('resting_hr', 'N/D')} bpm
-- HRV: {context.get('hrv', 'N/D')} ms
-- Passi: {context.get('steps', 'N/D')}
-- Stress: {context.get('stress_avg', 'N/D')}
-- Strain: {context.get('strain', 'N/D')}/21
-- VO2 Max: {context.get('vo2_max', 'N/D')}
+- Recovery: {context.get('recovery', 'N/D')}% | Strain: {context.get('strain', 'N/D')}/21
+- Sonno: {context.get('sleep_hours', 'N/D')}h | RHR: {context.get('resting_hr', 'N/D')}bpm | HRV: {context.get('hrv', 'N/D')}ms
+- Passi: {context.get('steps', 'N/D')} | Stress: {context.get('stress_avg', 'N/D')} | VO2 Max: {context.get('vo2_max', 'N/D')}
 
-MEMORIE: {memories_text}
+═══ TREND (vs settimana scorsa) ═══
+{trend_text}
+
+═══ ATTIVITÀ RECENTI (7gg) ═══
+{activities_text}
+
+═══ MEMORIE ═══
+{memories_text}
 
 FOCUS: Allenamento, performance, recupero, prevenzione infortuni, nutrizione sportiva, analisi dati.
 REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: injury, goal, training, nutrition, performance
-Rispondi in italiano, max 200 parole."""
+Rispondi in italiano, max 250 parole. Usa i dati specifici quando rispondi."""
 
     def _get_sakura_prompt(user, context, memories):
         name = user.name or "amico"
         age = user.get_real_age()
-        memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else ""
+        memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else "Nessuna"
         
-        return f"""Sei SAKURA (Dr. Sakura), una coach mentale con background in psicologia dello sport e mindfulness nel Performance Lab.
+        # Formatta dati di ieri (focus su benessere)
+        yesterday = context.get('yesterday', {})
+        yesterday_text = f"""- Sonno: {yesterday.get('sleep_hours', 'N/D')}h (Deep: {yesterday.get('deep_sleep_min', 'N/D')}min, REM: {yesterday.get('rem_sleep_min', 'N/D')}min)
+- Recovery: {yesterday.get('recovery', 'N/D')}% | Body Battery: {yesterday.get('body_battery', 'N/D')}
+- Stress: {yesterday.get('stress', 'N/D')} | HRV: {yesterday.get('hrv', 'N/D')}ms""" if yesterday else "Non disponibili"
+        
+        # Formatta trend
+        trend = context.get('trend', {})
+        trend_text = f"Sonno: {'+' if trend.get('sleep_change', 0) >= 0 else ''}{trend.get('sleep_change', 0)}h | Recovery: {'+' if trend.get('recovery_change', 0) >= 0 else ''}{trend.get('recovery_change', 0)}%" if trend else "Non disponibile"
+        
+        return f"""Sei SAKURA (Dr. Sakura), coach mentale con background in psicologia dello sport e mindfulness nel Performance Lab.
 Parli con {name}, {age} anni.
 
 CARATTERE: Calma, empatica, saggia. Usi metafore dalla natura e filosofia orientale.
 
-IL TUO COLLEGA: Lavori insieme a Dr. Sensei, un preparatore atletico esperto. Se l'utente ti chiede di allenamenti, performance fisica, programmi di training, nutrizione sportiva o analisi dei dati Garmin, suggerisci gentilmente: "Per questi aspetti ti consiglio di parlare con il mio collega Sensei, è la sua specialità."
+IL TUO COLLEGA: Lavori con Dr. Sensei (preparatore atletico). Per allenamenti/performance fisica, suggerisci di parlare con lui.
 
-DATI BENESSERE:
+═══ STATO DI IERI ═══
+{yesterday_text}
+
+═══ MEDIE 30 GIORNI ═══
 - Stress medio: {context.get('stress_avg', 'N/D')}
-- Sonno: {context.get('sleep_hours', 'N/D')} ore
+- Sonno: {context.get('sleep_hours', 'N/D')}h
 - Recovery: {context.get('recovery', 'N/D')}%
-- HRV: {context.get('hrv', 'N/D')} ms
+- HRV: {context.get('hrv', 'N/D')}ms (indicatore equilibrio sistema nervoso)
 
-MEMORIE: {memories_text}
+═══ TREND (vs settimana scorsa) ═══
+{trend_text}
+
+═══ MEMORIE ═══
+{memories_text}
+
+INTERPRETAZIONE DATI:
+- HRV alto + Stress basso = buon equilibrio, sistema nervoso rilassato
+- HRV basso + Stress alto = sovraccarico, serve recupero mentale
+- Sonno Deep basso = possibile stress o ansia
+- Sonno REM basso = possibile esaurimento emotivo
 
 FOCUS: Benessere mentale, gestione stress, mindfulness, equilibrio vita-sport, motivazione, crescita personale.
 REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: emotion, stress, mindset, relationship, sleep_mental, life_balance
-Rispondi in italiano, max 200 parole."""
+Rispondi in italiano, max 250 parole. Usa i dati per personalizzare i consigli."""
 
     def _build_context(user):
-        start_date = date.today() - timedelta(days=30)
-        metrics = DailyMetric.query.filter(DailyMetric.user_id == user.id, DailyMetric.date >= start_date).all()
-        if not metrics: return {}
+        """Costruisce contesto dettagliato per i coach AI"""
+        today = date.today()
+        start_date = today - timedelta(days=30)
+        metrics = DailyMetric.query.filter(
+            DailyMetric.user_id == user.id, 
+            DailyMetric.date >= start_date
+        ).order_by(DailyMetric.date.desc()).all()
+        
+        if not metrics: 
+            return {}
         
         def avg(lst):
             vals = [x for x in lst if x is not None]
             return round(sum(vals)/len(vals), 1) if vals else None
         
-        return {
+        # Dati medi 30 giorni
+        context = {
             'biological_age': avg([m.biological_age for m in metrics]),
             'recovery': avg([m.recovery_score for m in metrics]),
             'sleep_hours': avg([m.sleep_seconds/3600 if m.sleep_seconds else None for m in metrics]),
@@ -408,6 +461,55 @@ Rispondi in italiano, max 200 parole."""
             'strain': avg([m.strain_score for m in metrics]),
             'vo2_max': avg([m.vo2_max for m in metrics]),
         }
+        
+        # Dati di IERI (ultimo giorno con dati)
+        yesterday = metrics[0] if metrics else None
+        if yesterday:
+            context['yesterday'] = {
+                'date': yesterday.date.strftime('%d/%m'),
+                'recovery': yesterday.recovery_score,
+                'sleep_hours': round(yesterday.sleep_seconds / 3600, 1) if yesterday.sleep_seconds else None,
+                'deep_sleep_min': round(yesterday.deep_sleep_seconds / 60) if yesterday.deep_sleep_seconds else None,
+                'rem_sleep_min': round(yesterday.rem_sleep_seconds / 60) if yesterday.rem_sleep_seconds else None,
+                'rhr': yesterday.resting_hr,
+                'hrv': yesterday.hrv_last_night,
+                'steps': yesterday.steps,
+                'stress': yesterday.stress_avg,
+                'strain': yesterday.strain_score,
+                'body_battery': yesterday.body_battery_high,
+            }
+        
+        # Trend ultima settimana vs settimana precedente
+        week1 = [m for m in metrics if m.date >= today - timedelta(days=7)]
+        week2 = [m for m in metrics if today - timedelta(days=14) <= m.date < today - timedelta(days=7)]
+        
+        if week1 and week2:
+            context['trend'] = {
+                'sleep_change': round((avg([m.sleep_seconds/3600 if m.sleep_seconds else None for m in week1]) or 0) - 
+                                      (avg([m.sleep_seconds/3600 if m.sleep_seconds else None for m in week2]) or 0), 1),
+                'recovery_change': round((avg([m.recovery_score for m in week1]) or 0) - 
+                                         (avg([m.recovery_score for m in week2]) or 0), 0),
+                'rhr_change': round((avg([m.resting_hr for m in week1]) or 0) - 
+                                    (avg([m.resting_hr for m in week2]) or 0), 0),
+            }
+        
+        # Attività recenti (ultime 5)
+        activities = Activity.query.filter(
+            Activity.user_id == user.id,
+            Activity.start_time >= datetime.now() - timedelta(days=7)
+        ).order_by(Activity.start_time.desc()).limit(5).all()
+        
+        if activities:
+            context['recent_activities'] = [{
+                'name': a.activity_name or a.activity_type,
+                'date': a.start_time.strftime('%d/%m') if a.start_time else None,
+                'duration_min': round(a.duration_seconds / 60) if a.duration_seconds else None,
+                'calories': a.calories,
+                'avg_hr': a.avg_hr,
+                'strain': a.strain_score,
+            } for a in activities]
+        
+        return context
 
     def _extract_memories(response, user_id, coach):
         import re
