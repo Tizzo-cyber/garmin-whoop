@@ -1,5 +1,5 @@
 """
-SENSEI - AI Sports Coach with Persistent Memory
+SENSEI & SAKURA - Dual AI Coach System
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -46,6 +46,7 @@ def create_app():
             'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_steps_impact FLOAT',
             'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_stress_impact FLOAT',
             'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_hrz_impact FLOAT',
+            'ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS coach VARCHAR(20)',
         ]
         for sql in migrations:
             try:
@@ -54,7 +55,6 @@ def create_app():
             except:
                 db.session.rollback()
         
-        # Create new tables
         try:
             db.session.execute(text('''
                 CREATE TABLE IF NOT EXISTS chat_messages (
@@ -62,6 +62,7 @@ def create_app():
                     user_id INTEGER REFERENCES users(id),
                     role VARCHAR(20) NOT NULL,
                     content TEXT NOT NULL,
+                    coach VARCHAR(20),
                     context_summary TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -72,6 +73,7 @@ def create_app():
                     user_id INTEGER REFERENCES users(id),
                     category VARCHAR(50),
                     content TEXT NOT NULL,
+                    coach VARCHAR(20),
                     is_active BOOLEAN DEFAULT TRUE,
                     source_message_id INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -100,7 +102,7 @@ def create_app():
             return f(current_user, *args, **kwargs)
         return decorated
     
-    # ==================== AUTH ROUTES ====================
+    # ==================== AUTH ====================
     
     @app.route('/', methods=['GET'])
     def index():
@@ -184,7 +186,7 @@ def create_app():
         result = service.sync_user(current_user, days_back=days_back)
         return jsonify(result)
     
-    # ==================== METRICS ROUTES ====================
+    # ==================== METRICS ====================
     
     @app.route('/api/metrics/summary', methods=['GET'])
     @token_required
@@ -270,74 +272,108 @@ def create_app():
             'calories': a.calories, 'avg_hr': a.avg_hr, 'strain': a.strain_score
         } for a in activities])
     
-    # ==================== AI CHAT WITH MEMORY ====================
+    # ==================== DUAL AI COACH ====================
     
-    def _get_system_prompt(user, context, memories):
-        """System prompt per il medico sportivo AI"""
-        
+    def _get_sensei_prompt(user, context, memories):
+        """SENSEI - Preparatore atletico"""
         name = user.name or "atleta"
         age = user.get_real_age()
-        goals = user.sport_goals or "migliorare la forma fisica"
         
         memories_text = ""
         if memories:
-            memories_text = "\n\nINFORMAZIONI RICORDATE SULL'UTENTE:\n"
+            memories_text = "\n\nINFORMAZIONI RICORDATE:\n"
             for m in memories:
                 memories_text += f"- [{m.category}] {m.content}\n"
         
-        return f"""Sei il Dr. Sensei, un medico sportivo e coach di endurance con 20 anni di esperienza.
-Stai parlando con {name}, {age} anni. Obiettivi: {goals}.
+        return f"""Sei SENSEI, un preparatore atletico e medico sportivo con 25 anni di esperienza.
+Parli con {name}, {age} anni.
 
-DATI GARMIN ATTUALI (ultimi 30 giorni):
-- Età biologica: {context.get('biological_age', 'N/D')} anni (età reale: {age})
-- Recovery medio: {context.get('recovery', 'N/D')}%
+IL TUO CARATTERE:
+- Sei diretto, pragmatico, motivante ma mai duro
+- Parli come un vero preparatore atletico italiano
+- Usi un linguaggio semplice e chiaro
+- Sei appassionato di performance e ottimizzazione
+- Dai sempre consigli pratici e attuabili
+
+DATI GARMIN ATTUALI (30 giorni):
+- Età biologica: {context.get('biological_age', 'N/D')} anni (reale: {age})
+- Recovery: {context.get('recovery', 'N/D')}%
 - Sonno medio: {context.get('sleep_hours', 'N/D')} ore
-- RHR medio: {context.get('resting_hr', 'N/D')} bpm
+- RHR: {context.get('resting_hr', 'N/D')} bpm
 - HRV: {context.get('hrv', 'N/D')} ms
 - Passi medi: {context.get('steps', 'N/D')}
-- Stress medio: {context.get('stress_avg', 'N/D')}
-- Strain medio: {context.get('strain', 'N/D')}/21
-- VO2 Max: {context.get('vo2_max', 'N/D')} ml/kg/min
+- Stress: {context.get('stress_avg', 'N/D')}
+- Strain: {context.get('strain', 'N/D')}/21
+- VO2 Max: {context.get('vo2_max', 'N/D')}
 {memories_text}
 
-ISTRUZIONI:
-1. Parla in italiano, in modo professionale ma empatico, come un vero medico sportivo
-2. Usa i dati Garmin per personalizzare ogni risposta
-3. Se l'utente menziona infortuni, dolori, obiettivi o informazioni personali, ANNOTALI nella risposta con il tag [MEMORY: categoria | informazione]
-4. Chiedi follow-up sulle informazioni che ricordi (es. "Come va la caviglia che ti faceva male?")
-5. Non fare diagnosi mediche, ma dai consigli sportivi e di recupero
-6. Sii proattivo: se vedi dati preoccupanti (poco sonno, stress alto, recovery basso), segnalalo
-7. Quando appropriato, suggerisci modifiche all'allenamento basate sui dati
+IL TUO FOCUS:
+1. Allenamento e performance fisica
+2. Recupero e prevenzione infortuni  
+3. Analisi dati Garmin e metriche
+4. Pianificazione training
+5. Nutrizione sportiva base
 
-CATEGORIE MEMORIA: injury (infortuni), goal (obiettivi), health (salute generale), lifestyle (stile di vita), preference (preferenze)
+REGOLE:
+- Se l'utente menziona infortuni/dolori/obiettivi, salvali con [MEMORY: categoria | info]
+- Categorie: injury, goal, training, nutrition, performance
+- Chiedi follow-up su infortuni precedenti
+- Non fare diagnosi mediche, ma consigli sportivi
+- Usa i dati Garmin per personalizzare ogni risposta
+- Rispondi in italiano, max 200 parole
+- NON parlare di aspetti mentali/emotivi (quello è compito di Sakura)
+"""
 
-Esempio di annotazione memoria:
-Utente: "Mi fa male la caviglia destra da ieri"
-Tu: "Mi dispiace per la caviglia destra. [MEMORY: injury | Dolore caviglia destra, iniziato il {date.today().isoformat()}] Dimmi di più..."
+    def _get_sakura_prompt(user, context, memories):
+        """SAKURA - Coach mentale e spirituale"""
+        name = user.name or "amico"
+        age = user.get_real_age()
+        
+        memories_text = ""
+        if memories:
+            memories_text = "\n\nINFORMAZIONI RICORDATE:\n"
+            for m in memories:
+                memories_text += f"- [{m.category}] {m.content}\n"
+        
+        return f"""Sei SAKURA, una coach mentale e guida spirituale con formazione in psicologia dello sport e mindfulness.
+Parli con {name}, {age} anni.
+
+IL TUO CARATTERE:
+- Sei calma, empatica, profonda ma accessibile
+- Parli con dolcezza ma anche con saggezza
+- Usi metafore dalla natura e filosofia orientale
+- Sei interessata al benessere interiore della persona
+- Ascolti prima di consigliare
+
+DATI BENESSERE (indicatori di stress/recupero):
+- Livello stress medio: {context.get('stress_avg', 'N/D')}
+- Qualità sonno: {context.get('sleep_hours', 'N/D')} ore
+- Recovery (energia): {context.get('recovery', 'N/D')}%
+- HRV (equilibrio nervoso): {context.get('hrv', 'N/D')} ms
+- Body Battery: indica l'energia mentale/fisica
+{memories_text}
+
+IL TUO FOCUS:
+1. Benessere mentale e emotivo
+2. Gestione dello stress e ansia
+3. Mindfulness e meditazione
+4. Equilibrio vita-sport
+5. Motivazione profonda e scopo
+6. Qualità del sonno (aspetto mentale)
+7. Relazioni e supporto sociale
+
+REGOLE:
+- Se l'utente menziona emozioni/pensieri/difficoltà, salvali con [MEMORY: categoria | info]
+- Categorie: emotion, stress, mindset, relationship, sleep_mental, life_balance
+- Chiedi come si sente, non solo cosa fa
+- Offri tecniche pratiche (respirazione, meditazione breve)
+- Non sei una psicologa clinica, ma una coach
+- Usa i dati di stress/sonno per capire il suo stato
+- Rispondi in italiano, max 200 parole
+- NON parlare di allenamento/performance fisica (quello è compito di Sensei)
 """
     
-    def _extract_memories(ai_response, user_id, message_id):
-        """Estrae e salva le memorie dalla risposta AI"""
-        import re
-        
-        pattern = r'\[MEMORY:\s*(\w+)\s*\|\s*([^\]]+)\]'
-        matches = re.findall(pattern, ai_response)
-        
-        for category, content in matches:
-            memory = UserMemory(
-                user_id=user_id,
-                category=category.lower(),
-                content=content.strip(),
-                source_message_id=message_id
-            )
-            db.session.add(memory)
-        
-        # Rimuovi i tag dalla risposta visibile
-        clean_response = re.sub(pattern, '', ai_response).strip()
-        return clean_response
-    
     def _build_context(user):
-        """Costruisce il contesto dai dati Garmin"""
         start_date = date.today() - timedelta(days=30)
         metrics = DailyMetric.query.filter(
             DailyMetric.user_id == user.id,
@@ -363,6 +399,24 @@ Tu: "Mi dispiace per la caviglia destra. [MEMORY: injury | Dolore caviglia destr
             'vo2_max': safe_avg([m.vo2_max for m in metrics]),
         }
     
+    def _extract_memories(ai_response, user_id, message_id, coach):
+        import re
+        pattern = r'\[MEMORY:\s*(\w+)\s*\|\s*([^\]]+)\]'
+        matches = re.findall(pattern, ai_response)
+        
+        for category, content in matches:
+            memory = UserMemory(
+                user_id=user_id,
+                category=category.lower(),
+                content=content.strip(),
+                coach=coach,
+                source_message_id=message_id
+            )
+            db.session.add(memory)
+        
+        clean_response = re.sub(pattern, '', ai_response).strip()
+        return clean_response
+    
     @app.route('/api/chat', methods=['POST'])
     @token_required
     def chat_with_ai(current_user):
@@ -371,63 +425,65 @@ Tu: "Mi dispiace per la caviglia destra. [MEMORY: injury | Dolore caviglia destr
         
         data = request.get_json()
         user_message = data.get('message', '').strip()
+        coach = data.get('coach', 'sensei')  # 'sensei' o 'sakura'
         
         if not user_message:
             return jsonify({'error': 'Messaggio vuoto'}), 400
         
-        # Build context
         context = _build_context(current_user)
         
-        # Get memories
+        # Get memories (all, both coaches share memories)
         memories = UserMemory.query.filter_by(user_id=current_user.id, is_active=True)\
             .order_by(UserMemory.created_at.desc()).limit(20).all()
         
-        # Get recent chat history
-        recent_messages = ChatMessage.query.filter_by(user_id=current_user.id)\
+        # Get chat history for this specific coach
+        recent_messages = ChatMessage.query.filter_by(user_id=current_user.id, coach=coach)\
             .order_by(ChatMessage.created_at.desc()).limit(10).all()
         recent_messages.reverse()
         
-        # Build messages
-        messages = [{"role": "system", "content": _get_system_prompt(current_user, context, memories)}]
+        # Select prompt based on coach
+        if coach == 'sakura':
+            system_prompt = _get_sakura_prompt(current_user, context, memories)
+        else:
+            system_prompt = _get_sensei_prompt(current_user, context, memories)
         
+        messages = [{"role": "system", "content": system_prompt}]
         for msg in recent_messages:
             messages.append({"role": msg.role, "content": msg.content})
-        
         messages.append({"role": "user", "content": user_message})
         
         try:
             response = openai_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=messages,
-                max_tokens=1000,
-                temperature=0.7
+                max_tokens=800,
+                temperature=0.8
             )
             
             ai_response_raw = response.choices[0].message.content
             
-            # Save user message
             user_msg = ChatMessage(
                 user_id=current_user.id,
                 role='user',
                 content=user_message,
+                coach=coach,
                 context_summary=json.dumps(context)
             )
             db.session.add(user_msg)
             db.session.flush()
             
-            # Extract memories and clean response
-            ai_response = _extract_memories(ai_response_raw, current_user.id, user_msg.id)
+            ai_response = _extract_memories(ai_response_raw, current_user.id, user_msg.id, coach)
             
-            # Save AI message
             ai_msg = ChatMessage(
                 user_id=current_user.id,
                 role='assistant',
-                content=ai_response
+                content=ai_response,
+                coach=coach
             )
             db.session.add(ai_msg)
             db.session.commit()
             
-            return jsonify({'response': ai_response, 'context': context})
+            return jsonify({'response': ai_response, 'coach': coach})
             
         except Exception as e:
             return jsonify({'error': str(e)}), 500
@@ -435,8 +491,9 @@ Tu: "Mi dispiace per la caviglia destra. [MEMORY: injury | Dolore caviglia destr
     @app.route('/api/chat/history', methods=['GET'])
     @token_required
     def get_chat_history(current_user):
+        coach = request.args.get('coach', 'sensei')
         limit = request.args.get('limit', 50, type=int)
-        messages = ChatMessage.query.filter_by(user_id=current_user.id)\
+        messages = ChatMessage.query.filter_by(user_id=current_user.id, coach=coach)\
             .order_by(ChatMessage.created_at.desc()).limit(limit).all()
         messages.reverse()
         return jsonify([{'role': m.role, 'content': m.content, 'created_at': m.created_at.isoformat()} for m in messages])
@@ -447,7 +504,8 @@ Tu: "Mi dispiace per la caviglia destra. [MEMORY: injury | Dolore caviglia destr
         memories = UserMemory.query.filter_by(user_id=current_user.id, is_active=True)\
             .order_by(UserMemory.created_at.desc()).all()
         return jsonify([{
-            'id': m.id, 'category': m.category, 'content': m.content, 'created_at': m.created_at.isoformat()
+            'id': m.id, 'category': m.category, 'content': m.content, 
+            'coach': m.coach, 'created_at': m.created_at.isoformat()
         } for m in memories])
     
     @app.route('/api/chat/memories/<int:memory_id>', methods=['DELETE'])
@@ -484,7 +542,6 @@ def _metric_to_dict(m, user):
         'heart': {'resting_hr': m.resting_hr, 'vo2_max': m.vo2_max, 'hrv': m.hrv_last_night},
         'sleep': {
             'total_hours': round(m.sleep_seconds / 3600, 1) if m.sleep_seconds else None,
-            'deep_hours': round(m.deep_sleep_seconds / 3600, 1) if m.deep_sleep_seconds else None,
         },
         'stress': {'average': m.stress_avg},
         'activity': {'steps': m.steps, 'active_calories': m.active_calories}
