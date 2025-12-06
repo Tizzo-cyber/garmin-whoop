@@ -39,10 +39,8 @@
             color: var(--text-primary);
         }
         
-        /* Typography */
         .font-display { font-family: 'Space Grotesk', sans-serif; }
         
-        /* Cards */
         .glass-card {
             background: linear-gradient(135deg, var(--bg-card) 0%, rgba(24,26,34,0.8) 100%);
             border: 1px solid var(--border);
@@ -56,43 +54,26 @@
             transition: all 0.3s ease;
         }
         
-        /* Glows */
         .glow-green { box-shadow: 0 0 40px rgba(0, 245, 147, 0.15); }
         .glow-pink { box-shadow: 0 0 40px rgba(255, 110, 180, 0.15); }
         .glow-text-green { text-shadow: 0 0 30px rgba(0, 245, 147, 0.5); }
-        .glow-text-pink { text-shadow: 0 0 30px rgba(255, 110, 180, 0.5); }
         
-        /* Bio Ring */
-        .bio-ring-container {
-            position: relative;
-            width: 220px;
-            height: 220px;
-        }
+        .bio-ring-container { position: relative; width: 220px; height: 220px; }
         .bio-ring-bg {
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
+            position: absolute; inset: 0; border-radius: 50%;
             background: conic-gradient(from 180deg, var(--border) 0deg, var(--border) 360deg);
         }
         .bio-ring-progress {
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
+            position: absolute; inset: 0; border-radius: 50%;
             background: conic-gradient(from 180deg, var(--accent-green) 0deg, #00c978 calc(var(--progress) * 3.6deg), transparent calc(var(--progress) * 3.6deg));
             filter: drop-shadow(0 0 10px rgba(0, 245, 147, 0.4));
         }
         .bio-ring-inner {
-            position: absolute;
-            inset: 12px;
-            border-radius: 50%;
+            position: absolute; inset: 12px; border-radius: 50%;
             background: var(--bg-primary);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
         
-        /* Inputs */
         .input-premium {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
@@ -110,45 +91,38 @@
             box-shadow: 0 0 0 3px var(--accent-pink-dim);
         }
         
-        /* Buttons */
         .btn-primary {
             background: linear-gradient(135deg, var(--accent-green) 0%, #00c978 100%);
-            color: #000;
-            font-weight: 600;
-            transition: all 0.3s;
+            color: #000; font-weight: 600; transition: all 0.3s;
         }
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0, 245, 147, 0.3);
-        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0, 245, 147, 0.3); }
         .btn-primary:disabled { opacity: 0.5; transform: none; }
         
         .btn-pink {
             background: linear-gradient(135deg, var(--accent-pink) 0%, #e055a0 100%);
-            color: #000;
-            font-weight: 600;
+            color: #000; font-weight: 600;
         }
-        .btn-pink:hover {
-            box-shadow: 0 10px 30px rgba(255, 110, 180, 0.3);
-        }
+        .btn-pink:hover { box-shadow: 0 10px 30px rgba(255, 110, 180, 0.3); }
         
         .btn-ghost {
             background: transparent;
             border: 1px solid var(--border);
             color: var(--text-secondary);
+            transition: all 0.3s;
         }
-        .btn-ghost:hover {
-            border-color: var(--text-secondary);
-            color: var(--text-primary);
-        }
+        .btn-ghost:hover { border-color: var(--text-secondary); color: var(--text-primary); }
         
-        /* Chat */
+        .btn-danger {
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid var(--accent-red);
+            color: var(--accent-red);
+            transition: all 0.3s;
+        }
+        .btn-danger:hover { background: var(--accent-red); color: #000; }
+        
         .chat-bubble {
-            max-width: 80%;
-            padding: 16px 20px;
-            font-size: 15px;
-            line-height: 1.6;
-            border-radius: 20px;
+            max-width: 80%; padding: 16px 20px;
+            font-size: 15px; line-height: 1.6; border-radius: 20px;
         }
         .chat-ai {
             background: var(--bg-card);
@@ -162,11 +136,8 @@
             border-radius: 20px 20px 6px 20px;
         }
         
-        /* Typing animation */
         .typing-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
+            width: 8px; height: 8px; border-radius: 50%;
             animation: typing-bounce 1.4s infinite;
         }
         .typing-dot:nth-child(2) { animation-delay: 0.15s; }
@@ -176,82 +147,55 @@
             30% { transform: translateY(-8px); opacity: 1; }
         }
         
-        /* Navigation */
         .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            padding: 12px 16px;
-            border-radius: 16px;
-            transition: all 0.3s;
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            padding: 12px 16px; border-radius: 16px; transition: all 0.3s;
             color: var(--text-muted);
         }
-        .nav-item:hover { color: var(--text-secondary); }
-        .nav-item.active {
-            background: var(--bg-card);
-            color: var(--text-primary);
-        }
+        .nav-item:hover { color: var(--text-secondary); background: var(--bg-card); }
+        .nav-item.active { background: var(--bg-card); color: var(--text-primary); }
         .nav-item.active.sensei { color: var(--accent-green); }
         .nav-item.active.sakura { color: var(--accent-pink); }
         
-        /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { 
-            background: var(--border); 
-            border-radius: 3px; 
-        }
-        ::-webkit-scrollbar-thumb:hover { background: #3a3d48; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
         
-        /* Animations */
-        .fade-in {
-            animation: fadeIn 0.4s ease;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(12px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .slide-up {
-            animation: slideUp 0.5s ease;
-        }
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        .fade-in { animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .slide-up { animation: slideUp 0.5s ease; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* Metric cards */
         .metric-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 16px;
             padding: 20px;
             transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
         }
-        .metric-card:hover {
-            border-color: #3a3d48;
-            transform: translateY(-2px);
-        }
+        .metric-card:hover { border-color: var(--accent-blue); transform: translateY(-2px); }
         
-        /* Progress bars */
-        .progress-bar {
-            height: 6px;
-            background: var(--bg-secondary);
-            border-radius: 3px;
-            overflow: hidden;
-        }
-        .progress-fill {
-            height: 100%;
-            border-radius: 3px;
-            transition: width 0.8s ease;
-        }
+        .progress-bar { height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
         
-        /* Page backgrounds */
-        .bg-gradient-sensei {
-            background: radial-gradient(ellipse at top, rgba(0, 245, 147, 0.05) 0%, transparent 60%);
+        .bg-gradient-sensei { background: radial-gradient(ellipse at top, rgba(0, 245, 147, 0.05) 0%, transparent 60%); }
+        .bg-gradient-sakura { background: radial-gradient(ellipse at top, rgba(255, 110, 180, 0.05) 0%, transparent 60%); }
+        
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; animation: fadeIn 0.2s ease;
         }
-        .bg-gradient-sakura {
-            background: radial-gradient(ellipse at top, rgba(255, 110, 180, 0.05) 0%, transparent 60%);
+        .modal-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 28px;
+            max-width: 450px;
+            width: 90%;
+            animation: slideUp 0.3s ease;
         }
     </style>
 </head>
@@ -262,7 +206,132 @@
         const { useState, useEffect, useRef } = React;
         const API = '';
         
-        // ==================== UTILITY ====================
+        // ==================== METRIC INFO DATABASE ====================
+        
+        const metricInfo = {
+            rhr: {
+                title: 'Frequenza Cardiaca a Riposo',
+                icon: '❤️',
+                color: 'var(--accent-red)',
+                description: 'La frequenza cardiaca a riposo indica l\'efficienza del tuo cuore. Un cuore allenato pompa più sangue per battito, necessitando di meno battiti al minuto.',
+                tip: 'Ogni 5 bpm in meno può indicare 1-2 anni di età biologica più giovane.',
+                ranges: [
+                    { label: 'Atleta', value: '40-50 bpm', good: true },
+                    { label: 'Eccellente', value: '51-60 bpm', good: true },
+                    { label: 'Buono', value: '61-70 bpm', good: false },
+                    { label: 'Nella media', value: '71-80 bpm', good: false },
+                    { label: 'Da migliorare', value: '80+ bpm', good: false }
+                ]
+            },
+            vo2: {
+                title: 'VO2 Max',
+                icon: '🫁',
+                color: 'var(--accent-green)',
+                description: 'Il VO2 Max misura la massima quantità di ossigeno che il tuo corpo può utilizzare durante l\'esercizio intenso. È il miglior indicatore di fitness cardiovascolare e longevità.',
+                tip: 'Ogni 5 punti in più può ridurre l\'età biologica di 2-3 anni.',
+                ranges: [
+                    { label: 'Eccellente', value: '50+ ml/kg', good: true },
+                    { label: 'Buono', value: '42-50 ml/kg', good: true },
+                    { label: 'Medio', value: '35-42 ml/kg', good: false },
+                    { label: 'Da migliorare', value: '<35 ml/kg', good: false }
+                ]
+            },
+            steps: {
+                title: 'Passi Giornalieri',
+                icon: '👟',
+                color: 'var(--accent-orange)',
+                description: 'I passi giornalieri misurano il tuo livello di attività quotidiana. Camminare regolarmente riduce il rischio cardiovascolare e migliora la longevità.',
+                tip: 'Passare da 5.000 a 10.000 passi può ridurre l\'età biologica di 1-2 anni.',
+                ranges: [
+                    { label: 'Molto attivo', value: '12.000+', good: true },
+                    { label: 'Attivo', value: '10.000-12.000', good: true },
+                    { label: 'Moderato', value: '7.500-10.000', good: false },
+                    { label: 'Basso', value: '5.000-7.500', good: false },
+                    { label: 'Sedentario', value: '<5.000', good: false }
+                ]
+            },
+            sleep: {
+                title: 'Durata del Sonno',
+                icon: '😴',
+                color: 'var(--accent-purple)',
+                description: 'Il sonno è fondamentale per il recupero fisico e mentale. Durante il sonno profondo il corpo ripara i tessuti, consolida la memoria e regola gli ormoni.',
+                tip: 'Dormire 7-8 ore invece di 5-6 può ridurre l\'età biologica di 1-3 anni.',
+                ranges: [
+                    { label: 'Ottimale', value: '7-9 ore', good: true },
+                    { label: 'Accettabile', value: '6-7 ore', good: false },
+                    { label: 'Insufficiente', value: '<6 ore', good: false },
+                    { label: 'Eccessivo', value: '>9 ore', good: false }
+                ]
+            },
+            recovery: {
+                title: 'Recovery Score',
+                icon: '⚡',
+                color: 'var(--accent-green)',
+                description: 'Il Recovery Score indica quanto il tuo corpo è pronto per lo sforzo fisico. Combina HRV, qualità del sonno, frequenza cardiaca a riposo e altri parametri.',
+                tip: 'Allenati intensamente quando il recovery è alto (70%+), fai recupero attivo quando è basso.',
+                ranges: [
+                    { label: 'Pronto per tutto', value: '80-100%', good: true },
+                    { label: 'Buono', value: '60-79%', good: true },
+                    { label: 'Moderato', value: '40-59%', good: false },
+                    { label: 'Riposo consigliato', value: '<40%', good: false }
+                ]
+            },
+            strain: {
+                title: 'Strain Score',
+                icon: '🔥',
+                color: 'var(--accent-orange)',
+                description: 'Lo Strain Score misura il carico cardiovascolare accumulato durante la giornata su una scala 0-21. Tiene conto di durata e intensità di ogni attività.',
+                tip: 'Bilancia strain e recovery: strain alto richiede recovery alto il giorno dopo.',
+                ranges: [
+                    { label: 'Riposo', value: '0-4', good: false },
+                    { label: 'Leggero', value: '5-9', good: true },
+                    { label: 'Moderato', value: '10-14', good: true },
+                    { label: 'Intenso', value: '15-18', good: false },
+                    { label: 'Massimo', value: '19-21', good: false }
+                ]
+            },
+            bioAge: {
+                title: 'Età Biologica',
+                icon: '🧬',
+                color: 'var(--accent-green)',
+                description: 'L\'età biologica stima l\'età del tuo corpo basandosi su parametri fisiologici reali. Riflette quanto bene stai invecchiando rispetto alla tua età anagrafica.',
+                tip: 'Puoi influenzare la tua età biologica con stile di vita, alimentazione, sonno e attività fisica.',
+                ranges: [
+                    { label: 'Eccellente', value: '5+ anni più giovane', good: true },
+                    { label: 'Ottimo', value: '2-5 anni più giovane', good: true },
+                    { label: 'Nella norma', value: '± 2 anni', good: false },
+                    { label: 'Attenzione', value: '2+ anni più vecchio', good: false }
+                ]
+            },
+            stress: {
+                title: 'Livello di Stress',
+                icon: '😤',
+                color: 'var(--accent-orange)',
+                description: 'Misurato tramite la variabilità cardiaca (HRV). Lo stress cronico accelera l\'invecchiamento cellulare e danneggia il sistema cardiovascolare.',
+                tip: 'Pratiche come meditazione, respirazione e attività fisica riducono lo stress.',
+                ranges: [
+                    { label: 'Rilassato', value: '0-25', good: true },
+                    { label: 'Basso', value: '26-50', good: true },
+                    { label: 'Moderato', value: '51-75', good: false },
+                    { label: 'Alto', value: '76-100', good: false }
+                ]
+            },
+            hrz: {
+                title: 'Zone di Frequenza Cardiaca',
+                icon: '💪',
+                color: 'var(--accent-blue)',
+                description: 'Il tempo nelle zone HR elevate (zone 4-5) indica l\'intensità dell\'allenamento. Essenziale per migliorare VO2 Max e fitness cardiovascolare.',
+                tip: '150+ minuti settimanali di attività moderata-intensa migliorano significativamente la longevità.',
+                ranges: [
+                    { label: 'Ottimo', value: '30+ min/giorno in zone 3-5', good: true },
+                    { label: 'Buono', value: '15-30 min/giorno', good: true },
+                    { label: 'Moderato', value: '5-15 min/giorno', good: false },
+                    { label: 'Basso', value: '<5 min/giorno', good: false }
+                ]
+            }
+        };
+        
+        // ==================== COMPONENTS ====================
         
         const Loading = () => (
             <div className="h-full flex items-center justify-center">
@@ -270,26 +339,85 @@
             </div>
         );
         
+        // ==================== TOOLTIP MODAL ====================
+        
+        const MetricModal = ({ metricKey, value, onClose }) => {
+            const info = metricInfo[metricKey];
+            if (!info) return null;
+            
+            return (
+                <div className="modal-overlay" onClick={onClose}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <span className="text-3xl">{info.icon}</span>
+                                <h3 className="text-xl font-bold" style={{ color: info.color }}>{info.title}</h3>
+                            </div>
+                            <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white text-2xl leading-none">&times;</button>
+                        </div>
+                        
+                        {value !== undefined && value !== null && (
+                            <div className="text-center py-4 mb-4 rounded-xl" style={{ background: 'var(--bg-secondary)' }}>
+                                <div className="text-4xl font-bold font-display" style={{ color: info.color }}>{value}</div>
+                                <div className="text-sm text-[var(--text-muted)]">Il tuo valore attuale</div>
+                            </div>
+                        )}
+                        
+                        <p className="text-[var(--text-secondary)] leading-relaxed mb-4">{info.description}</p>
+                        
+                        <div className="flex items-start gap-2 p-4 rounded-xl mb-6" style={{ background: 'var(--accent-green-dim)' }}>
+                            <span>💡</span>
+                            <p className="text-sm" style={{ color: 'var(--accent-green)' }}>{info.tip}</p>
+                        </div>
+                        
+                        <div className="rounded-xl p-4" style={{ background: 'var(--bg-secondary)' }}>
+                            <div className="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-3">Valori di riferimento</div>
+                            {info.ranges.map((r, i) => (
+                                <div key={i} className="flex justify-between items-center py-2 border-b border-[var(--border)] last:border-0">
+                                    <span className="text-sm">{r.label}</span>
+                                    <span className="text-sm font-medium" style={{ color: r.good ? 'var(--accent-green)' : 'var(--accent-orange)' }}>{r.value}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== CONFIRM MODAL ====================
+        
+        const ConfirmModal = ({ title, message, onConfirm, onCancel }) => (
+            <div className="modal-overlay" onClick={onCancel}>
+                <div className="modal-card text-center" onClick={e => e.stopPropagation()}>
+                    <h3 className="text-xl font-bold mb-4">{title}</h3>
+                    <p className="text-[var(--text-secondary)] mb-8">{message}</p>
+                    <div className="flex gap-4 justify-center">
+                        <button onClick={onCancel} className="btn-ghost px-6 py-3 rounded-xl">Annulla</button>
+                        <button onClick={onConfirm} className="btn-danger px-6 py-3 rounded-xl">Conferma</button>
+                    </div>
+                </div>
+            </div>
+        );
+        
         // ==================== BIO AGE RING ====================
         
-        const BioAgeRing = ({ bioAge, realAge }) => {
+        const BioAgeRing = ({ bioAge, realAge, onClick }) => {
             const diff = realAge && bioAge ? realAge - bioAge : 0;
             const progress = Math.max(0, Math.min(100, 50 + diff * 8));
             
             return (
-                <div className="bio-ring-container">
+                <div className="bio-ring-container cursor-pointer hover:scale-105 transition-transform" onClick={onClick}>
                     <div className="bio-ring-bg" />
                     <div className="bio-ring-progress" style={{ '--progress': progress }} />
                     <div className="bio-ring-inner">
-                        <span className="text-5xl font-bold font-display glow-text-green">
-                            {bioAge?.toFixed(1) || '--'}
-                        </span>
+                        <span className="text-5xl font-bold font-display glow-text-green">{bioAge?.toFixed(1) || '--'}</span>
                         <span className="text-sm text-[var(--text-muted)] uppercase tracking-widest mt-1">Bio Age</span>
                         {diff !== 0 && (
                             <span className={`text-lg font-semibold mt-2 ${diff > 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}`}>
                                 {diff > 0 ? `${diff.toFixed(1)} anni più giovane` : `${Math.abs(diff).toFixed(1)} anni più vecchio`}
                             </span>
                         )}
+                        <span className="text-xs text-[var(--accent-blue)] mt-2">ⓘ Clicca per info</span>
                     </div>
                 </div>
             );
@@ -297,11 +425,14 @@
         
         // ==================== METRIC CARD ====================
         
-        const MetricCard = ({ icon, label, value, unit, color, subtitle }) => (
-            <div className="metric-card fade-in">
+        const MetricCard = ({ metricKey, icon, label, value, unit, color, subtitle, onClick }) => (
+            <div className="metric-card fade-in" onClick={onClick}>
                 <div className="flex items-start justify-between mb-3">
                     <span className="text-2xl">{icon}</span>
-                    <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">{label}</span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">{label}</span>
+                        <span className="text-xs text-[var(--accent-blue)]">ⓘ</span>
+                    </div>
                 </div>
                 <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-bold font-display" style={{ color }}>{value ?? '--'}</span>
@@ -313,17 +444,20 @@
         
         // ==================== IMPACT ROW ====================
         
-        const ImpactRow = ({ icon, label, value, description }) => {
+        const ImpactRow = ({ metricKey, icon, label, value, description, onClick }) => {
             const isGood = value <= 0;
             const width = Math.min(Math.abs(value || 0) / 2.5 * 100, 100);
             
             return (
-                <div className="py-4 border-b border-[var(--border)] last:border-0">
+                <div className="py-4 border-b border-[var(--border)] last:border-0 cursor-pointer hover:bg-[var(--bg-secondary)] rounded-lg px-3 -mx-3 transition-colors" onClick={onClick}>
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
                             <span className="text-xl">{icon}</span>
                             <div>
-                                <span className="font-medium">{label}</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-medium">{label}</span>
+                                    <span className="text-xs text-[var(--accent-blue)]">ⓘ</span>
+                                </div>
                                 {description && <p className="text-xs text-[var(--text-muted)]">{description}</p>}
                             </div>
                         </div>
@@ -332,13 +466,7 @@
                         </span>
                     </div>
                     <div className="progress-bar">
-                        <div 
-                            className="progress-fill" 
-                            style={{ 
-                                width: `${width}%`,
-                                background: isGood ? 'var(--accent-green)' : 'var(--accent-orange)'
-                            }} 
-                        />
+                        <div className="progress-fill" style={{ width: `${width}%`, background: isGood ? 'var(--accent-green)' : 'var(--accent-orange)' }} />
                     </div>
                 </div>
             );
@@ -351,6 +479,7 @@
             const [input, setInput] = useState('');
             const [loading, setLoading] = useState(false);
             const [ready, setReady] = useState(false);
+            const [showReset, setShowReset] = useState(false);
             const chatRef = useRef(null);
             const inputRef = useRef(null);
             
@@ -368,14 +497,12 @@
             }, [coach]);
             
             useEffect(() => {
-                if (chatRef.current) {
-                    chatRef.current.scrollTop = chatRef.current.scrollHeight;
-                }
+                if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
             }, [messages, loading]);
             
             const loadHistory = async () => {
                 try {
-                    const res = await fetch(`${API}/api/chat/history?coach=${coach}&limit=30`, {
+                    const res = await fetch(`${API}/api/chat/history?coach=${coach}&limit=50`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     if (res.ok) {
@@ -401,15 +528,23 @@
                         body: JSON.stringify({ message: text, coach })
                     });
                     const data = await res.json();
-                    setMessages(prev => [...prev, { 
-                        role: 'assistant', 
-                        content: data.response || data.error || 'Errore' 
-                    }]);
+                    setMessages(prev => [...prev, { role: 'assistant', content: data.response || data.error || 'Errore' }]);
                 } catch {
                     setMessages(prev => [...prev, { role: 'assistant', content: 'Errore di connessione' }]);
                 }
                 setLoading(false);
                 inputRef.current?.focus();
+            };
+            
+            const resetChat = async () => {
+                try {
+                    await fetch(`${API}/api/chat/reset?coach=${coach}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                } catch {}
+                setMessages([]);
+                setShowReset(false);
             };
             
             const suggestions = isSakura 
@@ -420,21 +555,42 @@
             
             return (
                 <div className={`flex flex-col h-full ${bgClass}`}>
-                    {/* Empty State or Messages */}
+                    {/* Reset Modal */}
+                    {showReset && (
+                        <ConfirmModal
+                            title={`Resettare la chat con ${coachName}?`}
+                            message="Tutti i messaggi verranno eliminati. Le memorie salvate rimarranno."
+                            onConfirm={resetChat}
+                            onCancel={() => setShowReset(false)}
+                        />
+                    )}
+                    
+                    {/* Header */}
+                    <div className="flex justify-between items-center p-4 border-b border-[var(--border)]">
+                        <div className="flex items-center gap-3">
+                            <span className="text-2xl">{coachEmoji}</span>
+                            <div>
+                                <h2 className="font-bold" style={{ color: accent }}>{coachName}</h2>
+                                <p className="text-xs text-[var(--text-muted)]">{coachTitle}</p>
+                            </div>
+                        </div>
+                        {messages.length > 0 && (
+                            <button onClick={() => setShowReset(true)} className="btn-ghost px-4 py-2 rounded-xl text-sm">
+                                🗑️ Reset
+                            </button>
+                        )}
+                    </div>
+                    
+                    {/* Messages */}
                     <div ref={chatRef} className="flex-1 overflow-y-auto">
                         {messages.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center px-6 text-center">
-                                <div className="w-24 h-24 rounded-full flex items-center justify-center text-5xl mb-6 glow-green"
-                                    style={{ 
-                                        background: isSakura ? 'var(--accent-pink-dim)' : 'var(--accent-green-dim)',
-                                        boxShadow: isSakura ? '0 0 60px rgba(255,110,180,0.2)' : '0 0 60px rgba(0,245,147,0.2)'
-                                    }}>
+                                <div className="w-24 h-24 rounded-full flex items-center justify-center text-5xl mb-6"
+                                    style={{ background: isSakura ? 'var(--accent-pink-dim)' : 'var(--accent-green-dim)',
+                                        boxShadow: isSakura ? '0 0 60px rgba(255,110,180,0.2)' : '0 0 60px rgba(0,245,147,0.2)' }}>
                                     {coachEmoji}
                                 </div>
-                                <h2 className="text-3xl font-bold font-display mb-2" style={{ color: accent }}>
-                                    {coachName}
-                                </h2>
-                                <p className="text-[var(--text-muted)] mb-2">{coachTitle}</p>
+                                <h2 className="text-3xl font-bold font-display mb-2" style={{ color: accent }}>{coachName}</h2>
                                 <p className="text-[var(--text-secondary)] max-w-md mb-8">
                                     {isSakura 
                                         ? 'Sono qui per guidarti nel tuo percorso di benessere mentale. Parliamo di come ti senti, dello stress, e troviamo insieme il tuo equilibrio interiore.'
@@ -442,11 +598,8 @@
                                 </p>
                                 <div className="flex flex-wrap justify-center gap-3 max-w-lg">
                                     {suggestions.map((s, i) => (
-                                        <button 
-                                            key={i} 
-                                            onClick={() => setInput(s)}
-                                            className="px-5 py-3 rounded-full text-sm glass-card glass-card-hover cursor-pointer"
-                                            style={{ borderColor: 'var(--border)' }}>
+                                        <button key={i} onClick={() => setInput(s)}
+                                            className="px-5 py-3 rounded-full text-sm glass-card glass-card-hover">
                                             {s}
                                         </button>
                                     ))}
@@ -460,10 +613,7 @@
                                             {m.role === 'assistant' && (
                                                 <div className="flex items-center gap-3 mb-3 pb-3 border-b border-[var(--border)]">
                                                     <span className="text-2xl">{coachEmoji}</span>
-                                                    <div>
-                                                        <span className="font-semibold" style={{ color: accent }}>{coachName}</span>
-                                                        <span className="text-xs text-[var(--text-muted)] ml-2">{coachTitle}</span>
-                                                    </div>
+                                                    <span className="font-semibold" style={{ color: accent }}>{coachName}</span>
                                                 </div>
                                             )}
                                             <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
@@ -473,7 +623,7 @@
                                 {loading && (
                                     <div className="flex justify-start fade-in">
                                         <div className={`chat-bubble chat-ai ${coach}`}>
-                                            <div className="flex items-center gap-3 mb-3 pb-3 border-b border-[var(--border)]">
+                                            <div className="flex items-center gap-3 mb-3">
                                                 <span className="text-2xl">{coachEmoji}</span>
                                                 <span className="font-semibold" style={{ color: accent }}>{coachName}</span>
                                             </div>
@@ -489,9 +639,9 @@
                         )}
                     </div>
                     
-                    {/* Input Area */}
-                    <div className="p-6 border-t border-[var(--border)]">
-                        <div className="max-w-4xl mx-auto flex gap-4">
+                    {/* Input */}
+                    <div className="p-4 border-t border-[var(--border)]">
+                        <div className="max-w-4xl mx-auto flex gap-3">
                             <input
                                 ref={inputRef}
                                 type="text"
@@ -499,14 +649,12 @@
                                 onChange={e => setInput(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
                                 placeholder={`Scrivi a ${coachName}...`}
-                                className={`input-premium flex-1 px-6 py-4 rounded-2xl ${isSakura ? 'pink' : ''}`}
+                                className={`input-premium flex-1 px-5 py-4 rounded-2xl ${isSakura ? 'pink' : ''}`}
                                 disabled={loading}
                             />
-                            <button 
-                                onClick={send} 
-                                disabled={loading || !input.trim()}
+                            <button onClick={send} disabled={loading || !input.trim()}
                                 className={`${isSakura ? 'btn-pink' : 'btn-primary'} px-8 rounded-2xl text-lg disabled:opacity-40`}>
-                                Invia →
+                                Invia
                             </button>
                         </div>
                     </div>
@@ -517,17 +665,25 @@
         // ==================== DATA VIEW ====================
         
         const DataView = ({ summary }) => {
+            const [activeMetric, setActiveMetric] = useState(null);
             const avgs = summary?.averages || {};
             const impacts = avgs.bio_impacts || {};
             const realAge = summary?.real_age || 42;
             
             return (
                 <div className="h-full overflow-y-auto bg-gradient-sensei">
+                    {activeMetric && (
+                        <MetricModal
+                            metricKey={activeMetric.key}
+                            value={activeMetric.value}
+                            onClose={() => setActiveMetric(null)}
+                        />
+                    )}
+                    
                     <div className="max-w-6xl mx-auto p-8">
-                        {/* Header */}
                         <div className="text-center mb-10 slide-up">
                             <h1 className="text-4xl font-bold font-display mb-2">Performance Dashboard</h1>
-                            <p className="text-[var(--text-muted)]">Analisi degli ultimi 30 giorni</p>
+                            <p className="text-[var(--text-muted)]">Media degli ultimi 30 giorni • Clicca sulle card per dettagli</p>
                         </div>
                         
                         {/* Bio Age Section */}
@@ -549,75 +705,78 @@
                                     </div>
                                 </div>
                             </div>
-                            <BioAgeRing bioAge={avgs.biological_age} realAge={realAge} />
+                            <BioAgeRing 
+                                bioAge={avgs.biological_age} 
+                                realAge={realAge} 
+                                onClick={() => setActiveMetric({ key: 'bioAge', value: avgs.biological_age?.toFixed(1) })}
+                            />
                         </div>
                         
                         {/* Metrics Grid */}
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
                             <MetricCard 
-                                icon="❤️" 
-                                label="RHR" 
-                                value={avgs.resting_hr?.toFixed(0)} 
-                                unit="bpm"
-                                color="var(--accent-red)"
-                                subtitle="Frequenza a riposo"
+                                metricKey="rhr"
+                                icon="❤️" label="RHR" 
+                                value={avgs.resting_hr?.toFixed(0)} unit="bpm"
+                                color="var(--accent-red)" subtitle="Frequenza a riposo"
+                                onClick={() => setActiveMetric({ key: 'rhr', value: avgs.resting_hr?.toFixed(0) })}
                             />
                             <MetricCard 
-                                icon="🫁" 
-                                label="VO2 Max" 
-                                value={avgs.vo2_max?.toFixed(0)} 
-                                unit="ml/kg"
-                                color="var(--accent-green)"
-                                subtitle="Capacità aerobica"
+                                metricKey="vo2"
+                                icon="🫁" label="VO2 Max" 
+                                value={avgs.vo2_max?.toFixed(0)} unit="ml/kg"
+                                color="var(--accent-green)" subtitle="Capacità aerobica"
+                                onClick={() => setActiveMetric({ key: 'vo2', value: avgs.vo2_max?.toFixed(0) })}
                             />
                             <MetricCard 
-                                icon="👟" 
-                                label="Passi" 
-                                value={avgs.steps ? (avgs.steps/1000).toFixed(1) : null} 
-                                unit="k/day"
-                                color="var(--accent-orange)"
-                                subtitle="Media giornaliera"
+                                metricKey="steps"
+                                icon="👟" label="Passi" 
+                                value={avgs.steps ? (avgs.steps/1000).toFixed(1) : null} unit="k/day"
+                                color="var(--accent-orange)" subtitle="Media giornaliera"
+                                onClick={() => setActiveMetric({ key: 'steps', value: avgs.steps?.toFixed(0) })}
                             />
                             <MetricCard 
-                                icon="😴" 
-                                label="Sonno" 
-                                value={avgs.sleep_hours?.toFixed(1)} 
-                                unit="ore"
-                                color="var(--accent-purple)"
-                                subtitle="Durata media"
+                                metricKey="sleep"
+                                icon="😴" label="Sonno" 
+                                value={avgs.sleep_hours?.toFixed(1)} unit="ore"
+                                color="var(--accent-purple)" subtitle="Durata media"
+                                onClick={() => setActiveMetric({ key: 'sleep', value: avgs.sleep_hours?.toFixed(1) + ' ore' })}
                             />
                             <MetricCard 
-                                icon="⚡" 
-                                label="Recovery" 
-                                value={avgs.recovery?.toFixed(0)} 
-                                unit="%"
-                                color="var(--accent-green)"
-                                subtitle="Prontezza fisica"
+                                metricKey="recovery"
+                                icon="⚡" label="Recovery" 
+                                value={avgs.recovery?.toFixed(0)} unit="%"
+                                color="var(--accent-green)" subtitle="Prontezza fisica"
+                                onClick={() => setActiveMetric({ key: 'recovery', value: avgs.recovery?.toFixed(0) + '%' })}
                             />
                             <MetricCard 
-                                icon="🔥" 
-                                label="Strain" 
-                                value={avgs.strain?.toFixed(1)} 
-                                unit="/21"
-                                color="var(--accent-orange)"
-                                subtitle="Carico allenamento"
+                                metricKey="strain"
+                                icon="🔥" label="Strain" 
+                                value={avgs.strain?.toFixed(1)} unit="/21"
+                                color="var(--accent-orange)" subtitle="Carico allenamento"
+                                onClick={() => setActiveMetric({ key: 'strain', value: avgs.strain?.toFixed(1) })}
                             />
                         </div>
                         
                         {/* Impact Analysis */}
                         <div className="glass-card p-8 slide-up">
-                            <h3 className="text-xl font-semibold mb-6">Impatto sull'Età Biologica</h3>
+                            <h3 className="text-xl font-semibold mb-2">Impatto sull'Età Biologica</h3>
                             <p className="text-[var(--text-muted)] mb-6">
-                                Ogni fattore contribuisce a modificare la tua età biologica. 
-                                I valori negativi (verdi) ti ringiovaniscono, quelli positivi (arancioni) ti invecchiano.
+                                Ogni fattore contribuisce a modificare la tua età biologica. Clicca per approfondire.
                             </p>
                             <div className="grid md:grid-cols-2 gap-x-10">
-                                <ImpactRow icon="🫁" label="VO2 Max" value={impacts.vo2} description="Capacità cardiovascolare" />
-                                <ImpactRow icon="❤️" label="Frequenza Cardiaca" value={impacts.rhr} description="Efficienza cardiaca" />
-                                <ImpactRow icon="😴" label="Qualità Sonno" value={impacts.sleep} description="Ore e profondità" />
-                                <ImpactRow icon="👟" label="Attività Fisica" value={impacts.steps} description="Movimento quotidiano" />
-                                <ImpactRow icon="😤" label="Gestione Stress" value={impacts.stress} description="Livello medio" />
-                                <ImpactRow icon="🔥" label="Intensità Training" value={impacts.hrz} description="Zone HR elevate" />
+                                <ImpactRow icon="🫁" label="VO2 Max" value={impacts.vo2} description="Capacità cardiovascolare"
+                                    onClick={() => setActiveMetric({ key: 'vo2', value: avgs.vo2_max?.toFixed(0) })} />
+                                <ImpactRow icon="❤️" label="Frequenza Cardiaca" value={impacts.rhr} description="Efficienza cardiaca"
+                                    onClick={() => setActiveMetric({ key: 'rhr', value: avgs.resting_hr?.toFixed(0) })} />
+                                <ImpactRow icon="😴" label="Qualità Sonno" value={impacts.sleep} description="Ore e profondità"
+                                    onClick={() => setActiveMetric({ key: 'sleep', value: avgs.sleep_hours?.toFixed(1) + ' ore' })} />
+                                <ImpactRow icon="👟" label="Attività Fisica" value={impacts.steps} description="Movimento quotidiano"
+                                    onClick={() => setActiveMetric({ key: 'steps', value: avgs.steps?.toFixed(0) })} />
+                                <ImpactRow icon="😤" label="Gestione Stress" value={impacts.stress} description="Livello medio"
+                                    onClick={() => setActiveMetric({ key: 'stress', value: avgs.stress_avg?.toFixed(0) })} />
+                                <ImpactRow icon="💪" label="Intensità Training" value={impacts.hrz} description="Zone HR elevate"
+                                    onClick={() => setActiveMetric({ key: 'hrz', value: null })} />
                             </div>
                         </div>
                     </div>
@@ -643,78 +802,22 @@
                 chartRef.current = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: trend.data.map(d => {
-                            const date = new Date(d.date);
-                            return date.toLocaleDateString('it', { day: '2-digit', month: 'short' });
-                        }),
+                        labels: trend.data.map(d => new Date(d.date).toLocaleDateString('it', { day: '2-digit', month: 'short' })),
                         datasets: [
-                            { 
-                                label: 'Età Biologica', 
-                                data: trend.data.map(d => d.biological_age), 
-                                borderColor: '#00f593',
-                                backgroundColor: gradient,
-                                fill: true,
-                                tension: 0.4,
-                                pointRadius: 0,
-                                pointHoverRadius: 6,
-                                pointHoverBackgroundColor: '#00f593',
-                                borderWidth: 3
-                            },
-                            { 
-                                label: 'Età Reale', 
-                                data: trend.data.map(() => realAge), 
-                                borderColor: '#5c5e6a',
-                                borderDash: [8, 4],
-                                pointRadius: 0,
-                                borderWidth: 2
-                            }
+                            { label: 'Età Biologica', data: trend.data.map(d => d.biological_age), borderColor: '#00f593', backgroundColor: gradient, fill: true, tension: 0.4, pointRadius: 0, borderWidth: 3 },
+                            { label: 'Età Reale', data: trend.data.map(() => realAge), borderColor: '#5c5e6a', borderDash: [8, 4], pointRadius: 0, borderWidth: 2 }
                         ]
                     },
                     options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: {
-                            intersect: false,
-                            mode: 'index'
-                        },
-                        plugins: { 
-                            legend: { 
-                                labels: { 
-                                    color: '#8b8d98',
-                                    font: { size: 12, family: 'Inter' },
-                                    padding: 20,
-                                    usePointStyle: true
-                                }
-                            },
-                            tooltip: {
-                                backgroundColor: '#181a22',
-                                borderColor: '#2a2d38',
-                                borderWidth: 1,
-                                titleColor: '#fff',
-                                bodyColor: '#8b8d98',
-                                padding: 12,
-                                cornerRadius: 8
-                            }
-                        },
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: { legend: { labels: { color: '#8b8d98', font: { size: 12 } } } },
                         scales: {
-                            x: { 
-                                grid: { color: '#1e2028' }, 
-                                ticks: { 
-                                    color: '#5c5e6a',
-                                    font: { size: 11 },
-                                    maxTicksLimit: 10
-                                }
-                            },
-                            y: { 
-                                grid: { color: '#1e2028' }, 
-                                ticks: { color: '#5c5e6a' },
-                                suggestedMin: realAge - 6,
-                                suggestedMax: realAge + 3
-                            }
+                            x: { grid: { color: '#1e2028' }, ticks: { color: '#5c5e6a', maxTicksLimit: 10 } },
+                            y: { grid: { color: '#1e2028' }, ticks: { color: '#5c5e6a' }, suggestedMin: realAge - 6, suggestedMax: realAge + 3 }
                         }
                     }
                 });
-                
                 return () => chartRef.current?.destroy();
             }, [trend, realAge]);
             
@@ -724,7 +827,7 @@
                         <div className="text-center glass-card p-10">
                             <span className="text-5xl mb-4 block">📈</span>
                             <h3 className="text-xl font-semibold mb-2">Dati insufficienti</h3>
-                            <p className="text-[var(--text-muted)]">Servono almeno 30 giorni di dati per il trend</p>
+                            <p className="text-[var(--text-muted)]">Servono almeno 30 giorni di dati</p>
                         </div>
                     </div>
                 );
@@ -740,48 +843,30 @@
                             <p className="text-[var(--text-muted)]">Evoluzione dell'età biologica nel tempo</p>
                         </div>
                         
-                        {/* Chart */}
                         <div className="glass-card p-8 mb-8 slide-up">
-                            <div style={{ height: 350 }}>
-                                <canvas ref={canvasRef} />
-                            </div>
+                            <div style={{ height: 350 }}><canvas ref={canvasRef} /></div>
                         </div>
                         
-                        {/* Pace of Aging */}
                         <div className="grid md:grid-cols-2 gap-6">
                             <div className="glass-card p-8 slide-up">
                                 <h3 className="text-sm text-[var(--text-muted)] uppercase tracking-wider mb-4">Pace of Aging</h3>
                                 <div className={`text-5xl font-bold font-display mb-4 ${pace <= 0 ? 'text-[var(--accent-green)] glow-text-green' : 'text-[var(--accent-orange)]'}`}>
                                     {pace != null ? (pace <= 0 ? '' : '+') + pace.toFixed(1) : '--'}
-                                    <span className="text-2xl ml-2">anni/anno</span>
+                                    <span className="text-xl ml-2">anni/anno</span>
                                 </div>
                                 <p className="text-[var(--text-secondary)]">
-                                    {pace < -0.5 ? '🎉 Eccellente! Stai ringiovanendo significativamente.' : 
-                                     pace < 0 ? '✨ Ottimo! Il tuo invecchiamento è rallentato.' :
-                                     pace < 0.5 ? '👍 Nella norma. Mantieni le buone abitudini.' :
-                                     '⚠️ Attenzione! Invecchiamento accelerato. Migliora sonno e attività.'}
+                                    {pace < -0.5 ? '🎉 Eccellente! Stai ringiovanendo.' : 
+                                     pace < 0 ? '✨ Ottimo! Invecchiamento rallentato.' :
+                                     pace < 0.5 ? '👍 Nella norma.' : '⚠️ Attenzione! Invecchiamento accelerato.'}
                                 </p>
                             </div>
                             
                             <div className="glass-card p-8 slide-up">
-                                <h3 className="text-sm text-[var(--text-muted)] uppercase tracking-wider mb-4">Statistiche Periodo</h3>
-                                <div className="space-y-4">
-                                    <div className="flex justify-between">
-                                        <span className="text-[var(--text-secondary)]">Giorni analizzati</span>
-                                        <span className="font-semibold">{trend.data.length}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-[var(--text-secondary)]">Bio Age min</span>
-                                        <span className="font-semibold text-[var(--accent-green)]">
-                                            {Math.min(...trend.data.filter(d => d.biological_age).map(d => d.biological_age)).toFixed(1)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-[var(--text-secondary)]">Bio Age max</span>
-                                        <span className="font-semibold text-[var(--accent-orange)]">
-                                            {Math.max(...trend.data.filter(d => d.biological_age).map(d => d.biological_age)).toFixed(1)}
-                                        </span>
-                                    </div>
+                                <h3 className="text-sm text-[var(--text-muted)] uppercase tracking-wider mb-4">Statistiche</h3>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between"><span className="text-[var(--text-secondary)]">Giorni</span><span className="font-semibold">{trend.data.length}</span></div>
+                                    <div className="flex justify-between"><span className="text-[var(--text-secondary)]">Bio Age min</span><span className="font-semibold text-[var(--accent-green)]">{Math.min(...trend.data.filter(d => d.biological_age).map(d => d.biological_age)).toFixed(1)}</span></div>
+                                    <div className="flex justify-between"><span className="text-[var(--text-secondary)]">Bio Age max</span><span className="font-semibold text-[var(--accent-orange)]">{Math.max(...trend.data.filter(d => d.biological_age).map(d => d.biological_age)).toFixed(1)}</span></div>
                                 </div>
                             </div>
                         </div>
@@ -793,10 +878,7 @@
         // ==================== PROFILE VIEW ====================
         
         const ProfileView = ({ token, user, onUpdate, onLogout }) => {
-            const [form, setForm] = useState({
-                name: user?.name || '',
-                birth_year: user?.birth_year || ''
-            });
+            const [form, setForm] = useState({ name: user?.name || '', birth_year: user?.birth_year || '' });
             const [saving, setSaving] = useState(false);
             const [saved, setSaved] = useState(false);
             
@@ -806,10 +888,7 @@
                     const res = await fetch(`${API}/api/profile`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({
-                            name: form.name,
-                            birth_year: form.birth_year ? parseInt(form.birth_year) : null
-                        })
+                        body: JSON.stringify({ name: form.name, birth_year: form.birth_year ? parseInt(form.birth_year) : null })
                     });
                     if (res.ok) {
                         setSaved(true);
@@ -834,31 +913,18 @@
                         
                         <div className="glass-card p-8 mb-6 slide-up">
                             <h3 className="text-lg font-semibold mb-6">Informazioni Personali</h3>
-                            
                             <div className="space-y-5">
                                 <div>
                                     <label className="text-sm text-[var(--text-muted)] block mb-2">Nome</label>
-                                    <input 
-                                        type="text" 
-                                        value={form.name} 
-                                        onChange={e => setForm({...form, name: e.target.value})}
-                                        className="input-premium w-full px-5 py-4 rounded-xl" 
-                                        placeholder="Il tuo nome" 
-                                    />
+                                    <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})}
+                                        className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Il tuo nome" />
                                 </div>
-                                
                                 <div>
                                     <label className="text-sm text-[var(--text-muted)] block mb-2">Anno di nascita</label>
-                                    <input 
-                                        type="number" 
-                                        value={form.birth_year} 
-                                        onChange={e => setForm({...form, birth_year: e.target.value})}
-                                        className="input-premium w-full px-5 py-4 rounded-xl" 
-                                        placeholder="1976" 
-                                    />
-                                    {age && <p className="text-sm text-[var(--text-muted)] mt-2">Età attuale: {age} anni</p>}
+                                    <input type="number" value={form.birth_year} onChange={e => setForm({...form, birth_year: e.target.value})}
+                                        className="input-premium w-full px-5 py-4 rounded-xl" placeholder="1976" />
+                                    {age && <p className="text-sm text-[var(--text-muted)] mt-2">Età: {age} anni</p>}
                                 </div>
-                                
                                 <button onClick={save} disabled={saving} className="btn-primary w-full py-4 rounded-xl text-lg">
                                     {saving ? 'Salvataggio...' : saved ? '✓ Salvato!' : 'Salva Modifiche'}
                                 </button>
@@ -873,7 +939,7 @@
                                     <span>{user?.email}</span>
                                 </div>
                                 <div className="flex justify-between items-center py-3">
-                                    <span className="text-[var(--text-muted)]">Garmin Connect</span>
+                                    <span className="text-[var(--text-muted)]">Garmin</span>
                                     <span className={user?.garmin_connected ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}>
                                         {user?.garmin_connected ? '✓ Connesso' : '✗ Non connesso'}
                                     </span>
@@ -881,9 +947,7 @@
                             </div>
                         </div>
                         
-                        <button onClick={onLogout} className="btn-ghost w-full py-4 rounded-xl">
-                            Logout
-                        </button>
+                        <button onClick={onLogout} className="btn-ghost w-full py-4 rounded-xl">Logout</button>
                     </div>
                 </div>
             );
@@ -894,23 +958,15 @@
         const LandingPage = ({ onNavigate }) => (
             <div className="h-full flex flex-col items-center justify-center p-8">
                 <div className="flex gap-6 mb-8">
-                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl glow-green"
-                        style={{ background: 'var(--accent-green-dim)' }}>🥋</div>
-                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl glow-pink"
-                        style={{ background: 'var(--accent-pink-dim)' }}>🌸</div>
+                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl glow-green" style={{ background: 'var(--accent-green-dim)' }}>🥋</div>
+                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl glow-pink" style={{ background: 'var(--accent-pink-dim)' }}>🌸</div>
                 </div>
                 <h1 className="text-5xl font-bold font-display mb-3">SENSEI & SAKURA</h1>
                 <p className="text-xl text-[var(--text-secondary)] mb-2">Performance Lab</p>
-                <p className="text-[var(--text-muted)] mb-10 max-w-md text-center">
-                    Il tuo centro medico sportivo digitale. Corpo e mente in perfetto equilibrio.
-                </p>
+                <p className="text-[var(--text-muted)] mb-10 max-w-md text-center">Il tuo centro medico sportivo digitale. Corpo e mente in perfetto equilibrio.</p>
                 <div className="flex gap-4">
-                    <button onClick={() => onNavigate('login')} className="btn-primary px-10 py-4 rounded-xl text-lg">
-                        Accedi
-                    </button>
-                    <button onClick={() => onNavigate('register')} className="btn-ghost px-10 py-4 rounded-xl text-lg">
-                        Registrati
-                    </button>
+                    <button onClick={() => onNavigate('login')} className="btn-primary px-10 py-4 rounded-xl text-lg">Accedi</button>
+                    <button onClick={() => onNavigate('register')} className="btn-ghost px-10 py-4 rounded-xl text-lg">Registrati</button>
                 </div>
             </div>
         );
@@ -923,12 +979,10 @@
             
             const submit = async (e) => {
                 e.preventDefault();
-                setLoading(true);
-                setError('');
+                setLoading(true); setError('');
                 try {
                     const res = await fetch(`${API}/api/login`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email, password })
                     });
                     const data = await res.json();
@@ -936,12 +990,8 @@
                         localStorage.setItem('token', data.token);
                         localStorage.setItem('user', JSON.stringify(data.user));
                         onLogin(data);
-                    } else {
-                        setError(data.error || 'Login fallito');
-                    }
-                } catch {
-                    setError('Errore di connessione');
-                }
+                    } else setError(data.error || 'Login fallito');
+                } catch { setError('Errore di connessione'); }
                 setLoading(false);
             };
             
@@ -952,42 +1002,13 @@
                             <h1 className="text-4xl font-bold font-display mb-2">Bentornato</h1>
                             <p className="text-[var(--text-muted)]">Accedi al tuo Performance Lab</p>
                         </div>
-                        
-                        {error && (
-                            <div className="glass-card border-[var(--accent-red)] p-4 mb-6 text-[var(--accent-red)] text-sm">
-                                {error}
-                            </div>
-                        )}
-                        
+                        {error && <div className="glass-card border-[var(--accent-red)] p-4 mb-6 text-[var(--accent-red)] text-sm">{error}</div>}
                         <div className="space-y-4 mb-6">
-                            <input 
-                                type="email" 
-                                value={email} 
-                                onChange={e => setEmail(e.target.value)}
-                                className="input-premium w-full px-5 py-4 rounded-xl" 
-                                placeholder="Email" 
-                                required 
-                            />
-                            <input 
-                                type="password" 
-                                value={password} 
-                                onChange={e => setPassword(e.target.value)}
-                                className="input-premium w-full px-5 py-4 rounded-xl" 
-                                placeholder="Password" 
-                                required 
-                            />
+                            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Email" required />
+                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Password" required />
                         </div>
-                        
-                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 rounded-xl text-lg mb-6">
-                            {loading ? 'Accesso...' : 'Accedi'}
-                        </button>
-                        
-                        <p className="text-center text-[var(--text-muted)]">
-                            Non hai un account?{' '}
-                            <button type="button" onClick={() => onNavigate('register')} className="text-[var(--accent-green)]">
-                                Registrati
-                            </button>
-                        </p>
+                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 rounded-xl text-lg mb-6">{loading ? 'Accesso...' : 'Accedi'}</button>
+                        <p className="text-center text-[var(--text-muted)]">Non hai un account? <button type="button" onClick={() => onNavigate('register')} className="text-[var(--accent-green)]">Registrati</button></p>
                     </form>
                 </div>
             );
@@ -1001,44 +1022,29 @@
             
             const submit = async (e) => {
                 e.preventDefault();
-                if (!form.birth_year) {
-                    setError('Anno di nascita richiesto per calcolare l\'età biologica');
-                    return;
-                }
-                setLoading(true);
-                setError('');
+                if (!form.birth_year) { setError('Anno di nascita richiesto'); return; }
+                setLoading(true); setError('');
                 try {
                     const res = await fetch(`${API}/api/register`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ ...form, birth_year: parseInt(form.birth_year) })
                     });
                     const data = await res.json();
-                    if (data.user_id) {
-                        setSuccess(true);
-                    } else {
-                        setError(data.error || 'Errore');
-                    }
-                } catch {
-                    setError('Errore di connessione');
-                }
+                    if (data.user_id) setSuccess(true);
+                    else setError(data.error || 'Errore');
+                } catch { setError('Errore di connessione'); }
                 setLoading(false);
             };
             
-            if (success) {
-                return (
-                    <div className="h-full flex items-center justify-center p-8">
-                        <div className="text-center glass-card p-12">
-                            <div className="text-6xl mb-6">🎉</div>
-                            <h2 className="text-3xl font-bold font-display text-[var(--accent-green)] mb-4">Account Creato!</h2>
-                            <p className="text-[var(--text-muted)] mb-8">Benvenuto nel Performance Lab</p>
-                            <button onClick={() => onNavigate('login')} className="btn-primary px-10 py-4 rounded-xl text-lg">
-                                Accedi Ora
-                            </button>
-                        </div>
+            if (success) return (
+                <div className="h-full flex items-center justify-center p-8">
+                    <div className="text-center glass-card p-12">
+                        <div className="text-6xl mb-6">🎉</div>
+                        <h2 className="text-3xl font-bold font-display text-[var(--accent-green)] mb-4">Account Creato!</h2>
+                        <button onClick={() => onNavigate('login')} className="btn-primary px-10 py-4 rounded-xl text-lg">Accedi Ora</button>
                     </div>
-                );
-            }
+                </div>
+            );
             
             return (
                 <div className="h-full flex items-center justify-center p-8">
@@ -1047,57 +1053,15 @@
                             <h1 className="text-4xl font-bold font-display mb-2">Registrazione</h1>
                             <p className="text-[var(--text-muted)]">Crea il tuo account Performance Lab</p>
                         </div>
-                        
-                        {error && (
-                            <div className="glass-card border-[var(--accent-red)] p-4 mb-6 text-[var(--accent-red)] text-sm">
-                                {error}
-                            </div>
-                        )}
-                        
+                        {error && <div className="glass-card border-[var(--accent-red)] p-4 mb-6 text-[var(--accent-red)] text-sm">{error}</div>}
                         <div className="space-y-4 mb-6">
-                            <input 
-                                value={form.name} 
-                                onChange={e => setForm({...form, name: e.target.value})}
-                                className="input-premium w-full px-5 py-4 rounded-xl" 
-                                placeholder="Nome" 
-                            />
-                            <input 
-                                type="email" 
-                                value={form.email} 
-                                onChange={e => setForm({...form, email: e.target.value})}
-                                className="input-premium w-full px-5 py-4 rounded-xl" 
-                                placeholder="Email" 
-                                required 
-                            />
-                            <input 
-                                type="password" 
-                                value={form.password} 
-                                onChange={e => setForm({...form, password: e.target.value})}
-                                className="input-premium w-full px-5 py-4 rounded-xl" 
-                                placeholder="Password (min 6 caratteri)" 
-                                required 
-                                minLength="6"
-                            />
-                            <input 
-                                type="number" 
-                                value={form.birth_year} 
-                                onChange={e => setForm({...form, birth_year: e.target.value})}
-                                className="input-premium w-full px-5 py-4 rounded-xl" 
-                                placeholder="Anno di nascita *" 
-                                required
-                            />
+                            <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Nome" />
+                            <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Email" required />
+                            <input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Password (min 6)" required minLength="6" />
+                            <input type="number" value={form.birth_year} onChange={e => setForm({...form, birth_year: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Anno di nascita *" required />
                         </div>
-                        
-                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 rounded-xl text-lg mb-6">
-                            {loading ? 'Registrazione...' : 'Crea Account'}
-                        </button>
-                        
-                        <p className="text-center text-[var(--text-muted)]">
-                            Hai già un account?{' '}
-                            <button type="button" onClick={() => onNavigate('login')} className="text-[var(--accent-green)]">
-                                Accedi
-                            </button>
-                        </p>
+                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 rounded-xl text-lg mb-6">{loading ? 'Registrazione...' : 'Crea Account'}</button>
+                        <p className="text-center text-[var(--text-muted)]">Hai già un account? <button type="button" onClick={() => onNavigate('login')} className="text-[var(--accent-green)]">Accedi</button></p>
                     </form>
                 </div>
             );
@@ -1111,8 +1075,7 @@
             
             const connect = async (e) => {
                 e.preventDefault();
-                setLoading(true);
-                setError('');
+                setLoading(true); setError('');
                 try {
                     const res = await fetch(`${API}/api/garmin/connect`, {
                         method: 'POST',
@@ -1129,36 +1092,29 @@
                         });
                         setStep(3);
                         setTimeout(onComplete, 2000);
-                    } else {
-                        setError(data.error || 'Errore di connessione a Garmin');
-                    }
-                } catch {
-                    setError('Errore di connessione');
-                }
+                    } else setError(data.error || 'Errore');
+                } catch { setError('Errore di connessione'); }
                 setLoading(false);
             };
             
-            if (step >= 2) {
-                return (
-                    <div className="h-full flex items-center justify-center">
-                        <div className="text-center glass-card p-12">
-                            {step === 2 ? (
-                                <>
-                                    <div className="w-16 h-16 border-4 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin mx-auto mb-6" />
-                                    <h3 className="text-2xl font-bold mb-2">Sincronizzazione in corso</h3>
-                                    <p className="text-[var(--text-muted)]">Importazione dati degli ultimi 90 giorni...</p>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="text-6xl mb-6">✓</div>
-                                    <h3 className="text-2xl font-bold text-[var(--accent-green)] mb-2">Tutto Pronto!</h3>
-                                    <p className="text-[var(--text-muted)]">I tuoi coach ti aspettano</p>
-                                </>
-                            )}
-                        </div>
+            if (step >= 2) return (
+                <div className="h-full flex items-center justify-center">
+                    <div className="text-center glass-card p-12">
+                        {step === 2 ? (
+                            <>
+                                <div className="w-16 h-16 border-4 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin mx-auto mb-6" />
+                                <h3 className="text-2xl font-bold mb-2">Sincronizzazione</h3>
+                                <p className="text-[var(--text-muted)]">Importazione dati degli ultimi 90 giorni...</p>
+                            </>
+                        ) : (
+                            <>
+                                <div className="text-6xl mb-6">✓</div>
+                                <h3 className="text-2xl font-bold text-[var(--accent-green)] mb-2">Tutto Pronto!</h3>
+                            </>
+                        )}
                     </div>
-                );
-            }
+                </div>
+            );
             
             return (
                 <div className="h-full flex items-center justify-center p-8">
@@ -1166,47 +1122,21 @@
                         <div className="text-center mb-10">
                             <div className="text-5xl mb-4">⌚</div>
                             <h1 className="text-4xl font-bold font-display mb-2">Connetti Garmin</h1>
-                            <p className="text-[var(--text-muted)]">Sincronizza i tuoi dati per analisi personalizzate</p>
+                            <p className="text-[var(--text-muted)]">Sincronizza i tuoi dati</p>
                         </div>
-                        
-                        {error && (
-                            <div className="glass-card border-[var(--accent-red)] p-4 mb-6 text-[var(--accent-red)] text-sm">
-                                {error}
-                            </div>
-                        )}
-                        
-                        <div className="glass-card p-4 mb-6 text-sm text-[var(--text-muted)]">
-                            🔒 Le tue credenziali sono criptate e utilizzate solo per sincronizzare i dati
-                        </div>
-                        
+                        {error && <div className="glass-card border-[var(--accent-red)] p-4 mb-6 text-[var(--accent-red)] text-sm">{error}</div>}
+                        <div className="glass-card p-4 mb-6 text-sm text-[var(--text-muted)]">🔒 Le tue credenziali sono criptate</div>
                         <div className="space-y-4 mb-6">
-                            <input 
-                                type="email" 
-                                value={garmin.email} 
-                                onChange={e => setGarmin({...garmin, email: e.target.value})}
-                                className="input-premium w-full px-5 py-4 rounded-xl" 
-                                placeholder="Email Garmin Connect" 
-                                required 
-                            />
-                            <input 
-                                type="password" 
-                                value={garmin.password} 
-                                onChange={e => setGarmin({...garmin, password: e.target.value})}
-                                className="input-premium w-full px-5 py-4 rounded-xl" 
-                                placeholder="Password Garmin Connect" 
-                                required 
-                            />
+                            <input type="email" value={garmin.email} onChange={e => setGarmin({...garmin, email: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Email Garmin" required />
+                            <input type="password" value={garmin.password} onChange={e => setGarmin({...garmin, password: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Password Garmin" required />
                         </div>
-                        
-                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 rounded-xl text-lg">
-                            {loading ? 'Connessione...' : 'Connetti Account'}
-                        </button>
+                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 rounded-xl text-lg">{loading ? 'Connessione...' : 'Connetti'}</button>
                     </form>
                 </div>
             );
         };
         
-        // ==================== MAIN DASHBOARD ====================
+        // ==================== DASHBOARD ====================
         
         const Dashboard = ({ token, user, onLogout, onUserUpdate }) => {
             const [tab, setTab] = useState('sensei');
@@ -1215,9 +1145,7 @@
             const [loading, setLoading] = useState(true);
             const [syncing, setSyncing] = useState(false);
             
-            useEffect(() => {
-                fetchData();
-            }, []);
+            useEffect(() => { fetchData(); }, []);
             
             const fetchData = async () => {
                 try {
@@ -1226,8 +1154,7 @@
                         fetch(`${API}/api/metrics/summary?days=30`, { headers }).then(r => r.ok ? r.json() : {}),
                         fetch(`${API}/api/metrics/trend?days=90`, { headers }).then(r => r.ok ? r.json() : {})
                     ]);
-                    setSummary(s);
-                    setTrend(t);
+                    setSummary(s); setTrend(t);
                 } catch {}
                 setLoading(false);
             };
@@ -1248,8 +1175,8 @@
             if (loading) return <Loading />;
             
             const navItems = [
-                { id: 'sensei', label: 'Sensei', icon: '🥋', color: 'sensei' },
-                { id: 'sakura', label: 'Sakura', icon: '🌸', color: 'sakura' },
+                { id: 'sensei', label: 'Sensei', icon: '🥋', type: 'sensei' },
+                { id: 'sakura', label: 'Sakura', icon: '🌸', type: 'sakura' },
                 { id: 'data', label: 'Dashboard', icon: '📊' },
                 { id: 'trend', label: 'Trend', icon: '📈' },
                 { id: 'profile', label: 'Profilo', icon: '⚙️' }
@@ -1257,37 +1184,30 @@
             
             return (
                 <div className="h-full flex">
-                    {/* Sidebar Navigation */}
+                    {/* Sidebar */}
                     <nav className="w-20 lg:w-64 border-r border-[var(--border)] bg-[var(--bg-secondary)] flex flex-col">
                         <div className="p-4 lg:p-6 border-b border-[var(--border)]">
                             <h1 className="hidden lg:block text-xl font-bold font-display">Performance Lab</h1>
                             <span className="lg:hidden text-2xl block text-center">⚡</span>
                         </div>
-                        
                         <div className="flex-1 p-3 space-y-2">
                             {navItems.map(item => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => setTab(item.id)}
-                                    className={`nav-item w-full ${tab === item.id ? `active ${item.color || ''}` : ''}`}>
+                                <button key={item.id} onClick={() => setTab(item.id)}
+                                    className={`nav-item w-full ${tab === item.id ? `active ${item.type || ''}` : ''}`}>
                                     <span className="text-xl lg:text-2xl">{item.icon}</span>
                                     <span className="hidden lg:block text-sm">{item.label}</span>
                                 </button>
                             ))}
                         </div>
-                        
                         <div className="p-3 border-t border-[var(--border)]">
-                            <button 
-                                onClick={sync} 
-                                disabled={syncing}
-                                className="nav-item w-full">
+                            <button onClick={sync} disabled={syncing} className="nav-item w-full">
                                 <span className={`text-xl ${syncing ? 'animate-spin' : ''}`}>🔄</span>
                                 <span className="hidden lg:block text-sm">{syncing ? 'Sync...' : 'Sincronizza'}</span>
                             </button>
                         </div>
                     </nav>
                     
-                    {/* Main Content */}
+                    {/* Content */}
                     <main className="flex-1 overflow-hidden">
                         {tab === 'sensei' && <ChatView token={token} coach="sensei" />}
                         {tab === 'sakura' && <ChatView token={token} coach="sakura" />}
@@ -1307,30 +1227,12 @@
             const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
             
             useEffect(() => {
-                if (token && user) {
-                    setPage(user.garmin_connected ? 'dashboard' : 'setup');
-                }
+                if (token && user) setPage(user.garmin_connected ? 'dashboard' : 'setup');
             }, []);
             
-            const handleLogin = (data) => {
-                setToken(data.token);
-                setUser(data.user);
-                setPage(data.user.garmin_connected ? 'dashboard' : 'setup');
-            };
-            
-            const handleLogout = () => {
-                localStorage.clear();
-                setToken(null);
-                setUser(null);
-                setPage('landing');
-            };
-            
-            const handleSetupComplete = () => {
-                const updated = { ...user, garmin_connected: true };
-                setUser(updated);
-                localStorage.setItem('user', JSON.stringify(updated));
-                setPage('dashboard');
-            };
+            const handleLogin = (data) => { setToken(data.token); setUser(data.user); setPage(data.user.garmin_connected ? 'dashboard' : 'setup'); };
+            const handleLogout = () => { localStorage.clear(); setToken(null); setUser(null); setPage('landing'); };
+            const handleSetupComplete = () => { const u = { ...user, garmin_connected: true }; setUser(u); localStorage.setItem('user', JSON.stringify(u)); setPage('dashboard'); };
             
             return (
                 <div className="h-full">

@@ -7,6 +7,7 @@ import hashlib
 db = SQLAlchemy()
 
 def get_fernet(key: str) -> Fernet:
+    """Crea un oggetto Fernet da una chiave stringa"""
     key_bytes = hashlib.sha256(key.encode()).digest()
     key_b64 = base64.urlsafe_b64encode(key_bytes)
     return Fernet(key_b64)
@@ -17,32 +18,36 @@ class User(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)  # Password app
     
+    # Profile
+    name = db.Column(db.String(100))
+    birth_year = db.Column(db.Integer)
+    sport_goals = db.Column(db.Text)
+    
+    # Credenziali Garmin (criptate)
     garmin_email = db.Column(db.String(255))
     garmin_password_encrypted = db.Column(db.Text)
     
-    birth_year = db.Column(db.Integer)
-    name = db.Column(db.String(100))
-    sport_goals = db.Column(db.Text)
-    injuries = db.Column(db.Text)
-    
+    # Stato sync
     last_sync = db.Column(db.DateTime)
     sync_enabled = db.Column(db.Boolean, default=True)
     
+    # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Relazioni
     daily_metrics = db.relationship('DailyMetric', backref='user', lazy='dynamic')
     activities = db.relationship('Activity', backref='user', lazy='dynamic')
-    chat_messages = db.relationship('ChatMessage', backref='user', lazy='dynamic')
-    memories = db.relationship('UserMemory', backref='user', lazy='dynamic')
     
     def set_garmin_password(self, password: str, encryption_key: str):
+        """Cripta e salva la password Garmin"""
         f = get_fernet(encryption_key)
         self.garmin_password_encrypted = f.encrypt(password.encode()).decode()
     
     def get_garmin_password(self, encryption_key: str) -> str:
+        """Decripta e ritorna la password Garmin"""
         if not self.garmin_password_encrypted:
             return None
         f = get_fernet(encryption_key)
@@ -61,20 +66,23 @@ class DailyMetric(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     date = db.Column(db.Date, nullable=False)
     
+    # Heart
     resting_hr = db.Column(db.Integer)
     min_hr = db.Column(db.Integer)
     max_hr = db.Column(db.Integer)
     avg_hr = db.Column(db.Integer)
     
+    # HRV (se disponibile)
     hrv_weekly_avg = db.Column(db.Float)
     hrv_last_night = db.Column(db.Float)
-    vo2_max = db.Column(db.Float)
     
+    # Body Battery
     body_battery_high = db.Column(db.Integer)
     body_battery_low = db.Column(db.Integer)
     body_battery_charged = db.Column(db.Integer)
     body_battery_drained = db.Column(db.Integer)
     
+    # Sleep
     sleep_seconds = db.Column(db.Integer)
     deep_sleep_seconds = db.Column(db.Integer)
     light_sleep_seconds = db.Column(db.Integer)
@@ -84,6 +92,7 @@ class DailyMetric(db.Model):
     sleep_start = db.Column(db.DateTime)
     sleep_end = db.Column(db.DateTime)
     
+    # Stress
     stress_avg = db.Column(db.Integer)
     stress_max = db.Column(db.Integer)
     rest_stress_duration = db.Column(db.Integer)
@@ -91,6 +100,7 @@ class DailyMetric(db.Model):
     medium_stress_duration = db.Column(db.Integer)
     high_stress_duration = db.Column(db.Integer)
     
+    # Activity
     steps = db.Column(db.Integer)
     total_calories = db.Column(db.Integer)
     active_calories = db.Column(db.Integer)
@@ -101,24 +111,25 @@ class DailyMetric(db.Model):
     active_seconds = db.Column(db.Integer)
     sedentary_seconds = db.Column(db.Integer)
     
-    hr_zone_1_seconds = db.Column(db.Integer)
-    hr_zone_2_seconds = db.Column(db.Integer)
-    hr_zone_3_seconds = db.Column(db.Integer)
-    hr_zone_4_seconds = db.Column(db.Integer)
-    hr_zone_5_seconds = db.Column(db.Integer)
-    
+    # Respiration
     avg_respiration = db.Column(db.Float)
     min_respiration = db.Column(db.Float)
     max_respiration = db.Column(db.Float)
     
+    # SpO2
     avg_spo2 = db.Column(db.Float)
     min_spo2 = db.Column(db.Float)
     
-    recovery_score = db.Column(db.Integer)
-    strain_score = db.Column(db.Float)
-    sleep_performance = db.Column(db.Integer)
+    # VO2 Max
+    vo2_max = db.Column(db.Float)
+    
+    # Metriche calcolate
+    recovery_score = db.Column(db.Integer)  # 0-100
+    strain_score = db.Column(db.Float)      # 0-21 stile WHOOP
+    sleep_performance = db.Column(db.Integer)  # 0-100
     biological_age = db.Column(db.Float)
     
+    # Impatto singoli fattori sull'età biologica
     bio_age_rhr_impact = db.Column(db.Float)
     bio_age_vo2_impact = db.Column(db.Float)
     bio_age_sleep_impact = db.Column(db.Float)
@@ -126,8 +137,10 @@ class DailyMetric(db.Model):
     bio_age_stress_impact = db.Column(db.Float)
     bio_age_hrz_impact = db.Column(db.Float)
     
+    # Raw data per debug
     raw_json = db.Column(db.Text)
     
+    # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -143,71 +156,75 @@ class Activity(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     garmin_activity_id = db.Column(db.BigInteger, unique=True)
     
+    # Info base
     activity_name = db.Column(db.String(255))
     activity_type = db.Column(db.String(100))
     start_time = db.Column(db.DateTime)
     end_time = db.Column(db.DateTime)
     
+    # Metriche
     duration_seconds = db.Column(db.Float)
     distance_meters = db.Column(db.Float)
     calories = db.Column(db.Integer)
     avg_hr = db.Column(db.Integer)
     max_hr = db.Column(db.Integer)
     
+    # Training Effect
     aerobic_effect = db.Column(db.Float)
     anaerobic_effect = db.Column(db.Float)
     
+    # HR Zones (secondi in ogni zona)
     hr_zone_1 = db.Column(db.Float)
     hr_zone_2 = db.Column(db.Float)
     hr_zone_3 = db.Column(db.Float)
     hr_zone_4 = db.Column(db.Float)
     hr_zone_5 = db.Column(db.Float)
     
+    # Intensity minutes
     moderate_intensity_minutes = db.Column(db.Integer)
     vigorous_intensity_minutes = db.Column(db.Integer)
     
+    # Strain calcolato
     strain_score = db.Column(db.Float)
     
+    # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class SyncLog(db.Model):
+    """Log delle sincronizzazioni"""
     __tablename__ = 'sync_logs'
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     started_at = db.Column(db.DateTime, default=datetime.utcnow)
     finished_at = db.Column(db.DateTime)
-    status = db.Column(db.String(50))
+    status = db.Column(db.String(50))  # success, error, partial
     error_message = db.Column(db.Text)
     metrics_synced = db.Column(db.Integer, default=0)
     activities_synced = db.Column(db.Integer, default=0)
 
 
 class ChatMessage(db.Model):
+    """Messaggi chat con i coach AI"""
     __tablename__ = 'chat_messages'
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    role = db.Column(db.String(20), nullable=False)
+    role = db.Column(db.String(20), nullable=False)  # user, assistant
     content = db.Column(db.Text, nullable=False)
-    coach = db.Column(db.String(20))
-    context_summary = db.Column(db.Text)
+    coach = db.Column(db.String(20))  # sensei, sakura
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class UserMemory(db.Model):
+    """Memoria persistente dei coach"""
     __tablename__ = 'user_memories'
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    
     category = db.Column(db.String(50))
     content = db.Column(db.Text, nullable=False)
     coach = db.Column(db.String(20))
-    
     is_active = db.Column(db.Boolean, default=True)
-    source_message_id = db.Column(db.Integer)
-    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

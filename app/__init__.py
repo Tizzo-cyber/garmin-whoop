@@ -1,5 +1,5 @@
 """
-SENSEI & SAKURA - Dual AI Coach System
+Garmin WHOOP - Flask App with AI Coaches
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -7,83 +7,28 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, date, timedelta
 from functools import wraps
-from sqlalchemy import text, or_
+from sqlalchemy import or_
 import jwt
 import os
-import json
 
 from config import Config
 from app.models import db, User, DailyMetric, Activity, SyncLog, ChatMessage, UserMemory
 from app.garmin_sync import GarminSyncService
-
-from openai import OpenAI
 
 
 def create_app():
     app = Flask(__name__, static_folder='../static', static_url_path='')
     app.config.from_object(Config)
     
+    # Init extensions
     db.init_app(app)
     CORS(app)
     
-    openai_client = None
-    if os.environ.get('OPENAI_API_KEY'):
-        openai_client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
-    
+    # Create tables
     with app.app_context():
         db.create_all()
-        
-        migrations = [
-            'ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_year INTEGER',
-            'ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(100)',
-            'ALTER TABLE users ADD COLUMN IF NOT EXISTS sport_goals TEXT',
-            'ALTER TABLE users ADD COLUMN IF NOT EXISTS injuries TEXT',
-            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS biological_age FLOAT',
-            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS vo2_max FLOAT',
-            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_rhr_impact FLOAT',
-            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_vo2_impact FLOAT',
-            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_sleep_impact FLOAT',
-            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_steps_impact FLOAT',
-            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_stress_impact FLOAT',
-            'ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_hrz_impact FLOAT',
-            'ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS coach VARCHAR(20)',
-            'ALTER TABLE user_memories ADD COLUMN IF NOT EXISTS coach VARCHAR(20)',
-        ]
-        for sql in migrations:
-            try:
-                db.session.execute(text(sql))
-                db.session.commit()
-            except:
-                db.session.rollback()
-        
-        try:
-            db.session.execute(text('''
-                CREATE TABLE IF NOT EXISTS chat_messages (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER REFERENCES users(id),
-                    role VARCHAR(20) NOT NULL,
-                    content TEXT NOT NULL,
-                    coach VARCHAR(20),
-                    context_summary TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            '''))
-            db.session.execute(text('''
-                CREATE TABLE IF NOT EXISTS user_memories (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER REFERENCES users(id),
-                    category VARCHAR(50),
-                    content TEXT NOT NULL,
-                    coach VARCHAR(20),
-                    is_active BOOLEAN DEFAULT TRUE,
-                    source_message_id INTEGER,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            '''))
-            db.session.commit()
-        except:
-            db.session.rollback()
+    
+    # ========== AUTH HELPERS ==========
     
     def token_required(f):
         @wraps(f)
@@ -103,97 +48,165 @@ def create_app():
             return f(current_user, *args, **kwargs)
         return decorated
     
-    # ==================== AUTH ====================
-    
-    @app.route('/', methods=['GET'])
-    def index():
-        return send_from_directory(app.static_folder, 'index.html')
+    # ========== AUTH ROUTES ==========
     
     @app.route('/api/register', methods=['POST'])
     def register():
+        """Registra un nuovo utente"""
         data = request.get_json()
+        
         if not data.get('email') or not data.get('password'):
             return jsonify({'error': 'Email e password richiesti'}), 400
+        
         if User.query.filter_by(email=data['email']).first():
             return jsonify({'error': 'Email già registrata'}), 400
+        
         user = User(
             email=data['email'],
             password_hash=generate_password_hash(data['password']),
-            birth_year=data.get('birth_year'),
-            name=data.get('name')
+            name=data.get('name'),
+            birth_year=data.get('birth_year')
         )
+        
+        # Se fornite, salva anche credenziali Garmin
+        if data.get('garmin_email') and data.get('garmin_password'):
+            user.garmin_email = data['garmin_email']
+            user.set_garmin_password(data['garmin_password'], app.config['ENCRYPTION_KEY'])
+        
         db.session.add(user)
         db.session.commit()
+        
         return jsonify({'message': 'Utente creato', 'user_id': user.id}), 201
     
     @app.route('/api/login', methods=['POST'])
     def login():
+        """Login e ottieni token JWT"""
         data = request.get_json()
+        
         user = User.query.filter_by(email=data.get('email')).first()
         if not user or not check_password_hash(user.password_hash, data.get('password', '')):
             return jsonify({'error': 'Credenziali non valide'}), 401
+        
         token = jwt.encode({
             'user_id': user.id,
             'exp': datetime.utcnow() + timedelta(days=30)
         }, app.config['SECRET_KEY'], algorithm='HS256')
+        
         return jsonify({
             'token': token,
             'user': {
                 'id': user.id,
                 'email': user.email,
                 'name': user.name,
+                'birth_year': user.birth_year,
                 'garmin_connected': bool(user.garmin_email),
-                'birth_year': user.birth_year
+                'last_sync': user.last_sync.isoformat() if user.last_sync else None
             }
         })
     
     @app.route('/api/profile', methods=['PUT'])
     @token_required
     def update_profile(current_user):
+        """Aggiorna profilo utente"""
         data = request.get_json()
-        if data.get('birth_year'):
-            current_user.birth_year = data['birth_year']
         if data.get('name'):
             current_user.name = data['name']
+        if data.get('birth_year'):
+            current_user.birth_year = data['birth_year']
         if data.get('sport_goals'):
             current_user.sport_goals = data['sport_goals']
         db.session.commit()
         return jsonify({'message': 'Profilo aggiornato'})
     
+    # ========== GARMIN CONFIG ==========
+    
     @app.route('/api/garmin/connect', methods=['POST'])
     @token_required
     def connect_garmin(current_user):
+        """Collega account Garmin"""
         data = request.get_json()
+        
         if not data.get('garmin_email') or not data.get('garmin_password'):
             return jsonify({'error': 'Credenziali Garmin richieste'}), 400
+        
+        # Verifica credenziali
         try:
             from garminconnect import Garmin
             client = Garmin(data['garmin_email'], data['garmin_password'])
             client.login()
         except Exception as e:
             return jsonify({'error': f'Login Garmin fallito: {str(e)}'}), 400
+        
+        # Salva credenziali
         current_user.garmin_email = data['garmin_email']
         current_user.set_garmin_password(data['garmin_password'], app.config['ENCRYPTION_KEY'])
         db.session.commit()
+        
         return jsonify({'message': 'Account Garmin collegato'})
+    
+    @app.route('/api/garmin/disconnect', methods=['POST'])
+    @token_required
+    def disconnect_garmin(current_user):
+        """Scollega account Garmin"""
+        current_user.garmin_email = None
+        current_user.garmin_password_encrypted = None
+        db.session.commit()
+        return jsonify({'message': 'Account Garmin scollegato'})
+    
+    # ========== SYNC ==========
     
     @app.route('/api/sync', methods=['POST'])
     @token_required
     def sync_now(current_user):
+        """Sincronizza dati Garmin ora"""
         if not current_user.garmin_email:
             return jsonify({'error': 'Account Garmin non collegato'}), 400
+        
         days_back = request.get_json().get('days_back', 7) if request.get_json() else 7
+        
         service = GarminSyncService(app.config['ENCRYPTION_KEY'])
         result = service.sync_user(current_user, days_back=days_back)
+        
         return jsonify(result)
     
-    # ==================== METRICS ====================
+    # ========== METRICS ==========
+    
+    @app.route('/api/metrics/today', methods=['GET'])
+    @token_required
+    def get_today_metrics(current_user):
+        """Ottieni metriche di oggi"""
+        metric = DailyMetric.query.filter_by(
+            user_id=current_user.id,
+            date=date.today()
+        ).first()
+        
+        if not metric:
+            return jsonify({'message': 'Nessun dato per oggi. Esegui sync.'}), 404
+        
+        return jsonify(_metric_to_dict(metric))
+    
+    @app.route('/api/metrics/range', methods=['GET'])
+    @token_required
+    def get_metrics_range(current_user):
+        """Ottieni metriche per un range di date"""
+        start = request.args.get('start', (date.today() - timedelta(days=7)).isoformat())
+        end = request.args.get('end', date.today().isoformat())
+        
+        metrics = DailyMetric.query.filter(
+            DailyMetric.user_id == current_user.id,
+            DailyMetric.date >= start,
+            DailyMetric.date <= end
+        ).order_by(DailyMetric.date.desc()).all()
+        
+        return jsonify([_metric_to_dict(m) for m in metrics])
     
     @app.route('/api/metrics/summary', methods=['GET'])
     @token_required
     def get_summary(current_user):
+        """Ottieni summary con tutti i dati"""
         days = request.args.get('days', 30, type=int)
         start_date = date.today() - timedelta(days=days)
+        
         metrics = DailyMetric.query.filter(
             DailyMetric.user_id == current_user.id,
             DailyMetric.date >= start_date
@@ -207,7 +220,11 @@ def create_app():
             return round(sum(vals) / len(vals), 1) if vals else None
         
         return jsonify({
-            'period': {'start': start_date.isoformat(), 'end': date.today().isoformat(), 'days_with_data': len(metrics)},
+            'period': {
+                'start': start_date.isoformat(),
+                'end': date.today().isoformat(),
+                'days_with_data': len(metrics)
+            },
             'averages': {
                 'recovery': safe_avg([m.recovery_score for m in metrics]),
                 'strain': safe_avg([m.strain_score for m in metrics]),
@@ -229,14 +246,16 @@ def create_app():
                 }
             },
             'real_age': current_user.get_real_age(),
-            'today': _metric_to_dict(metrics[0], current_user) if metrics else None
+            'today': _metric_to_dict(metrics[0]) if metrics else None
         })
     
     @app.route('/api/metrics/trend', methods=['GET'])
     @token_required
     def get_trend(current_user):
+        """Ottieni trend età biologica"""
         days = request.args.get('days', 90, type=int)
         start_date = date.today() - timedelta(days=days)
+        
         metrics = DailyMetric.query.filter(
             DailyMetric.user_id == current_user.id,
             DailyMetric.date >= start_date
@@ -244,326 +263,302 @@ def create_app():
         
         trend_data = [{
             'date': m.date.isoformat(),
+            'biological_age': m.biological_age,
             'recovery': m.recovery_score,
             'strain': m.strain_score,
-            'sleep_hours': round(m.sleep_seconds / 3600, 1) if m.sleep_seconds else None,
-            'biological_age': m.biological_age,
-            'resting_hr': m.resting_hr,
-            'steps': m.steps,
         } for m in metrics]
         
-        pace_of_aging = None
+        # Calculate pace of aging
+        pace = None
         if len(metrics) >= 30:
             recent = [m.biological_age for m in metrics[-15:] if m.biological_age]
             older = [m.biological_age for m in metrics[:15] if m.biological_age]
             if recent and older:
-                pace_of_aging = round((sum(recent)/len(recent) - sum(older)/len(older)) * 12, 1)
+                pace = round((sum(recent)/len(recent) - sum(older)/len(older)) * 12, 1)
         
-        return jsonify({'data': trend_data, 'real_age': current_user.get_real_age(), 'pace_of_aging': pace_of_aging})
+        return jsonify({
+            'data': trend_data,
+            'real_age': current_user.get_real_age(),
+            'pace_of_aging': pace
+        })
+    
+    # ========== ACTIVITIES ==========
     
     @app.route('/api/activities', methods=['GET'])
     @token_required
     def get_activities(current_user):
-        limit = request.args.get('limit', 10, type=int)
-        activities = Activity.query.filter_by(user_id=current_user.id).order_by(Activity.start_time.desc()).limit(limit).all()
+        """Ottieni lista attività"""
+        limit = request.args.get('limit', 20, type=int)
+        
+        activities = Activity.query.filter_by(
+            user_id=current_user.id
+        ).order_by(Activity.start_time.desc()).limit(limit).all()
+        
         return jsonify([{
-            'id': a.id, 'name': a.activity_name, 'type': a.activity_type,
+            'id': a.id,
+            'garmin_id': a.garmin_activity_id,
+            'name': a.activity_name,
+            'type': a.activity_type,
             'start_time': a.start_time.isoformat() if a.start_time else None,
             'duration_minutes': round(a.duration_seconds / 60, 1) if a.duration_seconds else None,
-            'calories': a.calories, 'avg_hr': a.avg_hr, 'strain': a.strain_score
+            'distance_km': round(a.distance_meters / 1000, 2) if a.distance_meters else None,
+            'calories': a.calories,
+            'avg_hr': a.avg_hr,
+            'max_hr': a.max_hr,
+            'strain': a.strain_score,
+            'aerobic_effect': a.aerobic_effect,
+            'anaerobic_effect': a.anaerobic_effect
         } for a in activities])
     
-    # ==================== DUAL AI COACH ====================
+    # ========== HEALTH CHECK ==========
+    
+    @app.route('/api/health', methods=['GET'])
+    def health_check():
+        """Health check per Railway"""
+        return jsonify({
+            'status': 'ok',
+            'timestamp': datetime.utcnow().isoformat()
+        })
+    
+    @app.route('/', methods=['GET'])
+    def index():
+        """Home page"""
+        return send_from_directory(app.static_folder, 'index.html')
+    
+    # ========== AI CHAT ==========
+    
+    openai_client = None
+    if os.environ.get('OPENAI_API_KEY'):
+        from openai import OpenAI
+        openai_client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
     
     def _get_sensei_prompt(user, context, memories):
         name = user.name or "atleta"
         age = user.get_real_age()
+        memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else ""
         
-        memories_text = ""
-        if memories:
-            memories_text = "\n\nINFORMAZIONI RICORDATE:\n"
-            for m in memories:
-                memories_text += f"- [{m.category}] {m.content}\n"
-        
-        return f"""Sei SENSEI, un preparatore atletico e medico sportivo con 25 anni di esperienza.
+        return f"""Sei SENSEI, un preparatore atletico italiano con 25 anni di esperienza.
 Parli con {name}, {age} anni.
 
-IL TUO CARATTERE:
-- Sei diretto, pragmatico, motivante ma mai duro
-- Parli come un vero preparatore atletico italiano
-- Usi un linguaggio semplice e chiaro
-- Sei appassionato di performance e ottimizzazione
-- Dai sempre consigli pratici e attuabili
+CARATTERE: Diretto, pragmatico, motivante. Parli come un vero coach italiano.
 
-DATI GARMIN ATTUALI (30 giorni):
-- Età biologica: {context.get('biological_age', 'N/D')} anni (reale: {age})
+DATI GARMIN (30 giorni):
+- Età biologica: {context.get('biological_age', 'N/D')} (reale: {age})
 - Recovery: {context.get('recovery', 'N/D')}%
-- Sonno medio: {context.get('sleep_hours', 'N/D')} ore
+- Sonno: {context.get('sleep_hours', 'N/D')} ore
 - RHR: {context.get('resting_hr', 'N/D')} bpm
 - HRV: {context.get('hrv', 'N/D')} ms
-- Passi medi: {context.get('steps', 'N/D')}
+- Passi: {context.get('steps', 'N/D')}
 - Stress: {context.get('stress_avg', 'N/D')}
 - Strain: {context.get('strain', 'N/D')}/21
 - VO2 Max: {context.get('vo2_max', 'N/D')}
-{memories_text}
 
-IL TUO FOCUS:
-1. Allenamento e performance fisica
-2. Recupero e prevenzione infortuni  
-3. Analisi dati Garmin e metriche
-4. Pianificazione training
-5. Nutrizione sportiva base
+MEMORIE: {memories_text}
 
-REGOLE:
-- Se l'utente menziona infortuni/dolori/obiettivi, salvali con [MEMORY: categoria | info]
-- Categorie: injury, goal, training, nutrition, performance
-- Chiedi follow-up su infortuni precedenti
-- Non fare diagnosi mediche, ma consigli sportivi
-- Usa i dati Garmin per personalizzare ogni risposta
-- Rispondi in italiano, max 200 parole
-- NON parlare di aspetti mentali/emotivi (quello è compito di Sakura)
-"""
+FOCUS: Allenamento, performance, recupero, prevenzione infortuni, nutrizione sportiva.
+REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: injury, goal, training, nutrition, performance
+NON parlare di aspetti emotivi/mentali (quello è Sakura).
+Rispondi in italiano, max 200 parole."""
 
     def _get_sakura_prompt(user, context, memories):
         name = user.name or "amico"
         age = user.get_real_age()
+        memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else ""
         
-        memories_text = ""
-        if memories:
-            memories_text = "\n\nINFORMAZIONI RICORDATE:\n"
-            for m in memories:
-                memories_text += f"- [{m.category}] {m.content}\n"
-        
-        return f"""Sei SAKURA, una coach mentale e guida spirituale con formazione in psicologia dello sport e mindfulness.
+        return f"""Sei SAKURA, una coach mentale con background in psicologia e mindfulness.
 Parli con {name}, {age} anni.
 
-IL TUO CARATTERE:
-- Sei calma, empatica, profonda ma accessibile
-- Parli con dolcezza ma anche con saggezza
-- Usi metafore dalla natura e filosofia orientale
-- Sei interessata al benessere interiore della persona
-- Ascolti prima di consigliare
+CARATTERE: Calma, empatica, saggia. Usi metafore dalla natura e filosofia orientale.
 
-DATI BENESSERE (indicatori di stress/recupero):
-- Livello stress medio: {context.get('stress_avg', 'N/D')}
-- Qualità sonno: {context.get('sleep_hours', 'N/D')} ore
-- Recovery (energia): {context.get('recovery', 'N/D')}%
-- HRV (equilibrio nervoso): {context.get('hrv', 'N/D')} ms
-{memories_text}
+DATI BENESSERE:
+- Stress medio: {context.get('stress_avg', 'N/D')}
+- Sonno: {context.get('sleep_hours', 'N/D')} ore
+- Recovery: {context.get('recovery', 'N/D')}%
+- HRV: {context.get('hrv', 'N/D')} ms
 
-IL TUO FOCUS:
-1. Benessere mentale e emotivo
-2. Gestione dello stress e ansia
-3. Mindfulness e meditazione
-4. Equilibrio vita-sport
-5. Motivazione profonda e scopo
-6. Qualità del sonno (aspetto mentale)
-7. Relazioni e supporto sociale
+MEMORIE: {memories_text}
 
-REGOLE:
-- Se l'utente menziona emozioni/pensieri/difficoltà, salvali con [MEMORY: categoria | info]
-- Categorie: emotion, stress, mindset, relationship, sleep_mental, life_balance
-- Chiedi come si sente, non solo cosa fa
-- Offri tecniche pratiche (respirazione, meditazione breve)
-- Non sei una psicologa clinica, ma una coach
-- Usa i dati di stress/sonno per capire il suo stato
-- Rispondi in italiano, max 200 parole
-- NON parlare di allenamento/performance fisica (quello è compito di Sensei)
-"""
-    
+FOCUS: Benessere mentale, gestione stress, mindfulness, equilibrio vita-sport, motivazione.
+REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: emotion, stress, mindset, relationship, sleep_mental, life_balance
+NON parlare di allenamento/performance fisica (quello è Sensei).
+Rispondi in italiano, max 200 parole."""
+
     def _build_context(user):
         start_date = date.today() - timedelta(days=30)
-        metrics = DailyMetric.query.filter(
-            DailyMetric.user_id == user.id,
-            DailyMetric.date >= start_date
-        ).all()
+        metrics = DailyMetric.query.filter(DailyMetric.user_id == user.id, DailyMetric.date >= start_date).all()
+        if not metrics: return {}
         
-        if not metrics:
-            return {}
-        
-        def safe_avg(lst):
+        def avg(lst):
             vals = [x for x in lst if x is not None]
-            return round(sum(vals) / len(vals), 1) if vals else None
+            return round(sum(vals)/len(vals), 1) if vals else None
         
         return {
-            'biological_age': safe_avg([m.biological_age for m in metrics]),
-            'recovery': safe_avg([m.recovery_score for m in metrics]),
-            'sleep_hours': safe_avg([m.sleep_seconds / 3600 if m.sleep_seconds else None for m in metrics]),
-            'resting_hr': safe_avg([m.resting_hr for m in metrics]),
-            'hrv': safe_avg([m.hrv_last_night for m in metrics]),
-            'steps': safe_avg([m.steps for m in metrics]),
-            'stress_avg': safe_avg([m.stress_avg for m in metrics]),
-            'strain': safe_avg([m.strain_score for m in metrics]),
-            'vo2_max': safe_avg([m.vo2_max for m in metrics]),
+            'biological_age': avg([m.biological_age for m in metrics]),
+            'recovery': avg([m.recovery_score for m in metrics]),
+            'sleep_hours': avg([m.sleep_seconds/3600 if m.sleep_seconds else None for m in metrics]),
+            'resting_hr': avg([m.resting_hr for m in metrics]),
+            'hrv': avg([m.hrv_last_night for m in metrics]),
+            'steps': avg([m.steps for m in metrics]),
+            'stress_avg': avg([m.stress_avg for m in metrics]),
+            'strain': avg([m.strain_score for m in metrics]),
+            'vo2_max': avg([m.vo2_max for m in metrics]),
         }
-    
-    def _extract_memories(ai_response, user_id, message_id, coach):
+
+    def _extract_memories(response, user_id, coach):
         import re
         pattern = r'\[MEMORY:\s*(\w+)\s*\|\s*([^\]]+)\]'
-        matches = re.findall(pattern, ai_response)
-        
-        for category, content in matches:
-            memory = UserMemory(
-                user_id=user_id,
-                category=category.lower(),
-                content=content.strip(),
-                coach=coach,
-                source_message_id=message_id
-            )
-            db.session.add(memory)
-        
-        clean_response = re.sub(pattern, '', ai_response).strip()
-        return clean_response
-    
+        for cat, content in re.findall(pattern, response):
+            mem = UserMemory(user_id=user_id, category=cat.lower(), content=content.strip(), coach=coach)
+            db.session.add(mem)
+        return re.sub(pattern, '', response).strip()
+
     @app.route('/api/chat', methods=['POST'])
     @token_required
-    def chat_with_ai(current_user):
+    def chat(current_user):
         if not openai_client:
             return jsonify({'error': 'OpenAI non configurato'}), 500
         
         data = request.get_json()
-        user_message = data.get('message', '').strip()
+        msg = data.get('message', '').strip()
         coach = data.get('coach', 'sensei')
-        
-        if not user_message:
+        if not msg:
             return jsonify({'error': 'Messaggio vuoto'}), 400
         
         context = _build_context(current_user)
+        memories = UserMemory.query.filter_by(user_id=current_user.id, is_active=True).limit(20).all()
         
-        # Get all memories (both coaches share)
-        memories = UserMemory.query.filter_by(user_id=current_user.id, is_active=True)\
-            .order_by(UserMemory.created_at.desc()).limit(20).all()
-        
-        # Get chat history for this coach
+        # Get history
         if coach == 'sensei':
-            recent_messages = ChatMessage.query.filter(
+            history = ChatMessage.query.filter(
                 ChatMessage.user_id == current_user.id,
                 or_(ChatMessage.coach == 'sensei', ChatMessage.coach == None)
             ).order_by(ChatMessage.created_at.desc()).limit(10).all()
         else:
-            recent_messages = ChatMessage.query.filter(
-                ChatMessage.user_id == current_user.id,
-                ChatMessage.coach == coach
-            ).order_by(ChatMessage.created_at.desc()).limit(10).all()
+            history = ChatMessage.query.filter_by(user_id=current_user.id, coach=coach).order_by(ChatMessage.created_at.desc()).limit(10).all()
+        history.reverse()
         
-        recent_messages.reverse()
-        
-        if coach == 'sakura':
-            system_prompt = _get_sakura_prompt(current_user, context, memories)
-        else:
-            system_prompt = _get_sensei_prompt(current_user, context, memories)
-        
+        system_prompt = _get_sakura_prompt(current_user, context, memories) if coach == 'sakura' else _get_sensei_prompt(current_user, context, memories)
         messages = [{"role": "system", "content": system_prompt}]
-        for msg in recent_messages:
-            messages.append({"role": msg.role, "content": msg.content})
-        messages.append({"role": "user", "content": user_message})
+        messages += [{"role": m.role, "content": m.content} for m in history]
+        messages.append({"role": "user", "content": msg})
         
         try:
-            response = openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=messages,
-                max_tokens=800,
-                temperature=0.8
-            )
+            resp = openai_client.chat.completions.create(model="gpt-4o-mini", messages=messages, max_tokens=800, temperature=0.8)
+            ai_raw = resp.choices[0].message.content
             
-            ai_response_raw = response.choices[0].message.content
-            
-            user_msg = ChatMessage(
-                user_id=current_user.id,
-                role='user',
-                content=user_message,
-                coach=coach,
-                context_summary=json.dumps(context)
-            )
-            db.session.add(user_msg)
-            db.session.flush()
-            
-            ai_response = _extract_memories(ai_response_raw, current_user.id, user_msg.id, coach)
-            
-            ai_msg = ChatMessage(
-                user_id=current_user.id,
-                role='assistant',
-                content=ai_response,
-                coach=coach
-            )
-            db.session.add(ai_msg)
+            # Save messages
+            db.session.add(ChatMessage(user_id=current_user.id, role='user', content=msg, coach=coach))
+            ai_clean = _extract_memories(ai_raw, current_user.id, coach)
+            db.session.add(ChatMessage(user_id=current_user.id, role='assistant', content=ai_clean, coach=coach))
             db.session.commit()
             
-            return jsonify({'response': ai_response, 'coach': coach})
-            
+            return jsonify({'response': ai_clean, 'coach': coach})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
-    
+
     @app.route('/api/chat/history', methods=['GET'])
     @token_required
-    def get_chat_history(current_user):
+    def chat_history(current_user):
         coach = request.args.get('coach', 'sensei')
         limit = request.args.get('limit', 50, type=int)
         
         if coach == 'sensei':
-            messages = ChatMessage.query.filter(
+            msgs = ChatMessage.query.filter(
                 ChatMessage.user_id == current_user.id,
                 or_(ChatMessage.coach == 'sensei', ChatMessage.coach == None)
             ).order_by(ChatMessage.created_at.desc()).limit(limit).all()
         else:
-            messages = ChatMessage.query.filter(
-                ChatMessage.user_id == current_user.id,
-                ChatMessage.coach == coach
-            ).order_by(ChatMessage.created_at.desc()).limit(limit).all()
+            msgs = ChatMessage.query.filter_by(user_id=current_user.id, coach=coach).order_by(ChatMessage.created_at.desc()).limit(limit).all()
         
-        messages.reverse()
-        return jsonify([{'role': m.role, 'content': m.content, 'created_at': m.created_at.isoformat()} for m in messages])
-    
+        msgs.reverse()
+        return jsonify([{'role': m.role, 'content': m.content} for m in msgs])
+
+    @app.route('/api/chat/reset', methods=['DELETE'])
+    @token_required
+    def chat_reset(current_user):
+        coach = request.args.get('coach', 'sensei')
+        if coach == 'sensei':
+            ChatMessage.query.filter(
+                ChatMessage.user_id == current_user.id,
+                or_(ChatMessage.coach == 'sensei', ChatMessage.coach == None)
+            ).delete(synchronize_session=False)
+        else:
+            ChatMessage.query.filter_by(user_id=current_user.id, coach=coach).delete(synchronize_session=False)
+        db.session.commit()
+        return jsonify({'message': f'Chat {coach} resettata'})
+
     @app.route('/api/chat/memories', methods=['GET'])
     @token_required
     def get_memories(current_user):
-        memories = UserMemory.query.filter_by(user_id=current_user.id, is_active=True)\
-            .order_by(UserMemory.created_at.desc()).all()
-        return jsonify([{
-            'id': m.id, 'category': m.category, 'content': m.content, 
-            'coach': m.coach or 'sensei', 'created_at': m.created_at.isoformat()
-        } for m in memories])
-    
-    @app.route('/api/chat/memories/<int:memory_id>', methods=['DELETE'])
+        mems = UserMemory.query.filter_by(user_id=current_user.id, is_active=True).all()
+        return jsonify([{'id': m.id, 'category': m.category, 'content': m.content, 'coach': m.coach} for m in mems])
+
+    @app.route('/api/chat/memories/<int:mid>', methods=['DELETE'])
     @token_required
-    def delete_memory(current_user, memory_id):
-        memory = UserMemory.query.filter_by(id=memory_id, user_id=current_user.id).first()
-        if memory:
-            memory.is_active = False
-            db.session.commit()
-        return jsonify({'message': 'Memoria rimossa'})
-    
-    @app.route('/api/health', methods=['GET'])
-    def health_check():
-        return jsonify({'status': 'ok', 'ai': bool(openai_client)})
+    def delete_memory(current_user, mid):
+        m = UserMemory.query.filter_by(id=mid, user_id=current_user.id).first()
+        if m: m.is_active = False; db.session.commit()
+        return jsonify({'message': 'OK'})
     
     return app
 
 
-def _metric_to_dict(m, user):
+def _metric_to_dict(m: DailyMetric) -> dict:
+    """Converte DailyMetric in dict"""
     return {
         'date': m.date.isoformat(),
         'scores': {
             'recovery': m.recovery_score,
             'strain': m.strain_score,
-            'sleep_performance': m.sleep_performance,
-            'biological_age': m.biological_age
+            'sleep_performance': m.sleep_performance
         },
-        'bio_impacts': {
-            'rhr': m.bio_age_rhr_impact, 'vo2': m.bio_age_vo2_impact,
-            'sleep': m.bio_age_sleep_impact, 'steps': m.bio_age_steps_impact,
-            'stress': m.bio_age_stress_impact, 'hrz': m.bio_age_hrz_impact
+        'heart': {
+            'resting_hr': m.resting_hr,
+            'min_hr': m.min_hr,
+            'max_hr': m.max_hr,
+            'hrv_last_night': m.hrv_last_night
         },
-        'real_age': user.get_real_age(),
-        'heart': {'resting_hr': m.resting_hr, 'vo2_max': m.vo2_max, 'hrv': m.hrv_last_night},
+        'body_battery': {
+            'high': m.body_battery_high,
+            'low': m.body_battery_low,
+            'charged': m.body_battery_charged,
+            'drained': m.body_battery_drained
+        },
         'sleep': {
             'total_hours': round(m.sleep_seconds / 3600, 1) if m.sleep_seconds else None,
+            'deep_hours': round(m.deep_sleep_seconds / 3600, 1) if m.deep_sleep_seconds else None,
+            'light_hours': round(m.light_sleep_seconds / 3600, 1) if m.light_sleep_seconds else None,
+            'rem_hours': round(m.rem_sleep_seconds / 3600, 1) if m.rem_sleep_seconds else None,
+            'awake_hours': round(m.awake_seconds / 3600, 1) if m.awake_seconds else None,
+            'score': m.sleep_score,
+            'start': m.sleep_start.strftime('%H:%M') if m.sleep_start else None,
+            'end': m.sleep_end.strftime('%H:%M') if m.sleep_end else None
         },
-        'stress': {'average': m.stress_avg},
-        'activity': {'steps': m.steps, 'active_calories': m.active_calories}
+        'stress': {
+            'average': m.stress_avg,
+            'max': m.stress_max
+        },
+        'activity': {
+            'steps': m.steps,
+            'calories': m.total_calories,
+            'active_calories': m.active_calories,
+            'distance_km': round(m.distance_meters / 1000, 2) if m.distance_meters else None,
+            'moderate_minutes': m.moderate_intensity_minutes,
+            'vigorous_minutes': m.vigorous_intensity_minutes
+        },
+        'respiration': {
+            'average': m.avg_respiration,
+            'min': m.min_respiration,
+            'max': m.max_respiration
+        },
+        'spo2': {
+            'average': m.avg_spo2,
+            'min': m.min_spo2
+        }
     }
 
 
+# Entry point
 app = create_app()
 
 if __name__ == '__main__':
