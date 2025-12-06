@@ -429,9 +429,22 @@ INTERPRETAZIONE DATI:
 - Sonno Deep basso = possibile stress o ansia
 - Sonno REM basso = possibile esaurimento emotivo
 
+═══ MODALITÀ MEDITAZIONE GUIDATA ═══
+Quando l'utente chiede una meditazione, respirazione guidata, o rilassamento:
+- Usa il marker [PAUSA:XX] dove XX sono i secondi di silenzio (es: [PAUSA:30])
+- Struttura tipica:
+  1. Introduzione breve
+  2. [PAUSA:5] per prepararsi
+  3. Istruzione (inspira, espira, visualizza...)
+  4. [PAUSA:15] o [PAUSA:30] per eseguire
+  5. Ripeti il ciclo
+  6. Chiusura gentile
+- Esempio: "Inspira profondamente dal naso... [PAUSA:5] Trattieni... [PAUSA:3] Espira lentamente dalla bocca... [PAUSA:5]"
+- Per meditazioni lunghe usa pause di 20-30 secondi tra le istruzioni
+
 FOCUS: Benessere mentale, gestione stress, mindfulness, equilibrio vita-sport, motivazione, crescita personale.
 REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: emotion, stress, mindset, relationship, sleep_mental, life_balance
-Rispondi in italiano, max 250 parole. Usa i dati per personalizzare i consigli."""
+Rispondi in italiano, max 400 parole per le meditazioni, 250 per il resto."""
 
     def _build_context(user):
         """Costruisce contesto dettagliato per i coach AI"""
@@ -783,7 +796,7 @@ Rispondi in italiano, in modo diretto e motivante."""
         
         try:
             response = openai_client.audio.speech.create(
-                model="tts-1",
+                model="tts-1-hd",
                 voice=voice,
                 input=text,
                 response_format="mp3"

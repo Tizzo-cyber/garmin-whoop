@@ -543,26 +543,69 @@
                 if (playingAudio) return;
                 setPlayingAudio(true);
                 
-                try {
-                    const res = await fetch(`${API}/api/tts`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({ text, coach })
-                    });
-                    const data = await res.json();
+                // Check for pause markers [PAUSA:XX]
+                const pausePattern = /\[PAUSA:(\d+)\]/g;
+                const hasPauses = pausePattern.test(text);
+                
+                if (hasPauses) {
+                    // Split text by pause markers and play with actual pauses
+                    const segments = text.split(/\[PAUSA:\d+\]/);
+                    const pauses = [...text.matchAll(/\[PAUSA:(\d+)\]/g)].map(m => parseInt(m[1]) * 1000);
                     
-                    if (data.audio) {
-                        const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
-                        audioRef.current = audio;
-                        audio.onended = () => setPlayingAudio(false);
-                        audio.onerror = () => setPlayingAudio(false);
-                        await audio.play();
-                    } else {
+                    for (let i = 0; i < segments.length; i++) {
+                        const segment = segments[i].trim();
+                        if (segment) {
+                            try {
+                                const res = await fetch(`${API}/api/tts`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                    body: JSON.stringify({ text: segment, coach })
+                                });
+                                const data = await res.json();
+                                
+                                if (data.audio) {
+                                    await new Promise((resolve) => {
+                                        const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+                                        audioRef.current = audio;
+                                        audio.onended = resolve;
+                                        audio.onerror = resolve;
+                                        audio.play();
+                                    });
+                                }
+                            } catch (e) {
+                                console.error('TTS segment error:', e);
+                            }
+                        }
+                        
+                        // Wait for pause duration (if not last segment)
+                        if (i < pauses.length) {
+                            await new Promise(resolve => setTimeout(resolve, pauses[i]));
+                        }
+                    }
+                    setPlayingAudio(false);
+                } else {
+                    // Normal playback without pauses
+                    try {
+                        const res = await fetch(`${API}/api/tts`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ text, coach })
+                        });
+                        const data = await res.json();
+                        
+                        if (data.audio) {
+                            const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+                            audioRef.current = audio;
+                            audio.onended = () => setPlayingAudio(false);
+                            audio.onerror = () => setPlayingAudio(false);
+                            await audio.play();
+                        } else {
+                            setPlayingAudio(false);
+                        }
+                    } catch (e) {
+                        console.error('TTS error:', e);
                         setPlayingAudio(false);
                     }
-                } catch (e) {
-                    console.error('TTS error:', e);
-                    setPlayingAudio(false);
                 }
             };
             
