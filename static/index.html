@@ -20,11 +20,10 @@
         }
         .font-orbitron { font-family: 'Orbitron', monospace; }
         
-        /* Bio Age Circle */
         .bio-circle {
             position: relative;
-            width: 280px;
-            height: 280px;
+            width: 240px;
+            height: 240px;
             border-radius: 50%;
             background: radial-gradient(circle at 30% 30%, #1a3d2e 0%, #0d1f17 50%, #000 100%);
             box-shadow: 0 0 60px rgba(0, 255, 128, 0.2), inset 0 0 60px rgba(0, 255, 128, 0.1);
@@ -33,16 +32,15 @@
         .bio-circle::before {
             content: '';
             position: absolute;
-            inset: 8px;
+            inset: 6px;
             border-radius: 50%;
             border: 2px solid rgba(0, 255, 128, 0.3);
         }
         
-        /* Particles */
         .particle {
             position: absolute;
-            width: 4px;
-            height: 4px;
+            width: 3px;
+            height: 3px;
             background: #00ff88;
             border-radius: 50%;
             opacity: 0.6;
@@ -51,31 +49,28 @@
         
         @keyframes float {
             0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
-            50% { transform: translateY(-20px) scale(1.2); opacity: 1; }
+            50% { transform: translateY(-15px) scale(1.2); opacity: 1; }
         }
         
-        /* Impact bars */
         .impact-bar {
-            height: 8px;
-            border-radius: 4px;
+            height: 6px;
+            border-radius: 3px;
             background: #1a1a2e;
             overflow: hidden;
         }
         
         .impact-fill {
             height: 100%;
-            border-radius: 4px;
+            border-radius: 3px;
             transition: width 1s ease;
         }
         
-        /* Cards */
         .card {
             background: linear-gradient(145deg, #111 0%, #0a0a0a 100%);
             border: 1px solid #222;
             border-radius: 16px;
         }
         
-        /* Inputs */
         .input-dark {
             background: #111;
             border: 1px solid #333;
@@ -88,7 +83,6 @@
             box-shadow: 0 0 20px rgba(0, 255, 128, 0.2);
         }
         
-        /* Buttons */
         .btn-primary {
             background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
             color: #000;
@@ -110,17 +104,23 @@
             color: #000;
         }
         
-        /* Animations */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
         .animate-fadeIn { animation: fadeIn 0.6s ease forwards; }
         
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
-        .animate-pulse-slow { animation: pulse 2s infinite; }
+        .chat-bubble-ai {
+            background: linear-gradient(135deg, #1a3d2e 0%, #0d1f17 100%);
+            border: 1px solid #00ff8840;
+            border-radius: 16px 16px 16px 4px;
+        }
         
-        /* Scrollbar */
+        .chat-bubble-user {
+            background: #222;
+            border-radius: 16px 16px 4px 16px;
+        }
+        
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
@@ -135,38 +135,29 @@
         
         // ==================== COMPONENTS ====================
         
-        // Particle effect for bio age circle
         const Particles = () => {
-            const particles = Array.from({ length: 30 }, (_, i) => ({
+            const particles = Array.from({ length: 20 }, (_, i) => ({
                 id: i,
                 left: Math.random() * 100,
                 top: Math.random() * 100,
                 delay: Math.random() * 3,
-                size: 2 + Math.random() * 4
+                size: 2 + Math.random() * 3
             }));
-            
             return (
                 <>
                     {particles.map(p => (
-                        <div
-                            key={p.id}
-                            className="particle"
-                            style={{
-                                left: `${p.left}%`,
-                                top: `${p.top}%`,
-                                width: p.size,
-                                height: p.size,
-                                animationDelay: `${p.delay}s`
-                            }}
-                        />
+                        <div key={p.id} className="particle" style={{
+                            left: `${p.left}%`, top: `${p.top}%`,
+                            width: p.size, height: p.size,
+                            animationDelay: `${p.delay}s`
+                        }} />
                     ))}
                 </>
             );
         };
         
-        // Bio Age Circle (WHOOP style)
         const BioAgeCircle = ({ bioAge, realAge, paceOfAging }) => {
-            const diff = realAge - bioAge;
+            const diff = (realAge && bioAge) ? (realAge - bioAge) : 0;
             const isYounger = diff > 0;
             
             return (
@@ -174,29 +165,25 @@
                     <div className="bio-circle flex items-center justify-center">
                         <Particles />
                         <div className="text-center z-10">
-                            <div className="font-orbitron text-6xl font-bold text-white">
+                            <div className="font-orbitron text-5xl font-bold text-white">
                                 {bioAge?.toFixed(1) || '--'}
                             </div>
-                            <div className="text-sm text-gray-400 uppercase tracking-widest mt-1">
+                            <div className="text-xs text-gray-400 uppercase tracking-widest mt-1">
                                 Biological Age
                             </div>
-                            {diff !== 0 && (
-                                <div className={`mt-2 text-lg font-bold ${isYounger ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
+                            {realAge && bioAge && (
+                                <div className={`mt-2 text-sm font-bold ${isYounger ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
                                     {isYounger ? `${diff.toFixed(1)} years younger` : `${Math.abs(diff).toFixed(1)} years older`}
                                 </div>
                             )}
                         </div>
                     </div>
                     
-                    {/* Pace of Aging */}
                     {paceOfAging !== null && paceOfAging !== undefined && (
-                        <div className="mt-6 text-center">
-                            <div className="text-xs text-gray-500 uppercase tracking-widest mb-1">Pace of Aging</div>
-                            <div className={`font-orbitron text-2xl font-bold ${paceOfAging <= 0 ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
+                        <div className="mt-4 text-center">
+                            <div className="text-xs text-gray-500 uppercase tracking-widest">Pace of Aging</div>
+                            <div className={`font-orbitron text-xl font-bold ${paceOfAging <= 0 ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
                                 {paceOfAging <= 0 ? paceOfAging.toFixed(1) : '+' + paceOfAging.toFixed(1)}x
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                                {paceOfAging < -0.5 ? 'Getting younger!' : paceOfAging < 0 ? 'Slowing aging' : paceOfAging < 0.5 ? 'Normal aging' : 'Fast aging'}
                             </div>
                         </div>
                     )}
@@ -204,42 +191,33 @@
             );
         };
         
-        // Impact Bar (shows contribution of each factor)
         const ImpactBar = ({ label, value, icon, description }) => {
             const isPositive = value <= 0;
             const absValue = Math.abs(value || 0);
-            const maxValue = 2.5;
-            const percentage = Math.min((absValue / maxValue) * 100, 100);
+            const percentage = Math.min((absValue / 2.5) * 100, 100);
             
             return (
                 <div className="card p-4">
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2">
-                            <span className="text-xl">{icon}</span>
-                            <span className="text-sm text-gray-400 uppercase tracking-wider">{label}</span>
+                            <span className="text-lg">{icon}</span>
+                            <span className="text-sm text-gray-400">{label}</span>
                         </div>
                         <div className={`font-orbitron font-bold ${isPositive ? 'text-[#00ff88]' : 'text-[#ff6b35]'}`}>
-                            {value !== null ? (isPositive ? value.toFixed(1) : '+' + Math.abs(value).toFixed(1)) : '--'}
-                            <span className="text-xs text-gray-500 ml-1">years</span>
+                            {value !== null && value !== undefined ? (isPositive ? value.toFixed(1) : '+' + Math.abs(value).toFixed(1)) : '--'} yr
                         </div>
                     </div>
                     <div className="impact-bar">
-                        <div
-                            className="impact-fill"
-                            style={{
-                                width: `${percentage}%`,
-                                background: isPositive 
-                                    ? 'linear-gradient(90deg, #00ff88, #00cc6a)' 
-                                    : 'linear-gradient(90deg, #ff6b35, #ff4444)'
-                            }}
-                        />
+                        <div className="impact-fill" style={{
+                            width: `${percentage}%`,
+                            background: isPositive ? 'linear-gradient(90deg, #00ff88, #00cc6a)' : 'linear-gradient(90deg, #ff6b35, #ff4444)'
+                        }} />
                     </div>
-                    {description && <div className="text-xs text-gray-500 mt-2">{description}</div>}
+                    {description && <div className="text-xs text-gray-500 mt-1">{description}</div>}
                 </div>
             );
         };
         
-        // Trend Chart
         const TrendChart = ({ data, realAge }) => {
             const canvasRef = useRef(null);
             const chartRef = useRef(null);
@@ -252,24 +230,21 @@
                 chartRef.current = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: data.map(d => {
-                            const date = new Date(d.date);
-                            return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
-                        }),
+                        labels: data.map(d => new Date(d.date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })),
                         datasets: [
                             {
-                                label: 'Biological Age',
+                                label: 'Bio Age',
                                 data: data.map(d => d.biological_age),
                                 borderColor: '#00ff88',
                                 backgroundColor: 'rgba(0, 255, 136, 0.1)',
                                 fill: true,
                                 tension: 0.4,
-                                pointRadius: 2
+                                pointRadius: 1
                             },
                             {
-                                label: 'Chronological Age',
+                                label: 'Real Age',
                                 data: data.map(() => realAge),
-                                borderColor: '#666',
+                                borderColor: '#444',
                                 borderDash: [5, 5],
                                 pointRadius: 0
                             }
@@ -278,75 +253,311 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                labels: { color: '#888', font: { size: 11 } }
-                            }
-                        },
+                        plugins: { legend: { labels: { color: '#666', font: { size: 10 } } } },
                         scales: {
-                            x: {
-                                grid: { color: '#1a1a1a' },
-                                ticks: { color: '#666', maxRotation: 45, font: { size: 10 } }
-                            },
-                            y: {
-                                grid: { color: '#1a1a1a' },
-                                ticks: { color: '#666' },
-                                suggestedMin: realAge - 10,
-                                suggestedMax: realAge + 5
-                            }
+                            x: { grid: { color: '#1a1a1a' }, ticks: { color: '#444', font: { size: 9 } } },
+                            y: { grid: { color: '#1a1a1a' }, ticks: { color: '#444' }, suggestedMin: realAge - 8, suggestedMax: realAge + 4 }
                         }
                     }
                 });
-                
                 return () => { if (chartRef.current) chartRef.current.destroy(); };
             }, [data, realAge]);
             
             return (
-                <div className="card p-6">
-                    <h3 className="text-sm text-gray-400 uppercase tracking-widest mb-4">📈 Age Trend</h3>
-                    <div style={{ height: 250 }}>
-                        <canvas ref={canvasRef}></canvas>
+                <div className="card p-4">
+                    <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-3">📈 Trend (90 days)</h3>
+                    <div style={{ height: 200 }}><canvas ref={canvasRef}></canvas></div>
+                </div>
+            );
+        };
+        
+        const MetricBox = ({ icon, label, value, unit, color = '#00ff88' }) => (
+            <div className="card p-3 text-center">
+                <div className="text-xl mb-1">{icon}</div>
+                <div className="font-orbitron text-xl font-bold" style={{ color }}>
+                    {value ?? '--'}{unit && <span className="text-xs text-gray-500 ml-1">{unit}</span>}
+                </div>
+                <div className="text-xs text-gray-500 uppercase mt-1">{label}</div>
+            </div>
+        );
+        
+        const Loading = () => (
+            <div className="min-h-screen flex flex-col items-center justify-center">
+                <div className="w-12 h-12 border-4 border-[#111] border-t-[#00ff88] rounded-full animate-spin mb-4"></div>
+                <div className="text-gray-500">Loading...</div>
+            </div>
+        );
+        
+        // ==================== AI COACH ====================
+        
+        const AICoach = ({ userData }) => {
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState('');
+            const [loading, setLoading] = useState(false);
+            const chatRef = useRef(null);
+            
+            useEffect(() => {
+                // Initial greeting based on data
+                if (userData && messages.length === 0) {
+                    const greeting = generateGreeting(userData);
+                    setMessages([{ role: 'ai', text: greeting }]);
+                }
+            }, [userData]);
+            
+            useEffect(() => {
+                if (chatRef.current) {
+                    chatRef.current.scrollTop = chatRef.current.scrollHeight;
+                }
+            }, [messages]);
+            
+            const generateGreeting = (data) => {
+                const bioAge = data.averages?.biological_age;
+                const realAge = data.real_age;
+                const recovery = data.averages?.recovery;
+                const sleep = data.averages?.sleep_hours;
+                
+                let greeting = `🥋 **Benvenuto, guerriero.**\n\n`;
+                
+                if (bioAge && realAge) {
+                    const diff = realAge - bioAge;
+                    if (diff > 2) {
+                        greeting += `Il tuo corpo ha **${bioAge.toFixed(1)} anni** - sei **${diff.toFixed(1)} anni più giovane** della tua età anagrafica! Eccellente lavoro.\n\n`;
+                    } else if (diff < -2) {
+                        greeting += `Il tuo corpo mostra **${bioAge.toFixed(1)} anni** - c'è margine di miglioramento. Ma ogni viaggio inizia con un passo.\n\n`;
+                    } else {
+                        greeting += `Il tuo corpo ha **${bioAge.toFixed(1)} anni** - in linea con la tua età. Possiamo fare di meglio insieme.\n\n`;
+                    }
+                }
+                
+                greeting += `Sono qui per guidarti. Chiedimi:\n`;
+                greeting += `• Come posso dormire meglio?\n`;
+                greeting += `• Cosa devo fare oggi?\n`;
+                greeting += `• Come abbasso la mia età biologica?\n`;
+                greeting += `• Analizza i miei dati\n\n`;
+                greeting += `*"Il maestro appare quando l'allievo è pronto."*`;
+                
+                return greeting;
+            };
+            
+            const generateResponse = (question, data) => {
+                const q = question.toLowerCase();
+                const avgs = data.averages || {};
+                const impacts = avgs.bio_impacts || {};
+                const today = data.today || {};
+                
+                // Sleep advice
+                if (q.includes('sonno') || q.includes('dormi') || q.includes('sleep')) {
+                    const sleepHours = avgs.sleep_hours;
+                    let response = `🌙 **Analisi del Sonno**\n\n`;
+                    if (sleepHours) {
+                        response += `Stai dormendo in media **${sleepHours.toFixed(1)} ore**.\n\n`;
+                        if (sleepHours < 6) {
+                            response += `⚠️ **Allarme critico!** Sotto le 6 ore stai danneggiando:\n- Sistema immunitario\n- Recupero muscolare\n- Funzioni cognitive\n- Equilibrio ormonale\n\n`;
+                            response += `**Azione immediata:**\n1. Stasera vai a letto 1 ora prima\n2. Niente schermi 1h prima di dormire\n3. Camera fresca (18-19°C)\n4. Oscurità totale\n\n`;
+                        } else if (sleepHours < 7) {
+                            response += `Quasi ci sei, ma il target è **7-8 ore**.\n\n`;
+                            response += `**Consiglio:** Aggiungi 30 minuti. Il sonno è il miglior anabolizzante naturale.\n\n`;
+                        } else {
+                            response += `✓ **Ottimo range!** Mantieni questa abitudine.\n\n`;
+                        }
+                    }
+                    response += `*"Il sonno è il cugino della morte, ma anche il padre della rigenerazione."*`;
+                    return response;
+                }
+                
+                // Today advice
+                if (q.includes('oggi') || q.includes('today') || q.includes('fare')) {
+                    const recovery = today.scores?.recovery || avgs.recovery;
+                    let response = `⚡ **Piano per Oggi**\n\n`;
+                    
+                    if (recovery >= 80) {
+                        response += `🔥 Recovery al **${recovery}%** - SEI UNA MACCHINA!\n\n`;
+                        response += `**Oggi puoi:**\n- Allenamento ad alta intensità\n- HIIT o pesi pesanti\n- Spingi i tuoi limiti\n\n`;
+                        response += `Il tuo corpo è pronto. Non sprecarlo.`;
+                    } else if (recovery >= 50) {
+                        response += `💪 Recovery al **${recovery}%** - Buono ma non strafare.\n\n`;
+                        response += `**Oggi consiglio:**\n- Allenamento moderato\n- Lavoro tecnico\n- Cardio zona 2-3\n\n`;
+                        response += `Ascolta il corpo. La costanza batte l'intensità.`;
+                    } else {
+                        response += `😴 Recovery al **${recovery || '--'}%** - Il corpo chiede riposo.\n\n`;
+                        response += `**Oggi focus su:**\n- Riposo attivo (camminata, stretching)\n- Meditazione\n- Sonno extra\n- Nutrizione di qualità\n\n`;
+                        response += `*"Anche il guerriero più forte deve affilare la spada in silenzio."*`;
+                    }
+                    return response;
+                }
+                
+                // Biological age
+                if (q.includes('età') || q.includes('biologica') || q.includes('age') || q.includes('giovane')) {
+                    let response = `🧬 **Come abbassare l'età biologica**\n\n`;
+                    
+                    response += `I tuoi fattori di impatto:\n\n`;
+                    
+                    if (impacts.rhr !== null && impacts.rhr !== undefined) {
+                        const rhrColor = impacts.rhr <= 0 ? '✅' : '⚠️';
+                        response += `${rhrColor} **RHR** (${avgs.resting_hr?.toFixed(0) || '--'} bpm): ${impacts.rhr > 0 ? '+' : ''}${impacts.rhr?.toFixed(1)} anni\n`;
+                    }
+                    if (impacts.vo2 !== null && impacts.vo2 !== undefined) {
+                        const vo2Color = impacts.vo2 <= 0 ? '✅' : '⚠️';
+                        response += `${vo2Color} **VO2 Max** (${avgs.vo2_max?.toFixed(0) || '--'}): ${impacts.vo2 > 0 ? '+' : ''}${impacts.vo2?.toFixed(1)} anni\n`;
+                    }
+                    if (impacts.sleep !== null && impacts.sleep !== undefined) {
+                        const sleepColor = impacts.sleep <= 0 ? '✅' : '⚠️';
+                        response += `${sleepColor} **Sonno** (${avgs.sleep_hours?.toFixed(1) || '--'}h): ${impacts.sleep > 0 ? '+' : ''}${impacts.sleep?.toFixed(1)} anni\n`;
+                    }
+                    if (impacts.steps !== null && impacts.steps !== undefined) {
+                        const stepsColor = impacts.steps <= 0 ? '✅' : '⚠️';
+                        response += `${stepsColor} **Passi** (${avgs.steps ? Math.round(avgs.steps).toLocaleString() : '--'}): ${impacts.steps > 0 ? '+' : ''}${impacts.steps?.toFixed(1)} anni\n`;
+                    }
+                    if (impacts.stress !== null && impacts.stress !== undefined) {
+                        const stressColor = impacts.stress <= 0 ? '✅' : '⚠️';
+                        response += `${stressColor} **Stress**: ${impacts.stress > 0 ? '+' : ''}${impacts.stress?.toFixed(1)} anni\n`;
+                    }
+                    if (impacts.hrz !== null && impacts.hrz !== undefined) {
+                        const hrzColor = impacts.hrz <= 0 ? '✅' : '⚠️';
+                        response += `${hrzColor} **High Intensity**: ${impacts.hrz > 0 ? '+' : ''}${impacts.hrz?.toFixed(1)} anni\n`;
+                    }
+                    
+                    response += `\n**Priorità di intervento:**\n`;
+                    
+                    // Find worst factor
+                    const factors = [
+                        { name: 'Cardio (abbassa RHR)', value: impacts.rhr, fix: 'Zone 2 cardio 3x/settimana' },
+                        { name: 'VO2 Max', value: impacts.vo2, fix: 'HIIT 2x/settimana' },
+                        { name: 'Sonno', value: impacts.sleep, fix: '7-8 ore ogni notte' },
+                        { name: 'Movimento', value: impacts.steps, fix: '10.000 passi/giorno' },
+                        { name: 'Stress', value: impacts.stress, fix: 'Meditazione 10 min/giorno' },
+                    ].filter(f => f.value > 0).sort((a, b) => b.value - a.value);
+                    
+                    if (factors.length > 0) {
+                        factors.slice(0, 2).forEach((f, i) => {
+                            response += `${i + 1}. **${f.name}**: ${f.fix}\n`;
+                        });
+                    } else {
+                        response += `Stai andando alla grande! Mantieni le abitudini.\n`;
+                    }
+                    
+                    return response;
+                }
+                
+                // Analyze data
+                if (q.includes('analiz') || q.includes('dati') || q.includes('data')) {
+                    let response = `📊 **Analisi Completa**\n\n`;
+                    
+                    response += `**Età biologica:** ${avgs.biological_age?.toFixed(1) || '--'} anni\n`;
+                    response += `**Età reale:** ${data.real_age || '--'} anni\n`;
+                    response += `**Differenza:** ${data.real_age && avgs.biological_age ? (data.real_age - avgs.biological_age).toFixed(1) : '--'} anni\n\n`;
+                    
+                    response += `**Medie 30 giorni:**\n`;
+                    response += `• Recovery: ${avgs.recovery?.toFixed(0) || '--'}%\n`;
+                    response += `• Strain: ${avgs.strain?.toFixed(1) || '--'}/21\n`;
+                    response += `• Sonno: ${avgs.sleep_hours?.toFixed(1) || '--'}h\n`;
+                    response += `• Sleep Performance: ${avgs.sleep_performance?.toFixed(0) || '--'}%\n`;
+                    response += `• RHR: ${avgs.resting_hr?.toFixed(0) || '--'} bpm\n`;
+                    response += `• Passi: ${avgs.steps ? Math.round(avgs.steps).toLocaleString() : '--'}\n`;
+                    
+                    return response;
+                }
+                
+                // Motivation
+                if (q.includes('motiv') || q.includes('forza') || q.includes('aiut')) {
+                    const quotes = [
+                        `🔥 **"Il dolore è temporaneo. La gloria è per sempre."**\n\nOgni goccia di sudore è un investimento nel tuo futuro. Ogni passo conta. Ogni scelta conta.\n\nNon stai solo costruendo un corpo - stai forgiando carattere.`,
+                        `⚔️ **"Non è la montagna che conquistiamo, ma noi stessi."**\n\nI tuoi dati mostrano il cammino. Ma sei TU che devi camminare.\n\nOggi è il giorno in cui il futuro te stesso ti ringrazierà.`,
+                        `🧘 **"L'acqua che scorre non diventa mai stagnante."**\n\nMuoviti. Riposa. Muoviti ancora. È il ritmo della vita.\n\nNon cercare la perfezione - cerca il progresso.`,
+                        `💪 **"La disciplina è il ponte tra obiettivi e risultati."**\n\nNon serve motivazione ogni giorno. Serve disciplina.\n\nFai oggi quello che gli altri non faranno, per avere domani quello che gli altri non avranno.`
+                    ];
+                    return quotes[Math.floor(Math.random() * quotes.length)];
+                }
+                
+                // Default
+                return `🤔 Non ho capito bene. Prova a chiedermi:\n\n• "Come posso dormire meglio?"\n• "Cosa devo fare oggi?"\n• "Come abbasso l'età biologica?"\n• "Analizza i miei dati"\n• "Ho bisogno di motivazione"\n\nSono qui per guidarti nel tuo percorso.`;
+            };
+            
+            const handleSend = () => {
+                if (!input.trim()) return;
+                
+                const userMsg = input.trim();
+                setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+                setInput('');
+                setLoading(true);
+                
+                // Simulate AI thinking
+                setTimeout(() => {
+                    const response = generateResponse(userMsg, userData);
+                    setMessages(prev => [...prev, { role: 'ai', text: response }]);
+                    setLoading(false);
+                }, 500);
+            };
+            
+            const formatMessage = (text) => {
+                // Simple markdown-like formatting
+                return text
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/\n/g, '<br/>');
+            };
+            
+            return (
+                <div className="flex flex-col h-[calc(100vh-120px)]">
+                    {/* Chat messages */}
+                    <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+                        {messages.map((msg, i) => (
+                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[85%] p-4 ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai'}`}>
+                                    {msg.role === 'ai' && <div className="text-[#00ff88] text-xs mb-2 font-bold">🥋 SENSEI</div>}
+                                    <div 
+                                        className="text-sm leading-relaxed"
+                                        dangerouslySetInnerHTML={{ __html: formatMessage(msg.text) }}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                        {loading && (
+                            <div className="flex justify-start">
+                                <div className="chat-bubble-ai p-4">
+                                    <div className="flex gap-1">
+                                        <div className="w-2 h-2 bg-[#00ff88] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                        <div className="w-2 h-2 bg-[#00ff88] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                        <div className="w-2 h-2 bg-[#00ff88] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Input */}
+                    <div className="p-4 border-t border-[#222]">
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={e => setInput(e.target.value)}
+                                onKeyPress={e => e.key === 'Enter' && handleSend()}
+                                placeholder="Chiedi al Sensei..."
+                                className="input-dark flex-1 px-4 py-3 rounded-xl"
+                            />
+                            <button onClick={handleSend} className="btn-primary px-6 py-3 rounded-xl">
+                                →
+                            </button>
+                        </div>
                     </div>
                 </div>
             );
         };
         
-        // Metric Box
-        const MetricBox = ({ icon, label, value, unit, color = '#00ff88' }) => (
-            <div className="card p-4 text-center">
-                <div className="text-2xl mb-1">{icon}</div>
-                <div className="font-orbitron text-2xl font-bold" style={{ color }}>
-                    {value ?? '--'}{unit && <span className="text-sm text-gray-500 ml-1">{unit}</span>}
-                </div>
-                <div className="text-xs text-gray-500 uppercase tracking-wider mt-1">{label}</div>
-            </div>
-        );
-        
-        // Loading
-        const Loading = () => (
-            <div className="min-h-screen flex flex-col items-center justify-center">
-                <div className="w-16 h-16 border-4 border-[#111] border-t-[#00ff88] rounded-full animate-spin mb-4"></div>
-                <div className="text-gray-500 font-orbitron">Loading...</div>
-            </div>
-        );
-        
         // ==================== PAGES ====================
         
         const LandingPage = ({ onNavigate }) => (
             <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-                <div className="bio-circle w-40 h-40 flex items-center justify-center mb-8">
+                <div className="bio-circle w-32 h-32 flex items-center justify-center mb-6">
                     <Particles />
-                    <span className="text-5xl z-10">🧬</span>
+                    <span className="text-4xl z-10">🧬</span>
                 </div>
-                <h1 className="font-orbitron text-5xl font-bold text-white mb-2">SENSEI</h1>
-                <p className="text-gray-500 mb-8">Your Biological Age Tracker</p>
+                <h1 className="font-orbitron text-4xl font-bold text-white mb-2">SENSEI</h1>
+                <p className="text-gray-500 mb-8">Biological Age + AI Coach</p>
                 <div className="flex gap-4">
-                    <button onClick={() => onNavigate('login')} className="btn-primary px-8 py-3 rounded-xl font-orbitron">
-                        LOGIN
-                    </button>
-                    <button onClick={() => onNavigate('register')} className="btn-outline px-8 py-3 rounded-xl font-orbitron">
-                        REGISTER
-                    </button>
+                    <button onClick={() => onNavigate('login')} className="btn-primary px-8 py-3 rounded-xl font-orbitron">LOGIN</button>
+                    <button onClick={() => onNavigate('register')} className="btn-outline px-8 py-3 rounded-xl font-orbitron">REGISTER</button>
                 </div>
             </div>
         );
@@ -371,35 +582,28 @@
                         localStorage.setItem('token', data.token);
                         localStorage.setItem('user', JSON.stringify(data.user));
                         onLogin(data);
-                    } else {
-                        setError(data.error || 'Login failed');
-                    }
-                } catch (err) {
-                    setError('Connection error');
-                } finally {
-                    setLoading(false);
-                }
+                    } else setError(data.error || 'Login failed');
+                } catch (err) { setError('Connection error'); }
+                finally { setLoading(false); }
             };
             
             return (
                 <div className="min-h-screen flex items-center justify-center p-6">
                     <div className="w-full max-w-md">
-                        <h1 className="font-orbitron text-3xl text-center mb-8">Login</h1>
-                        <form onSubmit={handleSubmit} className="card p-8">
+                        <h1 className="font-orbitron text-2xl text-center mb-6">Login</h1>
+                        <form onSubmit={handleSubmit} className="card p-6">
                             {error && <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 mb-4 text-red-300 text-sm">{error}</div>}
                             <div className="mb-4">
-                                <label className="block text-sm text-gray-400 mb-2">Email</label>
-                                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" required />
+                                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" placeholder="Email" required />
                             </div>
-                            <div className="mb-6">
-                                <label className="block text-sm text-gray-400 mb-2">Password</label>
-                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" required />
+                            <div className="mb-4">
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" placeholder="Password" required />
                             </div>
                             <button type="submit" disabled={loading} className="btn-primary w-full py-3 rounded-lg font-orbitron disabled:opacity-50">
-                                {loading ? 'Loading...' : 'LOGIN'}
+                                {loading ? '...' : 'LOGIN'}
                             </button>
                         </form>
-                        <p className="text-center mt-4 text-gray-500">
+                        <p className="text-center mt-4 text-gray-500 text-sm">
                             No account? <button onClick={() => onNavigate('register')} className="text-[#00ff88]">Register</button>
                         </p>
                     </div>
@@ -426,21 +630,18 @@
                     });
                     const data = await res.json();
                     if (data.user_id) setSuccess(true);
-                    else setError(data.error || 'Registration failed');
-                } catch (err) {
-                    setError('Connection error');
-                } finally {
-                    setLoading(false);
-                }
+                    else setError(data.error || 'Failed');
+                } catch (err) { setError('Connection error'); }
+                finally { setLoading(false); }
             };
             
             if (success) {
                 return (
                     <div className="min-h-screen flex items-center justify-center p-6">
-                        <div className="card p-10 text-center">
-                            <div className="text-5xl mb-4">✓</div>
-                            <h2 className="font-orbitron text-2xl text-[#00ff88] mb-4">Account Created!</h2>
-                            <button onClick={() => onNavigate('login')} className="btn-primary px-8 py-3 rounded-lg font-orbitron">LOGIN NOW</button>
+                        <div className="card p-8 text-center">
+                            <div className="text-4xl mb-4">✓</div>
+                            <h2 className="font-orbitron text-xl text-[#00ff88] mb-4">Account Created!</h2>
+                            <button onClick={() => onNavigate('login')} className="btn-primary px-6 py-2 rounded-lg">LOGIN</button>
                         </div>
                     </div>
                 );
@@ -449,26 +650,23 @@
             return (
                 <div className="min-h-screen flex items-center justify-center p-6">
                     <div className="w-full max-w-md">
-                        <h1 className="font-orbitron text-3xl text-center mb-8">Register</h1>
-                        <form onSubmit={handleSubmit} className="card p-8">
+                        <h1 className="font-orbitron text-2xl text-center mb-6">Register</h1>
+                        <form onSubmit={handleSubmit} className="card p-6">
                             {error && <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 mb-4 text-red-300 text-sm">{error}</div>}
                             <div className="mb-4">
-                                <label className="block text-sm text-gray-400 mb-2">Email</label>
-                                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" required />
+                                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" placeholder="Email" required />
                             </div>
                             <div className="mb-4">
-                                <label className="block text-sm text-gray-400 mb-2">Password</label>
-                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" required minLength="6" />
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" placeholder="Password (min 6)" required minLength="6" />
                             </div>
-                            <div className="mb-6">
-                                <label className="block text-sm text-gray-400 mb-2">Birth Year (for bio age)</label>
-                                <input type="number" value={birthYear} onChange={e => setBirthYear(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" placeholder="1985" min="1940" max="2010" />
+                            <div className="mb-4">
+                                <input type="number" value={birthYear} onChange={e => setBirthYear(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" placeholder="Birth year (es. 1976)" min="1940" max="2010" />
                             </div>
                             <button type="submit" disabled={loading} className="btn-primary w-full py-3 rounded-lg font-orbitron disabled:opacity-50">
-                                {loading ? 'Creating...' : 'CREATE ACCOUNT'}
+                                {loading ? '...' : 'CREATE ACCOUNT'}
                             </button>
                         </form>
-                        <p className="text-center mt-4 text-gray-500">
+                        <p className="text-center mt-4 text-gray-500 text-sm">
                             Have account? <button onClick={() => onNavigate('login')} className="text-[#00ff88]">Login</button>
                         </p>
                     </div>
@@ -496,7 +694,6 @@
                     const data = await res.json();
                     if (data.message?.includes('collegato')) {
                         setStep(2);
-                        // Sync 90 days
                         await fetch(`${API}/api/sync`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -504,33 +701,18 @@
                         });
                         setStep(3);
                         setTimeout(() => onComplete(), 1500);
-                    } else {
-                        setError(data.error || 'Connection failed');
-                    }
-                } catch (err) {
-                    setError('Connection error');
-                } finally {
-                    setLoading(false);
-                }
+                    } else setError(data.error || 'Failed');
+                } catch (err) { setError('Connection error'); }
+                finally { setLoading(false); }
             };
             
-            if (step === 2) {
+            if (step >= 2) {
                 return (
                     <div className="min-h-screen flex items-center justify-center">
                         <div className="text-center">
-                            <div className="w-16 h-16 border-4 border-[#111] border-t-[#00ff88] rounded-full animate-spin mx-auto mb-4"></div>
-                            <div className="font-orbitron text-[#00ff88]">Syncing 90 days of data...</div>
-                        </div>
-                    </div>
-                );
-            }
-            
-            if (step === 3) {
-                return (
-                    <div className="min-h-screen flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="text-5xl mb-4">✓</div>
-                            <div className="font-orbitron text-[#00ff88]">Ready!</div>
+                            {step === 2 && <div className="w-12 h-12 border-4 border-[#111] border-t-[#00ff88] rounded-full animate-spin mx-auto mb-4"></div>}
+                            {step === 3 && <div className="text-4xl mb-4">✓</div>}
+                            <div className="font-orbitron text-[#00ff88]">{step === 2 ? 'Syncing 90 days...' : 'Ready!'}</div>
                         </div>
                     </div>
                 );
@@ -540,22 +722,18 @@
                 <div className="min-h-screen flex items-center justify-center p-6">
                     <div className="w-full max-w-md">
                         <h1 className="font-orbitron text-2xl text-center mb-2">Connect Garmin</h1>
-                        <p className="text-gray-500 text-center mb-8">To calculate your biological age</p>
-                        <form onSubmit={handleConnect} className="card p-8">
+                        <p className="text-gray-500 text-center text-sm mb-6">To calculate your biological age</p>
+                        <form onSubmit={handleConnect} className="card p-6">
                             {error && <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 mb-4 text-red-300 text-sm">{error}</div>}
-                            <div className="bg-[#0a0a0a] rounded-lg p-3 mb-6 text-xs text-gray-500">
-                                🔒 Credentials are encrypted and only used to sync data
+                            <div className="bg-[#0a0a0a] rounded-lg p-3 mb-4 text-xs text-gray-500">🔒 Encrypted credentials</div>
+                            <div className="mb-4">
+                                <input type="email" value={garminEmail} onChange={e => setGarminEmail(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" placeholder="Garmin Email" required />
                             </div>
                             <div className="mb-4">
-                                <label className="block text-sm text-gray-400 mb-2">Garmin Email</label>
-                                <input type="email" value={garminEmail} onChange={e => setGarminEmail(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" required />
-                            </div>
-                            <div className="mb-6">
-                                <label className="block text-sm text-gray-400 mb-2">Garmin Password</label>
-                                <input type="password" value={garminPassword} onChange={e => setGarminPassword(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" required />
+                                <input type="password" value={garminPassword} onChange={e => setGarminPassword(e.target.value)} className="input-dark w-full px-4 py-3 rounded-lg" placeholder="Garmin Password" required />
                             </div>
                             <button type="submit" disabled={loading} className="btn-primary w-full py-3 rounded-lg font-orbitron disabled:opacity-50">
-                                {loading ? 'Connecting...' : 'CONNECT GARMIN'}
+                                {loading ? 'Connecting...' : 'CONNECT'}
                             </button>
                         </form>
                     </div>
@@ -581,11 +759,8 @@
                     ]);
                     setSummary(await sumRes.json());
                     setTrend(await trendRes.json());
-                } catch (err) {
-                    console.error(err);
-                } finally {
-                    setLoading(false);
-                }
+                } catch (err) { console.error(err); }
+                finally { setLoading(false); }
             };
             
             const handleSync = async () => {
@@ -601,100 +776,81 @@
             
             if (loading) return <Loading />;
             
-            const today = summary?.today || {};
             const avgs = summary?.averages || {};
             const impacts = avgs.bio_impacts || {};
-            const realAge = summary?.real_age || user?.birth_year ? (new Date().getFullYear() - user.birth_year) : 42;
+            const realAge = summary?.real_age || 42;
             const bioAge = avgs.biological_age;
             
             return (
-                <div className="min-h-screen pb-8">
+                <div className="min-h-screen flex flex-col">
                     {/* Header */}
-                    <header className="flex justify-between items-center p-4 border-b border-[#1a1a1a]">
-                        <h1 className="font-orbitron text-xl font-bold">SENSEI</h1>
-                        <div className="flex gap-3">
-                            <button onClick={handleSync} disabled={syncing} className="btn-outline px-4 py-2 rounded-lg text-sm disabled:opacity-50">
+                    <header className="flex justify-between items-center p-3 border-b border-[#1a1a1a]">
+                        <h1 className="font-orbitron text-lg font-bold">SENSEI</h1>
+                        <div className="flex gap-2">
+                            <button onClick={handleSync} disabled={syncing} className="btn-outline px-3 py-1 rounded-lg text-xs disabled:opacity-50">
                                 {syncing ? '⟳' : '⟳ Sync'}
                             </button>
-                            <button onClick={onLogout} className="text-gray-500 text-sm">Logout</button>
+                            <button onClick={onLogout} className="text-gray-500 text-xs">Exit</button>
                         </div>
                     </header>
                     
                     {/* Tabs */}
                     <div className="flex border-b border-[#1a1a1a]">
-                        {['overview', 'factors', 'trend'].map(t => (
-                            <button
-                                key={t}
-                                onClick={() => setTab(t)}
-                                className={`flex-1 py-3 text-sm uppercase tracking-wider ${tab === t ? 'text-[#00ff88] border-b-2 border-[#00ff88]' : 'text-gray-500'}`}
-                            >
-                                {t}
+                        {['overview', 'factors', 'trend', 'coach'].map(t => (
+                            <button key={t} onClick={() => setTab(t)}
+                                className={`flex-1 py-2 text-xs uppercase tracking-wider ${tab === t ? 'text-[#00ff88] border-b-2 border-[#00ff88]' : 'text-gray-500'}`}>
+                                {t === 'coach' ? '🥋 Coach' : t}
                             </button>
                         ))}
                     </div>
                     
-                    <div className="p-4 max-w-2xl mx-auto">
+                    <div className="flex-1 overflow-auto">
                         {tab === 'overview' && (
-                            <div className="animate-fadeIn">
-                                {/* Bio Age Circle */}
-                                <div className="flex justify-center py-8">
+                            <div className="p-4 max-w-lg mx-auto animate-fadeIn">
+                                <div className="flex justify-center py-6">
                                     <BioAgeCircle bioAge={bioAge} realAge={realAge} paceOfAging={trend?.pace_of_aging} />
                                 </div>
                                 
-                                {/* Quick Stats */}
-                                <div className="grid grid-cols-3 gap-3 mb-6">
+                                <div className="grid grid-cols-3 gap-2 mb-3">
                                     <MetricBox icon="❤️" label="RHR" value={avgs.resting_hr?.toFixed(0)} unit="bpm" color="#ff6b6b" />
-                                    <MetricBox icon="🫁" label="VO2 Max" value={avgs.vo2_max?.toFixed(0)} color="#00ff88" />
-                                    <MetricBox icon="👣" label="Steps" value={avgs.steps ? Math.round(avgs.steps).toLocaleString() : null} color="#ffd93d" />
+                                    <MetricBox icon="🫁" label="VO2" value={avgs.vo2_max?.toFixed(0)} color="#00ff88" />
+                                    <MetricBox icon="👣" label="Steps" value={avgs.steps ? Math.round(avgs.steps/1000) + 'k' : null} color="#ffd93d" />
                                 </div>
                                 
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid grid-cols-3 gap-2 mb-3">
                                     <MetricBox icon="😴" label="Sleep" value={avgs.sleep_hours?.toFixed(1)} unit="h" color="#6c5ce7" />
                                     <MetricBox icon="⚡" label="Recovery" value={avgs.recovery?.toFixed(0)} color="#00ff88" />
                                     <MetricBox icon="🔥" label="Strain" value={avgs.strain?.toFixed(1)} color="#ff6b35" />
                                 </div>
                                 
-                                {/* Period info */}
-                                <div className="text-center text-xs text-gray-600 mt-6">
-                                    30-day average • {summary?.period?.days_with_data || 0} days of data
+                                <div className="card p-3 mb-3">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-gray-400 text-sm">😴 Sleep Performance</span>
+                                        <span className="font-orbitron text-xl text-[#6c5ce7]">{avgs.sleep_performance?.toFixed(0) || '--'}%</span>
+                                    </div>
+                                </div>
+                                
+                                <div className="text-center text-xs text-gray-600">
+                                    30-day avg • {summary?.period?.days_with_data || 0} days
                                 </div>
                             </div>
                         )}
                         
                         {tab === 'factors' && (
-                            <div className="space-y-3 py-4 animate-fadeIn">
-                                <h2 className="text-gray-400 text-sm uppercase tracking-widest mb-4">What's impacting your age</h2>
+                            <div className="p-4 max-w-lg mx-auto space-y-2 animate-fadeIn">
+                                <h2 className="text-gray-400 text-xs uppercase tracking-widest mb-3">What's impacting your age</h2>
+                                <ImpactBar icon="🫁" label="VO2 Max" value={impacts.vo2} description={`${avgs.vo2_max?.toFixed(0) || '--'} ml/kg/min`} />
+                                <ImpactBar icon="❤️" label="Resting HR" value={impacts.rhr} description={`${avgs.resting_hr?.toFixed(0) || '--'} bpm`} />
+                                <ImpactBar icon="😴" label="Sleep" value={impacts.sleep} description={`${avgs.sleep_hours?.toFixed(1) || '--'} hours avg`} />
+                                <ImpactBar icon="👣" label="Steps" value={impacts.steps} description={`${avgs.steps ? Math.round(avgs.steps).toLocaleString() : '--'} avg`} />
+                                <ImpactBar icon="😤" label="Stress" value={impacts.stress} />
+                                <ImpactBar icon="🔥" label="High Intensity" value={impacts.hrz} />
                                 
-                                <ImpactBar 
-                                    icon="🫁" label="VO2 Max" value={impacts.vo2}
-                                    description={`Current: ${avgs.vo2_max?.toFixed(0) || '--'} ml/kg/min`}
-                                />
-                                <ImpactBar 
-                                    icon="❤️" label="Resting HR" value={impacts.rhr}
-                                    description={`Current: ${avgs.resting_hr?.toFixed(0) || '--'} bpm`}
-                                />
-                                <ImpactBar 
-                                    icon="😴" label="Sleep" value={impacts.sleep}
-                                    description={`Average: ${avgs.sleep_hours?.toFixed(1) || '--'} hours`}
-                                />
-                                <ImpactBar 
-                                    icon="👣" label="Steps" value={impacts.steps}
-                                    description={`Average: ${avgs.steps ? Math.round(avgs.steps).toLocaleString() : '--'} steps`}
-                                />
-                                <ImpactBar 
-                                    icon="😤" label="Stress" value={impacts.stress}
-                                    description="Based on HRV and stress levels"
-                                />
-                                <ImpactBar 
-                                    icon="🔥" label="High Intensity" value={impacts.hrz}
-                                    description="Time in HR zones 4-5"
-                                />
-                                
-                                <div className="card p-4 mt-6">
+                                <div className="card p-3 mt-4">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-gray-400">Total Impact</span>
-                                        <span className={`font-orbitron text-xl font-bold ${(realAge - bioAge) > 0 ? 'text-[#00ff88]' : 'text-[#ff6b35]'}`}>
-                                            {bioAge ? (realAge - bioAge > 0 ? '-' : '+') + Math.abs(realAge - bioAge).toFixed(1) : '--'} years
+                                        <span className="text-gray-400 text-sm">Total Impact</span>
+                                        <span className={`font-orbitron text-lg font-bold ${(realAge - bioAge) > 0 ? 'text-[#00ff88]' : 'text-[#ff6b35]'}`}>
+                                            {bioAge ? (realAge - bioAge > 0 ? '' : '+') + (realAge - bioAge).toFixed(1) : '--'} years
                                         </span>
                                     </div>
                                 </div>
@@ -702,37 +858,35 @@
                         )}
                         
                         {tab === 'trend' && (
-                            <div className="py-4 animate-fadeIn">
+                            <div className="p-4 max-w-lg mx-auto animate-fadeIn">
                                 {trend?.data?.length > 0 ? (
                                     <>
                                         <TrendChart data={trend.data} realAge={realAge} />
-                                        
                                         <div className="card p-4 mt-4">
-                                            <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">Pace of Aging</div>
-                                            <div className={`font-orbitron text-3xl font-bold ${trend.pace_of_aging <= 0 ? 'text-[#00ff88]' : 'text-[#ff6b35]'}`}>
-                                                {trend.pace_of_aging !== null ? (trend.pace_of_aging <= 0 ? trend.pace_of_aging.toFixed(1) : '+' + trend.pace_of_aging.toFixed(1)) + 'x' : '--'}
+                                            <div className="text-xs text-gray-500 uppercase">Pace of Aging</div>
+                                            <div className={`font-orbitron text-2xl font-bold ${trend.pace_of_aging <= 0 ? 'text-[#00ff88]' : 'text-[#ff6b35]'}`}>
+                                                {trend.pace_of_aging !== null ? (trend.pace_of_aging <= 0 ? '' : '+') + trend.pace_of_aging.toFixed(1) + 'x' : '--'}
                                             </div>
                                             <div className="text-xs text-gray-500 mt-1">
-                                                {trend.pace_of_aging < -0.5 ? 'You are getting younger!' :
-                                                 trend.pace_of_aging < 0 ? 'You are aging slower than normal' :
-                                                 trend.pace_of_aging < 0.5 ? 'Normal aging rate' : 'You are aging faster than normal'}
+                                                {trend.pace_of_aging < -0.3 ? 'Getting younger!' : trend.pace_of_aging < 0.3 ? 'Stable' : 'Aging faster'}
                                             </div>
                                         </div>
                                     </>
                                 ) : (
-                                    <div className="text-center text-gray-500 py-10">
-                                        Not enough data for trend analysis.<br/>
-                                        Need at least 30 days.
-                                    </div>
+                                    <div className="text-center text-gray-500 py-10">Need 30+ days for trend</div>
                                 )}
                             </div>
+                        )}
+                        
+                        {tab === 'coach' && (
+                            <AICoach userData={summary} />
                         )}
                     </div>
                 </div>
             );
         };
         
-        // ==================== MAIN APP ====================
+        // ==================== MAIN ====================
         
         const App = () => {
             const [page, setPage] = useState('landing');
@@ -740,9 +894,7 @@
             const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
             
             useEffect(() => {
-                if (token && user) {
-                    setPage(user.garmin_connected ? 'dashboard' : 'setup');
-                }
+                if (token && user) setPage(user.garmin_connected ? 'dashboard' : 'setup');
             }, []);
             
             const handleLogin = (data) => {
