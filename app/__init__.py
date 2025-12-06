@@ -341,93 +341,157 @@ def create_app():
         memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else "Nessuna"
         
         # Formatta dati di ieri
-        yesterday = context.get('yesterday', {})
-        yesterday_text = f"""Data: {yesterday.get('date', 'N/D')}
-- Recovery: {yesterday.get('recovery', 'N/D')}%
-- Sonno: {yesterday.get('sleep_hours', 'N/D')}h (Deep: {yesterday.get('deep_sleep_min', 'N/D')}min, REM: {yesterday.get('rem_sleep_min', 'N/D')}min)
-- RHR: {yesterday.get('rhr', 'N/D')} bpm | HRV: {yesterday.get('hrv', 'N/D')}ms
-- Passi: {yesterday.get('steps', 'N/D')} | Stress: {yesterday.get('stress', 'N/D')}
-- Strain: {yesterday.get('strain', 'N/D')}/21 | Body Battery: {yesterday.get('body_battery', 'N/D')}""" if yesterday else "Non disponibili"
+        y = context.get('yesterday', {})
+        yesterday_text = f"""📅 {y.get('date', 'N/D')}
+RECUPERO: {y.get('recovery', 'N/D')}% | Strain: {y.get('strain', 'N/D')}/21
+SONNO: {y.get('sleep_hours', 'N/D')}h (Score: {y.get('sleep_score', 'N/D')}) | {y.get('sleep_start', '?')}-{y.get('sleep_end', '?')}
+  Deep: {y.get('deep_sleep_min', 'N/D')}min | REM: {y.get('rem_sleep_min', 'N/D')}min | Light: {y.get('light_sleep_min', 'N/D')}min | Sveglio: {y.get('awake_min', 'N/D')}min
+CUORE: RHR {y.get('rhr', 'N/D')}bpm | HRV {y.get('hrv', 'N/D')}ms | Max {y.get('max_hr', 'N/D')}bpm
+STRESS: Media {y.get('stress_avg', 'N/D')} | Max {y.get('stress_max', 'N/D')} | Alto: {y.get('high_stress_min', 'N/D')}min
+ATTIVITÀ: {y.get('steps', 'N/D')} passi | {y.get('distance_km', 'N/D')}km | {y.get('active_calories', 'N/D')}kcal attive | {y.get('floors', 'N/D')} piani
+INTENSITÀ: Moderata {y.get('moderate_min', 'N/D')}min | Vigorosa {y.get('vigorous_min', 'N/D')}min
+BODY BATTERY: {y.get('body_battery_low', 'N/D')}-{y.get('body_battery_high', 'N/D')} | +{y.get('body_battery_charged', 'N/D')} -{y.get('body_battery_drained', 'N/D')}
+RESPIRO: {y.get('respiration', 'N/D')} resp/min | SpO2: {y.get('spo2', 'N/D')}%""" if y else "Non disponibili"
         
         # Formatta trend
-        trend = context.get('trend', {})
-        trend_text = f"Sonno: {'+' if trend.get('sleep_change', 0) >= 0 else ''}{trend.get('sleep_change', 0)}h | Recovery: {'+' if trend.get('recovery_change', 0) >= 0 else ''}{trend.get('recovery_change', 0)}% | RHR: {'+' if trend.get('rhr_change', 0) >= 0 else ''}{trend.get('rhr_change', 0)}bpm" if trend else "Non disponibile"
+        t = context.get('trend', {})
+        trend_text = f"""Sonno: {'+' if (t.get('sleep_change', 0) or 0) >= 0 else ''}{t.get('sleep_change', 0)}h | Recovery: {'+' if (t.get('recovery_change', 0) or 0) >= 0 else ''}{t.get('recovery_change', 0)}% | RHR: {'+' if (t.get('rhr_change', 0) or 0) >= 0 else ''}{t.get('rhr_change', 0)}bpm
+HRV: {'+' if (t.get('hrv_change', 0) or 0) >= 0 else ''}{t.get('hrv_change', 0)}ms | Passi: {'+' if (t.get('steps_change', 0) or 0) >= 0 else ''}{t.get('steps_change', 0)} | Stress: {'+' if (t.get('stress_change', 0) or 0) >= 0 else ''}{t.get('stress_change', 0)}""" if t else "Non disponibile"
         
         # Formatta attività recenti
         activities = context.get('recent_activities', [])
-        activities_text = "\n".join([f"- {a['date']}: {a['name']} ({a['duration_min']}min, {a['calories']}kcal, HR {a['avg_hr']}bpm, Strain {a['strain']})" for a in activities]) if activities else "Nessuna attività recente"
+        activities_text = "\n".join([
+            f"• {a['date']}: {a['name']} | {a['duration_min']}min | {a['distance_km']}km | {a['calories']}kcal | HR {a['avg_hr']}/{a['max_hr']}bpm | Strain {a['strain']} | Aerobico {a['aerobic_effect']} Anaerobico {a['anaerobic_effect']} | Z4:{a['hr_zone_4_min']}min Z5:{a['hr_zone_5_min']}min"
+            for a in activities
+        ]) if activities else "Nessuna attività recente"
+        
+        # Riepilogo settimana
+        ws = context.get('week_activity_summary', {})
+        week_summary = f"{ws.get('total_activities', 0)} attività | {round(ws.get('total_duration_min', 0))}min totali | {ws.get('total_distance_km', 0)}km | {ws.get('total_calories', 0)}kcal | Strain medio {ws.get('avg_strain', 'N/D')}" if ws else "N/D"
         
         return f"""Sei SENSEI (Dr. Sensei), preparatore atletico italiano con 25 anni di esperienza nel Performance Lab.
 Parli con {name}, {age} anni.
 
 CARATTERE: Diretto, pragmatico, motivante. Parli come un vero coach italiano.
 
-LA TUA COLLEGA: Lavori con Dr. Sakura (coach mentale). Per temi emotivi/stress/ansia, suggerisci di parlare con lei.
+COLLEGA: Dr. Sakura (coach mentale). Per temi emotivi/stress/ansia, suggerisci di parlare con lei.
 
-═══ DATI DI IERI ═══
+══════════════════════════════════════
+        DATI COMPLETI DI IERI
+══════════════════════════════════════
 {yesterday_text}
 
-═══ MEDIE 30 GIORNI ═══
-- Età biologica: {context.get('biological_age', 'N/D')} (reale: {age})
-- Recovery: {context.get('recovery', 'N/D')}% | Strain: {context.get('strain', 'N/D')}/21
-- Sonno: {context.get('sleep_hours', 'N/D')}h | RHR: {context.get('resting_hr', 'N/D')}bpm | HRV: {context.get('hrv', 'N/D')}ms
-- Passi: {context.get('steps', 'N/D')} | Stress: {context.get('stress_avg', 'N/D')} | VO2 Max: {context.get('vo2_max', 'N/D')}
+══════════════════════════════════════
+           MEDIE 30 GIORNI
+══════════════════════════════════════
+ETÀ BIOLOGICA: {context.get('biological_age', 'N/D')} (reale: {age}) | VO2 Max: {context.get('vo2_max', 'N/D')}
+SCORES: Recovery {context.get('recovery', 'N/D')}% | Strain {context.get('strain', 'N/D')}/21 | Sleep {context.get('sleep_performance', 'N/D')}%
+CUORE: RHR {context.get('resting_hr', 'N/D')}bpm | HRV {context.get('hrv', 'N/D')}ms
+SONNO: {context.get('sleep_hours', 'N/D')}h | Deep {context.get('deep_sleep_min', 'N/D')}min | REM {context.get('rem_sleep_min', 'N/D')}min
+STRESS: {context.get('stress_avg', 'N/D')} media
+ATTIVITÀ: {context.get('steps', 'N/D')} passi | {context.get('distance_km', 'N/D')}km | {context.get('active_calories', 'N/D')}kcal
+INTENSITÀ: Moderata {context.get('moderate_min', 'N/D')}min | Vigorosa {context.get('vigorous_min', 'N/D')}min
 
-═══ TREND (vs settimana scorsa) ═══
+══════════════════════════════════════
+      TREND VS SETTIMANA SCORSA
+══════════════════════════════════════
 {trend_text}
 
-═══ ATTIVITÀ RECENTI (7gg) ═══
+══════════════════════════════════════
+       ATTIVITÀ ULTIMI 7 GIORNI
+══════════════════════════════════════
+RIEPILOGO: {week_summary}
+
+DETTAGLIO:
 {activities_text}
 
-═══ MEMORIE ═══
+══════════════════════════════════════
+              MEMORIE
+══════════════════════════════════════
 {memories_text}
 
 FOCUS: Allenamento, performance, recupero, prevenzione infortuni, nutrizione sportiva, analisi dati.
 REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: injury, goal, training, nutrition, performance
-Rispondi in italiano, max 250 parole. Usa i dati specifici quando rispondi."""
+Rispondi in italiano, max 300 parole. USA I DATI SPECIFICI nelle risposte!"""
 
     def _get_sakura_prompt(user, context, memories):
         name = user.name or "amico"
         age = user.get_real_age()
         memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else "Nessuna"
         
-        # Formatta dati di ieri (focus su benessere)
-        yesterday = context.get('yesterday', {})
-        yesterday_text = f"""- Sonno: {yesterday.get('sleep_hours', 'N/D')}h (Deep: {yesterday.get('deep_sleep_min', 'N/D')}min, REM: {yesterday.get('rem_sleep_min', 'N/D')}min)
-- Recovery: {yesterday.get('recovery', 'N/D')}% | Body Battery: {yesterday.get('body_battery', 'N/D')}
-- Stress: {yesterday.get('stress', 'N/D')} | HRV: {yesterday.get('hrv', 'N/D')}ms""" if yesterday else "Non disponibili"
+        # Formatta dati di ieri (focus benessere)
+        y = context.get('yesterday', {})
+        yesterday_text = f"""📅 {y.get('date', 'N/D')}
+SONNO: {y.get('sleep_hours', 'N/D')}h (Score: {y.get('sleep_score', 'N/D')}) | Ora: {y.get('sleep_start', '?')}-{y.get('sleep_end', '?')}
+  Deep: {y.get('deep_sleep_min', 'N/D')}min | REM: {y.get('rem_sleep_min', 'N/D')}min | Sveglio: {y.get('awake_min', 'N/D')}min
+RECUPERO: {y.get('recovery', 'N/D')}%
+STRESS: Media {y.get('stress_avg', 'N/D')} | Max {y.get('stress_max', 'N/D')}
+  Riposo: {y.get('rest_stress_min', 'N/D')}min | Basso: {y.get('low_stress_min', 'N/D')}min | Medio: {y.get('medium_stress_min', 'N/D')}min | Alto: {y.get('high_stress_min', 'N/D')}min
+CUORE: HRV {y.get('hrv', 'N/D')}ms | RHR {y.get('rhr', 'N/D')}bpm
+BODY BATTERY: Min {y.get('body_battery_low', 'N/D')} → Max {y.get('body_battery_high', 'N/D')} | Caricato +{y.get('body_battery_charged', 'N/D')} | Consumato -{y.get('body_battery_drained', 'N/D')}
+RESPIRO: {y.get('respiration', 'N/D')} resp/min | SpO2: {y.get('spo2', 'N/D')}%""" if y else "Non disponibili"
         
         # Formatta trend
-        trend = context.get('trend', {})
-        trend_text = f"Sonno: {'+' if trend.get('sleep_change', 0) >= 0 else ''}{trend.get('sleep_change', 0)}h | Recovery: {'+' if trend.get('recovery_change', 0) >= 0 else ''}{trend.get('recovery_change', 0)}%" if trend else "Non disponibile"
+        t = context.get('trend', {})
+        trend_text = f"""Sonno: {'+' if (t.get('sleep_change', 0) or 0) >= 0 else ''}{t.get('sleep_change', 0)}h | Recovery: {'+' if (t.get('recovery_change', 0) or 0) >= 0 else ''}{t.get('recovery_change', 0)}%
+HRV: {'+' if (t.get('hrv_change', 0) or 0) >= 0 else ''}{t.get('hrv_change', 0)}ms | Stress: {'+' if (t.get('stress_change', 0) or 0) >= 0 else ''}{t.get('stress_change', 0)}""" if t else "Non disponibile"
         
         return f"""Sei SAKURA (Dr. Sakura), coach mentale con background in psicologia dello sport e mindfulness nel Performance Lab.
 Parli con {name}, {age} anni.
 
 CARATTERE: Calma, empatica, saggia. Usi metafore dalla natura e filosofia orientale.
 
-IL TUO COLLEGA: Lavori con Dr. Sensei (preparatore atletico). Per allenamenti/performance fisica, suggerisci di parlare con lui.
+COLLEGA: Dr. Sensei (preparatore atletico). Per allenamenti/performance fisica, suggerisci di parlare con lui.
 
-═══ STATO DI IERI ═══
+══════════════════════════════════════
+       STATO BENESSERE DI IERI
+══════════════════════════════════════
 {yesterday_text}
 
-═══ MEDIE 30 GIORNI ═══
-- Stress medio: {context.get('stress_avg', 'N/D')}
-- Sonno: {context.get('sleep_hours', 'N/D')}h
-- Recovery: {context.get('recovery', 'N/D')}%
-- HRV: {context.get('hrv', 'N/D')}ms (indicatore equilibrio sistema nervoso)
+══════════════════════════════════════
+           MEDIE 30 GIORNI
+══════════════════════════════════════
+SONNO: {context.get('sleep_hours', 'N/D')}h media | Score {context.get('sleep_performance', 'N/D')}%
+  Deep: {context.get('deep_sleep_min', 'N/D')}min | REM: {context.get('rem_sleep_min', 'N/D')}min
+STRESS: {context.get('stress_avg', 'N/D')} media
+CUORE: HRV {context.get('hrv', 'N/D')}ms | RHR {context.get('resting_hr', 'N/D')}bpm
+RECUPERO: {context.get('recovery', 'N/D')}%
+BODY BATTERY: {context.get('body_battery_low', 'N/D')}-{context.get('body_battery_high', 'N/D')}
 
-═══ TREND (vs settimana scorsa) ═══
+══════════════════════════════════════
+      TREND VS SETTIMANA SCORSA
+══════════════════════════════════════
 {trend_text}
 
-═══ MEMORIE ═══
+══════════════════════════════════════
+              MEMORIE
+══════════════════════════════════════
 {memories_text}
 
-INTERPRETAZIONE DATI:
-- HRV alto + Stress basso = buon equilibrio, sistema nervoso rilassato
-- HRV basso + Stress alto = sovraccarico, serve recupero mentale
-- Sonno Deep basso = possibile stress o ansia
-- Sonno REM basso = possibile esaurimento emotivo
+══════════════════════════════════════
+       INTERPRETAZIONE DATI
+══════════════════════════════════════
+HRV (Variabilità Cardiaca):
+- HRV alto (>50ms) = Sistema nervoso equilibrato, buona resilienza
+- HRV basso (<30ms) = Stress accumulato, sistema in allerta
+
+STRESS Garmin:
+- <25 = Riposo/rilassato
+- 25-50 = Basso/normale
+- 50-75 = Medio
+- >75 = Alto, serve recupero
+
+DEEP SLEEP:
+- Basso (<45min) = Possibile stress, ansia, sovraccarico mentale
+- Ottimale (60-90min) = Buon recupero fisico e mentale
+
+REM SLEEP:
+- Basso (<60min) = Possibile esaurimento emotivo, elaborazione incompleta
+- Ottimale (90-120min) = Buona elaborazione emotiva e memoria
+
+BODY BATTERY:
+- Mattina <50 = Non hai recuperato abbastanza
+- Sera >30 = Buona gestione energie
 
 ═══ MODALITÀ MEDITAZIONE GUIDATA ═══
 Quando l'utente chiede una meditazione, respirazione guidata, o rilassamento:
@@ -445,10 +509,10 @@ ESEMPIO SBAGLIATO (non fare così):
 
 FOCUS: Benessere mentale, gestione stress, mindfulness, equilibrio vita-sport, motivazione, crescita personale.
 REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: emotion, stress, mindset, relationship, sleep_mental, life_balance
-Rispondi in italiano, max 400 parole per le meditazioni, 250 per il resto."""
+Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I DATI SPECIFICI nelle risposte!"""
 
     def _build_context(user):
-        """Costruisce contesto dettagliato per i coach AI"""
+        """Costruisce contesto COMPLETO per i coach AI"""
         today = date.today()
         start_date = today - timedelta(days=30)
         metrics = DailyMetric.query.filter(
@@ -463,37 +527,112 @@ Rispondi in italiano, max 400 parole per le meditazioni, 250 per il resto."""
             vals = [x for x in lst if x is not None]
             return round(sum(vals)/len(vals), 1) if vals else None
         
-        # Dati medi 30 giorni
+        def total(lst):
+            vals = [x for x in lst if x is not None]
+            return sum(vals) if vals else None
+        
+        # ═══ MEDIE 30 GIORNI ═══
         context = {
             'biological_age': avg([m.biological_age for m in metrics]),
             'recovery': avg([m.recovery_score for m in metrics]),
-            'sleep_hours': avg([m.sleep_seconds/3600 if m.sleep_seconds else None for m in metrics]),
-            'resting_hr': avg([m.resting_hr for m in metrics]),
-            'hrv': avg([m.hrv_last_night for m in metrics]),
-            'steps': avg([m.steps for m in metrics]),
-            'stress_avg': avg([m.stress_avg for m in metrics]),
             'strain': avg([m.strain_score for m in metrics]),
+            'sleep_performance': avg([m.sleep_performance for m in metrics]),
             'vo2_max': avg([m.vo2_max for m in metrics]),
+            
+            # Cuore
+            'resting_hr': avg([m.resting_hr for m in metrics]),
+            'min_hr': avg([m.min_hr for m in metrics]),
+            'max_hr': avg([m.max_hr for m in metrics]),
+            'hrv': avg([m.hrv_last_night for m in metrics]),
+            'hrv_weekly': avg([m.hrv_weekly_avg for m in metrics]),
+            
+            # Sonno
+            'sleep_hours': avg([m.sleep_seconds/3600 if m.sleep_seconds else None for m in metrics]),
+            'deep_sleep_min': avg([m.deep_sleep_seconds/60 if m.deep_sleep_seconds else None for m in metrics]),
+            'rem_sleep_min': avg([m.rem_sleep_seconds/60 if m.rem_sleep_seconds else None for m in metrics]),
+            'light_sleep_min': avg([m.light_sleep_seconds/60 if m.light_sleep_seconds else None for m in metrics]),
+            'awake_min': avg([m.awake_seconds/60 if m.awake_seconds else None for m in metrics]),
+            'sleep_score': avg([m.sleep_score for m in metrics]),
+            
+            # Stress
+            'stress_avg': avg([m.stress_avg for m in metrics]),
+            'stress_max': avg([m.stress_max for m in metrics]),
+            
+            # Attività giornaliera
+            'steps': avg([m.steps for m in metrics]),
+            'total_calories': avg([m.total_calories for m in metrics]),
+            'active_calories': avg([m.active_calories for m in metrics]),
+            'distance_km': avg([m.distance_meters/1000 if m.distance_meters else None for m in metrics]),
+            'floors': avg([m.floors_ascended for m in metrics]),
+            'moderate_min': avg([m.moderate_intensity_minutes for m in metrics]),
+            'vigorous_min': avg([m.vigorous_intensity_minutes for m in metrics]),
+            
+            # Body Battery
+            'body_battery_high': avg([m.body_battery_high for m in metrics]),
+            'body_battery_low': avg([m.body_battery_low for m in metrics]),
+            
+            # Respirazione e SpO2
+            'respiration': avg([m.avg_respiration for m in metrics]),
+            'spo2': avg([m.avg_spo2 for m in metrics]),
         }
         
-        # Dati di IERI (ultimo giorno con dati)
+        # ═══ DATI DI IERI ═══
         yesterday = metrics[0] if metrics else None
         if yesterday:
+            sleep_start_str = yesterday.sleep_start.strftime('%H:%M') if yesterday.sleep_start else None
+            sleep_end_str = yesterday.sleep_end.strftime('%H:%M') if yesterday.sleep_end else None
+            
             context['yesterday'] = {
                 'date': yesterday.date.strftime('%d/%m'),
                 'recovery': yesterday.recovery_score,
+                'strain': yesterday.strain_score,
+                'sleep_performance': yesterday.sleep_performance,
+                
+                # Sonno dettagliato
                 'sleep_hours': round(yesterday.sleep_seconds / 3600, 1) if yesterday.sleep_seconds else None,
+                'sleep_score': yesterday.sleep_score,
                 'deep_sleep_min': round(yesterday.deep_sleep_seconds / 60) if yesterday.deep_sleep_seconds else None,
                 'rem_sleep_min': round(yesterday.rem_sleep_seconds / 60) if yesterday.rem_sleep_seconds else None,
+                'light_sleep_min': round(yesterday.light_sleep_seconds / 60) if yesterday.light_sleep_seconds else None,
+                'awake_min': round(yesterday.awake_seconds / 60) if yesterday.awake_seconds else None,
+                'sleep_start': sleep_start_str,
+                'sleep_end': sleep_end_str,
+                
+                # Cuore
                 'rhr': yesterday.resting_hr,
+                'min_hr': yesterday.min_hr,
+                'max_hr': yesterday.max_hr,
                 'hrv': yesterday.hrv_last_night,
+                
+                # Stress dettagliato
+                'stress_avg': yesterday.stress_avg,
+                'stress_max': yesterday.stress_max,
+                'rest_stress_min': round(yesterday.rest_stress_duration / 60) if yesterday.rest_stress_duration else None,
+                'low_stress_min': round(yesterday.low_stress_duration / 60) if yesterday.low_stress_duration else None,
+                'medium_stress_min': round(yesterday.medium_stress_duration / 60) if yesterday.medium_stress_duration else None,
+                'high_stress_min': round(yesterday.high_stress_duration / 60) if yesterday.high_stress_duration else None,
+                
+                # Attività
                 'steps': yesterday.steps,
-                'stress': yesterday.stress_avg,
-                'strain': yesterday.strain_score,
-                'body_battery': yesterday.body_battery_high,
+                'total_calories': yesterday.total_calories,
+                'active_calories': yesterday.active_calories,
+                'distance_km': round(yesterday.distance_meters / 1000, 1) if yesterday.distance_meters else None,
+                'floors': yesterday.floors_ascended,
+                'moderate_min': yesterday.moderate_intensity_minutes,
+                'vigorous_min': yesterday.vigorous_intensity_minutes,
+                
+                # Body Battery
+                'body_battery_high': yesterday.body_battery_high,
+                'body_battery_low': yesterday.body_battery_low,
+                'body_battery_charged': yesterday.body_battery_charged,
+                'body_battery_drained': yesterday.body_battery_drained,
+                
+                # Respirazione e SpO2
+                'respiration': yesterday.avg_respiration,
+                'spo2': yesterday.avg_spo2,
             }
         
-        # Trend ultima settimana vs settimana precedente
+        # ═══ TREND SETTIMANA ═══
         week1 = [m for m in metrics if m.date >= today - timedelta(days=7)]
         week2 = [m for m in metrics if today - timedelta(days=14) <= m.date < today - timedelta(days=7)]
         
@@ -505,23 +644,50 @@ Rispondi in italiano, max 400 parole per le meditazioni, 250 per il resto."""
                                          (avg([m.recovery_score for m in week2]) or 0), 0),
                 'rhr_change': round((avg([m.resting_hr for m in week1]) or 0) - 
                                     (avg([m.resting_hr for m in week2]) or 0), 0),
+                'hrv_change': round((avg([m.hrv_last_night for m in week1]) or 0) - 
+                                    (avg([m.hrv_last_night for m in week2]) or 0), 0),
+                'steps_change': round((avg([m.steps for m in week1]) or 0) - 
+                                      (avg([m.steps for m in week2]) or 0), 0),
+                'stress_change': round((avg([m.stress_avg for m in week1]) or 0) - 
+                                       (avg([m.stress_avg for m in week2]) or 0), 0),
             }
         
-        # Attività recenti (ultime 5)
+        # ═══ ATTIVITÀ RECENTI (7gg) - DETTAGLIATE ═══
         activities = Activity.query.filter(
             Activity.user_id == user.id,
             Activity.start_time >= datetime.now() - timedelta(days=7)
-        ).order_by(Activity.start_time.desc()).limit(5).all()
+        ).order_by(Activity.start_time.desc()).limit(10).all()
         
         if activities:
             context['recent_activities'] = [{
                 'name': a.activity_name or a.activity_type,
-                'date': a.start_time.strftime('%d/%m') if a.start_time else None,
+                'type': a.activity_type,
+                'date': a.start_time.strftime('%d/%m %H:%M') if a.start_time else None,
                 'duration_min': round(a.duration_seconds / 60) if a.duration_seconds else None,
+                'distance_km': round(a.distance_meters / 1000, 2) if a.distance_meters else None,
                 'calories': a.calories,
                 'avg_hr': a.avg_hr,
+                'max_hr': a.max_hr,
                 'strain': a.strain_score,
+                'aerobic_effect': a.aerobic_effect,
+                'anaerobic_effect': a.anaerobic_effect,
+                'hr_zone_1_min': round(a.hr_zone_1 / 60) if a.hr_zone_1 else None,
+                'hr_zone_2_min': round(a.hr_zone_2 / 60) if a.hr_zone_2 else None,
+                'hr_zone_3_min': round(a.hr_zone_3 / 60) if a.hr_zone_3 else None,
+                'hr_zone_4_min': round(a.hr_zone_4 / 60) if a.hr_zone_4 else None,
+                'hr_zone_5_min': round(a.hr_zone_5 / 60) if a.hr_zone_5 else None,
+                'moderate_min': a.moderate_intensity_minutes,
+                'vigorous_min': a.vigorous_intensity_minutes,
             } for a in activities]
+            
+            # Riepilogo settimanale attività
+            context['week_activity_summary'] = {
+                'total_activities': len(activities),
+                'total_duration_min': sum([a.duration_seconds/60 for a in activities if a.duration_seconds]),
+                'total_calories': sum([a.calories for a in activities if a.calories]),
+                'total_distance_km': round(sum([a.distance_meters/1000 for a in activities if a.distance_meters]), 1),
+                'avg_strain': avg([a.strain_score for a in activities]),
+            }
         
         return context
 
