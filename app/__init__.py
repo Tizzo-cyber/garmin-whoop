@@ -2,12 +2,13 @@
 Garmin WHOOP - Flask App
 """
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, date, timedelta
 from functools import wraps
 import jwt
+import os
 
 from config import Config
 from app.models import db, User, DailyMetric, Activity, SyncLog
@@ -15,7 +16,7 @@ from app.garmin_sync import GarminSyncService
 
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder='../static', static_url_path='')
     app.config.from_object(Config)
     
     # Init extensions
@@ -45,6 +46,13 @@ def create_app():
                 return jsonify({'error': 'Token non valido'}), 401
             return f(current_user, *args, **kwargs)
         return decorated
+    
+    # ========== FRONTEND ==========
+    
+    @app.route('/', methods=['GET'])
+    def index():
+        """Serve frontend"""
+        return send_from_directory(app.static_folder, 'index.html')
     
     # ========== AUTH ROUTES ==========
     
@@ -189,7 +197,7 @@ def create_app():
         metrics = DailyMetric.query.filter(
             DailyMetric.user_id == current_user.id,
             DailyMetric.date >= week_ago
-        ).all()
+        ).order_by(DailyMetric.date.desc()).all()
         
         if not metrics:
             return jsonify({'message': 'Nessun dato disponibile'}), 404
@@ -253,9 +261,9 @@ def create_app():
             'timestamp': datetime.utcnow().isoformat()
         })
     
-    @app.route('/', methods=['GET'])
-    def index():
-        """Home page"""
+    @app.route('/api', methods=['GET'])
+    def api_info():
+        """API info"""
         return jsonify({
             'app': 'Garmin WHOOP',
             'version': '1.0.0',
