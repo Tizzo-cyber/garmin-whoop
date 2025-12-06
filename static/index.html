@@ -883,6 +883,7 @@
             const [saved, setSaved] = useState(false);
             const [recalculating, setRecalculating] = useState(false);
             const [recalcResult, setRecalcResult] = useState(null);
+            const [debugData, setDebugData] = useState(null);
             
             const save = async () => {
                 setSaving(true);
@@ -913,11 +914,23 @@
                     });
                     const data = await res.json();
                     setRecalcResult(data.message || 'Fatto!');
-                    setTimeout(() => setRecalcResult(null), 3000);
+                    setTimeout(() => setRecalcResult(null), 5000);
                 } catch (e) {
                     setRecalcResult('Errore: ' + e.message);
                 }
                 setRecalculating(false);
+            };
+            
+            const loadDebug = async () => {
+                try {
+                    const res = await fetch(`${API}/api/debug/bio`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    setDebugData(data);
+                } catch (e) {
+                    setDebugData([{ error: e.message }]);
+                }
             };
             
             const age = form.birth_year ? new Date().getFullYear() - parseInt(form.birth_year) : null;
@@ -972,11 +985,31 @@
                                 Ricalcola l'età biologica per tutti i dati storici usando la formula aggiornata.
                             </p>
                             <button onClick={recalculate} disabled={recalculating} 
-                                className="btn-primary w-full py-4 rounded-xl text-lg">
+                                className="btn-primary w-full py-4 rounded-xl text-lg mb-4">
                                 {recalculating ? '🔄 Ricalcolo in corso...' : '🧬 Ricalcola Tutto'}
                             </button>
                             {recalcResult && (
-                                <p className="text-center text-[var(--accent-green)] mt-4">{recalcResult}</p>
+                                <p className="text-center text-[var(--accent-green)] mb-4">{recalcResult}</p>
+                            )}
+                            
+                            <button onClick={loadDebug} className="btn-ghost w-full py-3 rounded-xl text-sm">
+                                🔍 Debug: Mostra ultimi 5 giorni
+                            </button>
+                            
+                            {debugData && (
+                                <div className="mt-4 p-4 rounded-xl text-xs font-mono overflow-x-auto" style={{ background: 'var(--bg-secondary)' }}>
+                                    {debugData.map((d, i) => (
+                                        <div key={i} className="mb-3 pb-3 border-b border-[var(--border)] last:border-0">
+                                            <div className="text-[var(--accent-green)] font-bold">{d.date}</div>
+                                            <div>Sonno: {d.sleep_hours}h → impatto: <span className={d.bio_age_sleep_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_sleep_impact}</span></div>
+                                            <div>RHR: {d.resting_hr} → impatto: <span className={d.bio_age_rhr_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_rhr_impact}</span></div>
+                                            <div>Passi: {d.steps} → impatto: <span className={d.bio_age_steps_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_steps_impact}</span></div>
+                                            <div>Stress: {d.stress_avg} → impatto: <span className={d.bio_age_stress_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_stress_impact}</span></div>
+                                            <div>HRZ: impatto: <span className={d.bio_age_hrz_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_hrz_impact}</span></div>
+                                            <div className="mt-1 font-bold">Bio Age: {d.biological_age}</div>
+                                        </div>
+                                    ))}
+                                </div>
                             )}
                         </div>
                         
