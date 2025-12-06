@@ -881,6 +881,8 @@
             const [form, setForm] = useState({ name: user?.name || '', birth_year: user?.birth_year || '' });
             const [saving, setSaving] = useState(false);
             const [saved, setSaved] = useState(false);
+            const [recalculating, setRecalculating] = useState(false);
+            const [recalcResult, setRecalcResult] = useState(null);
             
             const save = async () => {
                 setSaving(true);
@@ -899,6 +901,23 @@
                     }
                 } catch {}
                 setSaving(false);
+            };
+            
+            const recalculate = async () => {
+                setRecalculating(true);
+                setRecalcResult(null);
+                try {
+                    const res = await fetch(`${API}/api/recalculate`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    setRecalcResult(data.message || 'Fatto!');
+                    setTimeout(() => setRecalcResult(null), 3000);
+                } catch (e) {
+                    setRecalcResult('Errore: ' + e.message);
+                }
+                setRecalculating(false);
             };
             
             const age = form.birth_year ? new Date().getFullYear() - parseInt(form.birth_year) : null;
@@ -945,6 +964,20 @@
                                     </span>
                                 </div>
                             </div>
+                        </div>
+                        
+                        <div className="glass-card p-8 mb-6 slide-up">
+                            <h3 className="text-lg font-semibold mb-4">Ricalcola Età Biologica</h3>
+                            <p className="text-sm text-[var(--text-muted)] mb-4">
+                                Ricalcola l'età biologica per tutti i dati storici usando la formula aggiornata.
+                            </p>
+                            <button onClick={recalculate} disabled={recalculating} 
+                                className="btn-primary w-full py-4 rounded-xl text-lg">
+                                {recalculating ? '🔄 Ricalcolo in corso...' : '🧬 Ricalcola Tutto'}
+                            </button>
+                            {recalcResult && (
+                                <p className="text-center text-[var(--accent-green)] mt-4">{recalcResult}</p>
+                            )}
                         </div>
                         
                         <button onClick={onLogout} className="btn-ghost w-full py-4 rounded-xl">Logout</button>

@@ -500,6 +500,92 @@ Rispondi in italiano, max 200 parole."""
         if m: m.is_active = False; db.session.commit()
         return jsonify({'message': 'OK'})
     
+    @app.route('/api/recalculate', methods=['POST'])
+    @token_required
+    def recalculate_bio_age(current_user):
+        """Ricalcola età biologica per tutti i dati esistenti"""
+        from app.garmin_sync import GarminSyncService
+        
+        metrics = DailyMetric.query.filter_by(user_id=current_user.id).all()
+        count = 0
+        
+        for metric in metrics:
+            # Ricalcola biological age
+            real_age = current_user.get_real_age()
+            total_impact = 0
+            
+            # RHR
+            if metric.resting_hr:
+                rhr = metric.resting_hr
+                if rhr < 50: metric.bio_age_rhr_impact = -1.5
+                elif rhr < 55: metric.bio_age_rhr_impact = -1.0
+                elif rhr < 60: metric.bio_age_rhr_impact = -0.5
+                elif rhr < 65: metric.bio_age_rhr_impact = 0.0
+                elif rhr < 70: metric.bio_age_rhr_impact = 0.5
+                elif rhr < 75: metric.bio_age_rhr_impact = 1.0
+                else: metric.bio_age_rhr_impact = 1.5
+                total_impact += metric.bio_age_rhr_impact
+            
+            # VO2 Max
+            if metric.vo2_max:
+                vo2 = metric.vo2_max
+                if vo2 >= 55: metric.bio_age_vo2_impact = -2.5
+                elif vo2 >= 50: metric.bio_age_vo2_impact = -1.5
+                elif vo2 >= 45: metric.bio_age_vo2_impact = -0.5
+                elif vo2 >= 40: metric.bio_age_vo2_impact = 0.0
+                elif vo2 >= 35: metric.bio_age_vo2_impact = 0.5
+                else: metric.bio_age_vo2_impact = 1.5
+                total_impact += metric.bio_age_vo2_impact
+            else:
+                metric.bio_age_vo2_impact = 0.0
+            
+            # Sleep
+            if metric.sleep_seconds:
+                sleep_hours = metric.sleep_seconds / 3600
+                if 7.0 <= sleep_hours <= 8.5: metric.bio_age_sleep_impact = -0.8
+                elif 6.5 <= sleep_hours < 7.0 or 8.5 < sleep_hours <= 9.0: metric.bio_age_sleep_impact = -0.3
+                elif 6.0 <= sleep_hours < 6.5 or 9.0 < sleep_hours <= 9.5: metric.bio_age_sleep_impact = 0.3
+                elif 5.0 <= sleep_hours < 6.0: metric.bio_age_sleep_impact = 1.0
+                else: metric.bio_age_sleep_impact = 1.5
+                total_impact += metric.bio_age_sleep_impact
+            
+            # Steps
+            if metric.steps:
+                steps = metric.steps
+                if steps >= 12000: metric.bio_age_steps_impact = -1.0
+                elif steps >= 10000: metric.bio_age_steps_impact = -0.5
+                elif steps >= 7500: metric.bio_age_steps_impact = 0.0
+                elif steps >= 5000: metric.bio_age_steps_impact = 0.5
+                else: metric.bio_age_steps_impact = 1.0
+                total_impact += metric.bio_age_steps_impact
+            
+            # Stress
+            if metric.stress_avg:
+                stress = metric.stress_avg
+                if stress < 25: metric.bio_age_stress_impact = -0.5
+                elif stress < 40: metric.bio_age_stress_impact = 0.0
+                elif stress < 55: metric.bio_age_stress_impact = 0.3
+                elif stress < 70: metric.bio_age_stress_impact = 0.7
+                else: metric.bio_age_stress_impact = 1.2
+                total_impact += metric.bio_age_stress_impact
+            
+            # HR Zones
+            moderate = metric.moderate_intensity_minutes or 0
+            vigorous = metric.vigorous_intensity_minutes or 0
+            intensity_minutes = moderate + vigorous * 2
+            if intensity_minutes >= 60: metric.bio_age_hrz_impact = -0.8
+            elif intensity_minutes >= 40: metric.bio_age_hrz_impact = -0.4
+            elif intensity_minutes >= 20: metric.bio_age_hrz_impact = 0.0
+            elif intensity_minutes >= 10: metric.bio_age_hrz_impact = 0.3
+            else: metric.bio_age_hrz_impact = 0.6
+            total_impact += metric.bio_age_hrz_impact
+            
+            metric.biological_age = round(real_age + total_impact, 1)
+            count += 1
+        
+        db.session.commit()
+        return jsonify({'message': f'Ricalcolati {count} giorni', 'count': count})
+    
     return app
 
 
