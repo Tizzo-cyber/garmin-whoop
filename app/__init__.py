@@ -1,5 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
+Version: 2.1.0 - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
