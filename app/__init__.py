@@ -288,24 +288,27 @@ def create_app():
     @token_required
     def get_activities(current_user):
         """Ottieni lista attività"""
-        limit = request.args.get('limit', 20, type=int)
+        days = request.args.get('days', 7, type=int)
+        limit = request.args.get('limit', 50, type=int)
+        since = datetime.utcnow() - timedelta(days=days)
         
-        activities = Activity.query.filter_by(
-            user_id=current_user.id
+        activities = Activity.query.filter(
+            Activity.user_id == current_user.id,
+            Activity.start_time >= since
         ).order_by(Activity.start_time.desc()).limit(limit).all()
         
         return jsonify([{
             'id': a.id,
             'garmin_id': a.garmin_activity_id,
-            'name': a.activity_name,
-            'type': a.activity_type,
+            'activity_name': a.activity_name,
+            'activity_type': a.activity_type,
             'start_time': a.start_time.isoformat() if a.start_time else None,
-            'duration_minutes': round(a.duration_seconds / 60, 1) if a.duration_seconds else None,
-            'distance_km': round(a.distance_meters / 1000, 2) if a.distance_meters else None,
+            'duration_seconds': a.duration_seconds,
+            'distance_meters': a.distance_meters,
             'calories': a.calories,
             'avg_hr': a.avg_hr,
             'max_hr': a.max_hr,
-            'strain': a.strain_score,
+            'strain_score': a.strain_score,
             'aerobic_effect': a.aerobic_effect,
             'anaerobic_effect': a.anaerobic_effect
         } for a in activities])
@@ -615,33 +618,6 @@ Rispondi in italiano, max 200 parole."""
             'bio_age_hrz_impact': m.bio_age_hrz_impact,
             'biological_age': m.biological_age
         } for m in metrics])
-    
-    @app.route('/api/activities', methods=['GET'])
-    @token_required
-    def get_activities(current_user):
-        """Recupera le attività degli ultimi N giorni"""
-        days = request.args.get('days', 7, type=int)
-        since = datetime.utcnow() - timedelta(days=days)
-        
-        activities = Activity.query.filter(
-            Activity.user_id == current_user.id,
-            Activity.start_time >= since
-        ).order_by(Activity.start_time.desc()).all()
-        
-        return jsonify([{
-            'id': a.id,
-            'activity_name': a.activity_name,
-            'activity_type': a.activity_type,
-            'start_time': a.start_time.isoformat() if a.start_time else None,
-            'duration_seconds': a.duration_seconds,
-            'distance_meters': a.distance_meters,
-            'calories': a.calories,
-            'avg_hr': a.avg_hr,
-            'max_hr': a.max_hr,
-            'strain_score': a.strain_score,
-            'aerobic_effect': a.aerobic_effect,
-            'anaerobic_effect': a.anaerobic_effect
-        } for a in activities])
     
     @app.route('/api/activity/<int:activity_id>/comment', methods=['POST'])
     @token_required
