@@ -792,22 +792,33 @@ Rispondi in italiano, in modo diretto e motivante."""
         if not text:
             return jsonify({'error': 'Testo vuoto'}), 400
         
+        # Pulisci testo da formattazioni markdown
+        import re
+        clean_text = text
+        clean_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', clean_text)  # Rimuovi **bold**
+        clean_text = re.sub(r'\*([^*]+)\*', r'\1', clean_text)      # Rimuovi *italic*
+        clean_text = re.sub(r'#{1,6}\s*', '', clean_text)           # Rimuovi headers
+        clean_text = re.sub(r'---+', '', clean_text)                # Rimuovi linee
+        clean_text = re.sub(r'\[PAUSA:\d+\]', '', clean_text)       # Rimuovi marker pause
+        clean_text = clean_text.strip()
+        
+        if not clean_text:
+            return jsonify({'error': 'Testo vuoto dopo pulizia'}), 400
+        
         # Voci e velocità diverse per i coach
-        # Sensei: onyx (profonda, maschile), velocità normale
-        # Sakura: shimmer (soft, femminile), velocità lenta per meditazioni
+        # Modello gpt-4o-mini-tts con voci naturali
+        # Sensei: ash (maschile, profonda, autorevole)
+        # Sakura: coral (femminile, calda, empatica)
         if coach == 'sensei':
-            voice = 'onyx'
-            speed = 1.0
+            voice = 'ash'
         else:
-            voice = 'shimmer'  # Più soft di nova
-            speed = 0.85  # Più lenta, perfetta per meditazioni
+            voice = 'coral'
         
         try:
             response = openai_client.audio.speech.create(
-                model="tts-1-hd",
+                model="gpt-4o-mini-tts",
                 voice=voice,
-                input=text,
-                speed=speed,
+                input=clean_text,
                 response_format="mp3"
             )
             
