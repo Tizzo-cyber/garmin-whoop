@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.2.3 - Better HRV debug errors - 2024-12-07
+Version: 2.2.4 - Use get_fernet - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -920,7 +920,7 @@ Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I
         if not current_user.garmin_email:
             return jsonify({'error': 'Garmin non connesso'}), 400
         
-        # Ottieni password Garmin
+        # Ottieni password Garmin usando il metodo del model
         encryption_key = os.environ.get('ENCRYPTION_KEY')
         if not encryption_key:
             return jsonify({'error': 'ENCRYPTION_KEY non configurata'}), 500
@@ -929,9 +929,7 @@ Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I
             return jsonify({'error': 'Password Garmin non salvata'}), 400
         
         try:
-            from cryptography.fernet import Fernet
-            fernet = Fernet(encryption_key.encode())
-            garmin_password = fernet.decrypt(current_user.garmin_password_encrypted.encode()).decode()
+            garmin_password = current_user.get_garmin_password(encryption_key)
         except Exception as e:
             return jsonify({'error': f'Decrypt password fallito: {str(e)}'}), 500
         
