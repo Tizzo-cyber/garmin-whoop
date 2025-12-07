@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Version 2.6.0 - Time-aware coach + period comparison + year sync - 2024-12-07 -->
+<!-- Version 2.6.1 - Chunked year sync (45 day limit) - 2024-12-07 -->
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -1552,22 +1552,30 @@
             const [syncProgress, setSyncProgress] = useState(null);
             
             const syncYear = async () => {
-                if (!confirm('Questo scaricherà tutti i dati da inizio anno. Può richiedere qualche minuto. Continuare?')) return;
+                if (!confirm('Questo scaricherà tutti i dati da inizio anno in blocchi. Può richiedere qualche minuto. Continuare?')) return;
                 setSyncingYear(true);
-                setSyncProgress('Avvio sync anno...');
                 
                 const startOfYear = new Date(new Date().getFullYear(), 0, 1);
-                const daysBack = Math.ceil((new Date() - startOfYear) / (1000 * 60 * 60 * 24));
+                const totalDays = Math.ceil((new Date() - startOfYear) / (1000 * 60 * 60 * 24));
+                const chunkSize = 45;
+                const chunks = Math.ceil(totalDays / chunkSize);
                 
                 try {
-                    setSyncProgress(`Scaricando ${daysBack} giorni di dati...`);
-                    const res = await fetch(`${API}/api/sync`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({ days_back: daysBack })
-                    });
-                    const data = await res.json();
-                    setSyncProgress(`✅ Completato! ${data.days_synced || daysBack} giorni sincronizzati`);
+                    for (let i = 0; i < chunks; i++) {
+                        const daysBack = Math.min((i + 1) * chunkSize, totalDays);
+                        const startDay = i * chunkSize;
+                        setSyncProgress(`Blocco ${i + 1}/${chunks}: giorni ${startDay + 1}-${daysBack}...`);
+                        
+                        await fetch(`${API}/api/sync`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ days_back: chunkSize, offset_days: startDay })
+                        });
+                        
+                        // Pausa tra blocchi
+                        if (i < chunks - 1) await new Promise(r => setTimeout(r, 2000));
+                    }
+                    setSyncProgress(`✅ Completato! ${totalDays} giorni sincronizzati`);
                     setTimeout(() => setSyncProgress(null), 5000);
                 } catch (e) {
                     setSyncProgress('❌ Errore: ' + e.message);
@@ -1938,7 +1946,7 @@
                     await fetch(`${API}/api/sync`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({ days_back: 30 })
+                        body: JSON.stringify({ days_back: 45 })
                     });
                     await fetchData();
                 } catch {}

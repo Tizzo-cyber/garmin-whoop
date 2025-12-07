@@ -15,13 +15,14 @@ class GarminSyncService:
     def __init__(self, encryption_key: str):
         self.encryption_key = encryption_key
     
-    def sync_user(self, user: User, days_back: int = 7) -> dict:
+    def sync_user(self, user: User, days_back: int = 7, offset_days: int = 0) -> dict:
         """
         Sincronizza i dati di un utente.
         
         Args:
             user: User da sincronizzare
-            days_back: Quanti giorni indietro sincronizzare
+            days_back: Quanti giorni sincronizzare
+            offset_days: Da quale giorno partire (0 = oggi, 30 = 30 giorni fa)
         
         Returns:
             dict con risultato sync
@@ -46,9 +47,9 @@ class GarminSyncService:
             client = Garmin(user.garmin_email, garmin_password)
             client.login()
             
-            # Sync metriche giornaliere
+            # Sync metriche giornaliere (con offset)
             for i in range(days_back):
-                day = date.today() - timedelta(days=i)
+                day = date.today() - timedelta(days=i + offset_days)
                 try:
                     synced = self._sync_daily_metrics(client, user, day)
                     if synced:
@@ -56,18 +57,19 @@ class GarminSyncService:
                 except Exception as e:
                     result['errors'].append(f"Metrics {day}: {str(e)}")
             
-            # Sync attività recenti
-            try:
-                activities = client.get_activities(0, 20)  # Ultime 20
-                for act in activities:
-                    try:
-                        synced = self._sync_activity(user, act)
-                        if synced:
-                            result['activities_synced'] += 1
-                    except Exception as e:
-                        result['errors'].append(f"Activity {act.get('activityId')}: {str(e)}")
-            except Exception as e:
-                result['errors'].append(f"Activities fetch: {str(e)}")
+            # Sync attività recenti (solo se offset=0)
+            if offset_days == 0:
+                try:
+                    activities = client.get_activities(0, 20)  # Ultime 20
+                    for act in activities:
+                        try:
+                            synced = self._sync_activity(user, act)
+                            if synced:
+                                result['activities_synced'] += 1
+                        except Exception as e:
+                            result['errors'].append(f"Activity {act.get('activityId')}: {str(e)}")
+                except Exception as e:
+                    result['errors'].append(f"Activities fetch: {str(e)}")
             
             # Update user last sync
             user.last_sync = datetime.utcnow()

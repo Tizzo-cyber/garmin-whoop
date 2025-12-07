@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.6.0 - Time-aware coach + period comparison + year sync - 2024-12-07
+Version: 2.6.1 - Chunked year sync (45 day limit) - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -183,10 +183,12 @@ def create_app():
         if not current_user.garmin_email:
             return jsonify({'error': 'Account Garmin non collegato'}), 400
         
-        days_back = request.get_json().get('days_back', 7) if request.get_json() else 7
+        data = request.get_json() or {}
+        days_back = data.get('days_back', 7)
+        offset_days = data.get('offset_days', 0)  # Per sync a blocchi
         
         service = GarminSyncService(app.config['ENCRYPTION_KEY'])
-        result = service.sync_user(current_user, days_back=days_back)
+        result = service.sync_user(current_user, days_back=days_back, offset_days=offset_days)
         
         return jsonify(result)
     
