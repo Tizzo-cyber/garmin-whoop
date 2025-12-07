@@ -1,1200 +1,1708 @@
-"""
-Garmin WHOOP - Flask App with AI Coaches
-Version: 2.4.2 - All activities 30 days - 2024-12-07
-"""
-
-from flask import Flask, jsonify, request, send_from_directory
-from flask_cors import CORS
-from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, date, timedelta
-from functools import wraps
-from sqlalchemy import or_
-import jwt
-import os
-
-from config import Config
-from app.models import db, User, DailyMetric, Activity, SyncLog, ChatMessage, UserMemory
-from app.garmin_sync import GarminSyncService
-
-
-def create_app():
-    app = Flask(__name__, static_folder='../static', static_url_path='')
-    app.config.from_object(Config)
+<!DOCTYPE html>
+<!-- Version 2.4.2 - All activities 30 days - 2024-12-07 -->
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>SENSEI & SAKURA — Performance Lab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0b0f;
+            --bg-secondary: #12141a;
+            --bg-card: #181a22;
+            --bg-card-hover: #1e2028;
+            --border: #2a2d38;
+            --text-primary: #ffffff;
+            --text-secondary: #8b8d98;
+            --text-muted: #5c5e6a;
+            --accent-green: #00f593;
+            --accent-green-dim: rgba(0, 245, 147, 0.15);
+            --accent-pink: #ff6eb4;
+            --accent-pink-dim: rgba(255, 110, 180, 0.15);
+            --accent-blue: #4da6ff;
+            --accent-orange: #ff9f43;
+            --accent-red: #ff6b6b;
+            --accent-purple: #a855f7;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body, #root { 
+            height: 100%; 
+            overflow: hidden; 
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        
+        .font-display { font-family: 'Space Grotesk', sans-serif; }
+        
+        .glass-card {
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(24,26,34,0.8) 100%);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .glass-card-hover:hover {
+            background: var(--bg-card-hover);
+            border-color: #3a3d48;
+            transform: translateY(-2px);
+            transition: all 0.3s ease;
+        }
+        
+        .glow-green { box-shadow: 0 0 40px rgba(0, 245, 147, 0.15); }
+        .glow-pink { box-shadow: 0 0 40px rgba(255, 110, 180, 0.15); }
+        .glow-text-green { text-shadow: 0 0 30px rgba(0, 245, 147, 0.5); }
+        
+        .bio-ring-container { position: relative; width: 220px; height: 220px; }
+        .bio-ring-bg {
+            position: absolute; inset: 0; border-radius: 50%;
+            background: conic-gradient(from 180deg, var(--border) 0deg, var(--border) 360deg);
+        }
+        .bio-ring-progress {
+            position: absolute; inset: 0; border-radius: 50%;
+            background: conic-gradient(from 180deg, var(--accent-green) 0deg, #00c978 calc(var(--progress) * 3.6deg), transparent calc(var(--progress) * 3.6deg));
+            filter: drop-shadow(0 0 10px rgba(0, 245, 147, 0.4));
+        }
+        .bio-ring-inner {
+            position: absolute; inset: 12px; border-radius: 50%;
+            background: var(--bg-primary);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        
+        .input-premium {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        .input-premium:focus {
+            border-color: var(--accent-green);
+            outline: none;
+            box-shadow: 0 0 0 3px var(--accent-green-dim);
+        }
+        .input-premium.pink:focus {
+            border-color: var(--accent-pink);
+            box-shadow: 0 0 0 3px var(--accent-pink-dim);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-green) 0%, #00c978 100%);
+            color: #000; font-weight: 600; transition: all 0.3s;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0, 245, 147, 0.3); }
+        .btn-primary:disabled { opacity: 0.5; transform: none; }
+        
+        .btn-pink {
+            background: linear-gradient(135deg, var(--accent-pink) 0%, #e055a0 100%);
+            color: #000; font-weight: 600;
+        }
+        .btn-pink:hover { box-shadow: 0 10px 30px rgba(255, 110, 180, 0.3); }
+        
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            transition: all 0.3s;
+        }
+        .btn-ghost:hover { border-color: var(--text-secondary); color: var(--text-primary); }
+        
+        .btn-danger {
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid var(--accent-red);
+            color: var(--accent-red);
+            transition: all 0.3s;
+        }
+        .btn-danger:hover { background: var(--accent-red); color: #000; }
+        
+        .chat-bubble {
+            max-width: 80%; padding: 16px 20px;
+            font-size: 15px; line-height: 1.6; border-radius: 20px;
+        }
+        .chat-ai {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px 20px 20px 20px;
+        }
+        .chat-ai.sensei { border-left: 3px solid var(--accent-green); }
+        .chat-ai.sakura { border-left: 3px solid var(--accent-pink); }
+        .chat-user {
+            background: linear-gradient(135deg, #2a2d38 0%, #1e2028 100%);
+            border-radius: 20px 20px 6px 20px;
+        }
+        
+        .typing-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            animation: typing-bounce 1.4s infinite;
+        }
+        .typing-dot:nth-child(2) { animation-delay: 0.15s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes typing-bounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-8px); opacity: 1; }
+        }
+        
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            padding: 12px 16px; border-radius: 16px; transition: all 0.3s;
+            color: var(--text-muted);
+        }
+        .nav-item:hover { color: var(--text-secondary); background: var(--bg-card); }
+        .nav-item.active { background: var(--bg-card); color: var(--text-primary); }
+        .nav-item.active.sensei { color: var(--accent-green); }
+        .nav-item.active.sakura { color: var(--accent-pink); }
+        
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        
+        .fade-in { animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .slide-up { animation: slideUp 0.5s ease; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+        }
+        .metric-card:hover { border-color: var(--accent-blue); transform: translateY(-2px); }
+        
+        .progress-bar { height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+        
+        .bg-gradient-sensei { background: radial-gradient(ellipse at top, rgba(0, 245, 147, 0.05) 0%, transparent 60%); }
+        .bg-gradient-sakura { background: radial-gradient(ellipse at top, rgba(255, 110, 180, 0.05) 0%, transparent 60%); }
+        
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; animation: fadeIn 0.2s ease;
+        }
+        .modal-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 28px;
+            max-width: 450px;
+            width: 90%;
+            animation: slideUp 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
     
-    # Init extensions
-    db.init_app(app)
-    CORS(app)
-    
-    # Create tables
-    with app.app_context():
-        db.create_all()
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const API = '';
         
-        # Auto-migration: aggiungi nuove colonne se non esistono
-        try:
-            from sqlalchemy import text
-            migrations = [
-                "ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS fitness_age INTEGER",
-                "ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS race_time_5k INTEGER",
-                "ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS race_time_10k INTEGER",
-                "ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS race_time_half INTEGER",
-                "ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS race_time_marathon INTEGER",
-            ]
-            for sql in migrations:
-                try:
-                    db.session.execute(text(sql))
-                except Exception:
-                    pass  # Colonna già esiste o altro errore non critico
-            db.session.commit()
-            print("✅ Auto-migration completata")
-        except Exception as e:
-            print(f"⚠️ Auto-migration warning: {e}")
-    
-    # ========== AUTH HELPERS ==========
-    
-    def token_required(f):
-        @wraps(f)
-        def decorated(*args, **kwargs):
-            token = request.headers.get('Authorization', '').replace('Bearer ', '')
-            if not token:
-                return jsonify({'error': 'Token mancante'}), 401
-            try:
-                data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-                current_user = User.query.get(data['user_id'])
-                if not current_user:
-                    return jsonify({'error': 'Utente non trovato'}), 401
-            except jwt.ExpiredSignatureError:
-                return jsonify({'error': 'Token scaduto'}), 401
-            except:
-                return jsonify({'error': 'Token non valido'}), 401
-            return f(current_user, *args, **kwargs)
-        return decorated
-    
-    # ========== AUTH ROUTES ==========
-    
-    @app.route('/api/register', methods=['POST'])
-    def register():
-        """Registra un nuovo utente"""
-        data = request.get_json()
+        // ==================== METRIC INFO DATABASE ====================
         
-        if not data.get('email') or not data.get('password'):
-            return jsonify({'error': 'Email e password richiesti'}), 400
-        
-        if User.query.filter_by(email=data['email']).first():
-            return jsonify({'error': 'Email già registrata'}), 400
-        
-        user = User(
-            email=data['email'],
-            password_hash=generate_password_hash(data['password']),
-            name=data.get('name'),
-            birth_year=data.get('birth_year')
-        )
-        
-        # Se fornite, salva anche credenziali Garmin
-        if data.get('garmin_email') and data.get('garmin_password'):
-            user.garmin_email = data['garmin_email']
-            user.set_garmin_password(data['garmin_password'], app.config['ENCRYPTION_KEY'])
-        
-        db.session.add(user)
-        db.session.commit()
-        
-        return jsonify({'message': 'Utente creato', 'user_id': user.id}), 201
-    
-    @app.route('/api/login', methods=['POST'])
-    def login():
-        """Login e ottieni token JWT"""
-        data = request.get_json()
-        
-        user = User.query.filter_by(email=data.get('email')).first()
-        if not user or not check_password_hash(user.password_hash, data.get('password', '')):
-            return jsonify({'error': 'Credenziali non valide'}), 401
-        
-        token = jwt.encode({
-            'user_id': user.id,
-            'exp': datetime.utcnow() + timedelta(days=30)
-        }, app.config['SECRET_KEY'], algorithm='HS256')
-        
-        return jsonify({
-            'token': token,
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'name': user.name,
-                'birth_year': user.birth_year,
-                'garmin_connected': bool(user.garmin_email),
-                'last_sync': user.last_sync.isoformat() if user.last_sync else None
-            }
-        })
-    
-    @app.route('/api/profile', methods=['PUT'])
-    @token_required
-    def update_profile(current_user):
-        """Aggiorna profilo utente"""
-        data = request.get_json()
-        if data.get('name'):
-            current_user.name = data['name']
-        if data.get('birth_year'):
-            current_user.birth_year = data['birth_year']
-        if data.get('sport_goals'):
-            current_user.sport_goals = data['sport_goals']
-        db.session.commit()
-        return jsonify({'message': 'Profilo aggiornato'})
-    
-    # ========== GARMIN CONFIG ==========
-    
-    @app.route('/api/garmin/connect', methods=['POST'])
-    @token_required
-    def connect_garmin(current_user):
-        """Collega account Garmin"""
-        data = request.get_json()
-        
-        if not data.get('garmin_email') or not data.get('garmin_password'):
-            return jsonify({'error': 'Credenziali Garmin richieste'}), 400
-        
-        # Verifica credenziali
-        try:
-            from garminconnect import Garmin
-            client = Garmin(data['garmin_email'], data['garmin_password'])
-            client.login()
-        except Exception as e:
-            return jsonify({'error': f'Login Garmin fallito: {str(e)}'}), 400
-        
-        # Salva credenziali
-        current_user.garmin_email = data['garmin_email']
-        current_user.set_garmin_password(data['garmin_password'], app.config['ENCRYPTION_KEY'])
-        db.session.commit()
-        
-        return jsonify({'message': 'Account Garmin collegato'})
-    
-    @app.route('/api/garmin/disconnect', methods=['POST'])
-    @token_required
-    def disconnect_garmin(current_user):
-        """Scollega account Garmin"""
-        current_user.garmin_email = None
-        current_user.garmin_password_encrypted = None
-        db.session.commit()
-        return jsonify({'message': 'Account Garmin scollegato'})
-    
-    # ========== SYNC ==========
-    
-    @app.route('/api/sync', methods=['POST'])
-    @token_required
-    def sync_now(current_user):
-        """Sincronizza dati Garmin ora"""
-        if not current_user.garmin_email:
-            return jsonify({'error': 'Account Garmin non collegato'}), 400
-        
-        days_back = request.get_json().get('days_back', 7) if request.get_json() else 7
-        
-        service = GarminSyncService(app.config['ENCRYPTION_KEY'])
-        result = service.sync_user(current_user, days_back=days_back)
-        
-        return jsonify(result)
-    
-    # ========== METRICS ==========
-    
-    @app.route('/api/metrics/today', methods=['GET'])
-    @token_required
-    def get_today_metrics(current_user):
-        """Ottieni metriche di oggi"""
-        metric = DailyMetric.query.filter_by(
-            user_id=current_user.id,
-            date=date.today()
-        ).first()
-        
-        if not metric:
-            return jsonify({'message': 'Nessun dato per oggi. Esegui sync.'}), 404
-        
-        return jsonify(_metric_to_dict(metric))
-    
-    @app.route('/api/metrics/range', methods=['GET'])
-    @token_required
-    def get_metrics_range(current_user):
-        """Ottieni metriche per un range di date"""
-        start = request.args.get('start', (date.today() - timedelta(days=7)).isoformat())
-        end = request.args.get('end', date.today().isoformat())
-        
-        metrics = DailyMetric.query.filter(
-            DailyMetric.user_id == current_user.id,
-            DailyMetric.date >= start,
-            DailyMetric.date <= end
-        ).order_by(DailyMetric.date.desc()).all()
-        
-        return jsonify([_metric_to_dict(m) for m in metrics])
-    
-    @app.route('/api/metrics/summary', methods=['GET'])
-    @token_required
-    def get_summary(current_user):
-        """Ottieni summary con tutti i dati"""
-        days = request.args.get('days', 30, type=int)
-        start_date = date.today() - timedelta(days=days)
-        
-        metrics = DailyMetric.query.filter(
-            DailyMetric.user_id == current_user.id,
-            DailyMetric.date >= start_date
-        ).order_by(DailyMetric.date.desc()).all()
-        
-        if not metrics:
-            return jsonify({'message': 'Nessun dato disponibile'}), 404
-        
-        def safe_avg(lst):
-            vals = [x for x in lst if x is not None]
-            return round(sum(vals) / len(vals), 1) if vals else None
-        
-        return jsonify({
-            'period': {
-                'start': start_date.isoformat(),
-                'end': date.today().isoformat(),
-                'days_with_data': len(metrics)
+        const metricInfo = {
+            rhr: {
+                title: 'Frequenza Cardiaca a Riposo',
+                icon: '❤️',
+                color: 'var(--accent-red)',
+                description: 'La frequenza cardiaca a riposo indica l\'efficienza del tuo cuore. Un cuore allenato pompa più sangue per battito, necessitando di meno battiti al minuto.',
+                tip: 'Ogni 5 bpm in meno può indicare 1-2 anni di età biologica più giovane.',
+                ranges: [
+                    { label: 'Atleta', value: '40-50 bpm', good: true },
+                    { label: 'Eccellente', value: '51-60 bpm', good: true },
+                    { label: 'Buono', value: '61-70 bpm', good: false },
+                    { label: 'Nella media', value: '71-80 bpm', good: false },
+                    { label: 'Da migliorare', value: '80+ bpm', good: false }
+                ]
             },
-            'averages': {
-                'recovery': safe_avg([m.recovery_score for m in metrics]),
-                'strain': safe_avg([m.strain_score for m in metrics]),
-                'sleep_performance': safe_avg([m.sleep_performance for m in metrics]),
-                'sleep_hours': safe_avg([m.sleep_seconds / 3600 if m.sleep_seconds else None for m in metrics]),
-                'biological_age': safe_avg([m.biological_age for m in metrics]),
-                'resting_hr': safe_avg([m.resting_hr for m in metrics]),
-                'vo2_max': safe_avg([m.vo2_max for m in metrics]),
-                'steps': safe_avg([m.steps for m in metrics]),
-                'stress_avg': safe_avg([m.stress_avg for m in metrics]),
-                'hrv': safe_avg([m.hrv_last_night for m in metrics]),
-                'bio_impacts': {
-                    'rhr': safe_avg([m.bio_age_rhr_impact for m in metrics]),
-                    'vo2': safe_avg([m.bio_age_vo2_impact for m in metrics]),
-                    'sleep': safe_avg([m.bio_age_sleep_impact for m in metrics]),
-                    'steps': safe_avg([m.bio_age_steps_impact for m in metrics]),
-                    'stress': safe_avg([m.bio_age_stress_impact for m in metrics]),
-                    'hrz': safe_avg([m.bio_age_hrz_impact for m in metrics]),
+            vo2: {
+                title: 'VO2 Max',
+                icon: '🫁',
+                color: 'var(--accent-green)',
+                description: 'Il VO2 Max misura la massima quantità di ossigeno che il tuo corpo può utilizzare durante l\'esercizio intenso. È il miglior indicatore di fitness cardiovascolare e longevità.',
+                tip: 'Ogni 5 punti in più può ridurre l\'età biologica di 2-3 anni.',
+                ranges: [
+                    { label: 'Eccellente', value: '50+ ml/kg', good: true },
+                    { label: 'Buono', value: '42-50 ml/kg', good: true },
+                    { label: 'Medio', value: '35-42 ml/kg', good: false },
+                    { label: 'Da migliorare', value: '<35 ml/kg', good: false }
+                ]
+            },
+            steps: {
+                title: 'Passi Giornalieri',
+                icon: '👟',
+                color: 'var(--accent-orange)',
+                description: 'I passi giornalieri misurano il tuo livello di attività quotidiana. Camminare regolarmente riduce il rischio cardiovascolare e migliora la longevità.',
+                tip: 'Passare da 5.000 a 10.000 passi può ridurre l\'età biologica di 1-2 anni.',
+                ranges: [
+                    { label: 'Molto attivo', value: '12.000+', good: true },
+                    { label: 'Attivo', value: '10.000-12.000', good: true },
+                    { label: 'Moderato', value: '7.500-10.000', good: false },
+                    { label: 'Basso', value: '5.000-7.500', good: false },
+                    { label: 'Sedentario', value: '<5.000', good: false }
+                ]
+            },
+            sleep: {
+                title: 'Durata del Sonno',
+                icon: '😴',
+                color: 'var(--accent-purple)',
+                description: 'Il sonno è fondamentale per il recupero fisico e mentale. Durante il sonno profondo il corpo ripara i tessuti, consolida la memoria e regola gli ormoni.',
+                tip: 'Dormire 7-8 ore invece di 5-6 può ridurre l\'età biologica di 1-3 anni.',
+                ranges: [
+                    { label: 'Ottimale', value: '7-9 ore', good: true },
+                    { label: 'Accettabile', value: '6-7 ore', good: false },
+                    { label: 'Insufficiente', value: '<6 ore', good: false },
+                    { label: 'Eccessivo', value: '>9 ore', good: false }
+                ]
+            },
+            recovery: {
+                title: 'Recovery Score',
+                icon: '⚡',
+                color: 'var(--accent-green)',
+                description: 'Il Recovery Score indica quanto il tuo corpo è pronto per lo sforzo fisico. Combina HRV, qualità del sonno, frequenza cardiaca a riposo e altri parametri.',
+                tip: 'Allenati intensamente quando il recovery è alto (70%+), fai recupero attivo quando è basso.',
+                ranges: [
+                    { label: 'Pronto per tutto', value: '80-100%', good: true },
+                    { label: 'Buono', value: '60-79%', good: true },
+                    { label: 'Moderato', value: '40-59%', good: false },
+                    { label: 'Riposo consigliato', value: '<40%', good: false }
+                ]
+            },
+            strain: {
+                title: 'Strain Score',
+                icon: '🔥',
+                color: 'var(--accent-orange)',
+                description: 'Lo Strain Score misura il carico cardiovascolare accumulato durante la giornata su una scala 0-21. Tiene conto di durata e intensità di ogni attività.',
+                tip: 'Bilancia strain e recovery: strain alto richiede recovery alto il giorno dopo.',
+                ranges: [
+                    { label: 'Riposo', value: '0-4', good: false },
+                    { label: 'Leggero', value: '5-9', good: true },
+                    { label: 'Moderato', value: '10-14', good: true },
+                    { label: 'Intenso', value: '15-18', good: false },
+                    { label: 'Massimo', value: '19-21', good: false }
+                ]
+            },
+            bioAge: {
+                title: 'Età Biologica',
+                icon: '🧬',
+                color: 'var(--accent-green)',
+                description: 'L\'età biologica stima l\'età del tuo corpo basandosi su parametri fisiologici reali. Riflette quanto bene stai invecchiando rispetto alla tua età anagrafica.',
+                tip: 'Puoi influenzare la tua età biologica con stile di vita, alimentazione, sonno e attività fisica.',
+                ranges: [
+                    { label: 'Eccellente', value: '5+ anni più giovane', good: true },
+                    { label: 'Ottimo', value: '2-5 anni più giovane', good: true },
+                    { label: 'Nella norma', value: '± 2 anni', good: false },
+                    { label: 'Attenzione', value: '2+ anni più vecchio', good: false }
+                ]
+            },
+            stress: {
+                title: 'Livello di Stress',
+                icon: '😤',
+                color: 'var(--accent-orange)',
+                description: 'Misurato tramite la variabilità cardiaca (HRV). Lo stress cronico accelera l\'invecchiamento cellulare e danneggia il sistema cardiovascolare.',
+                tip: 'Pratiche come meditazione, respirazione e attività fisica riducono lo stress.',
+                ranges: [
+                    { label: 'Rilassato', value: '0-25', good: true },
+                    { label: 'Basso', value: '26-50', good: true },
+                    { label: 'Moderato', value: '51-75', good: false },
+                    { label: 'Alto', value: '76-100', good: false }
+                ]
+            },
+            hrz: {
+                title: 'Zone di Frequenza Cardiaca',
+                icon: '💪',
+                color: 'var(--accent-blue)',
+                description: 'Il tempo nelle zone HR elevate (zone 4-5) indica l\'intensità dell\'allenamento. Essenziale per migliorare VO2 Max e fitness cardiovascolare.',
+                tip: '150+ minuti settimanali di attività moderata-intensa migliorano significativamente la longevità.',
+                ranges: [
+                    { label: 'Ottimo', value: '30+ min/giorno in zone 3-5', good: true },
+                    { label: 'Buono', value: '15-30 min/giorno', good: true },
+                    { label: 'Moderato', value: '5-15 min/giorno', good: false },
+                    { label: 'Basso', value: '<5 min/giorno', good: false }
+                ]
+            }
+        };
+        
+        // ==================== COMPONENTS ====================
+        
+        const Loading = () => (
+            <div className="h-full flex items-center justify-center">
+                <div className="w-12 h-12 border-4 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin" />
+            </div>
+        );
+        
+        // ==================== TOOLTIP MODAL ====================
+        
+        const MetricModal = ({ metricKey, value, onClose }) => {
+            const info = metricInfo[metricKey];
+            if (!info) return null;
+            
+            return (
+                <div className="modal-overlay" onClick={onClose}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <span className="text-3xl">{info.icon}</span>
+                                <h3 className="text-xl font-bold" style={{ color: info.color }}>{info.title}</h3>
+                            </div>
+                            <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white text-2xl leading-none">&times;</button>
+                        </div>
+                        
+                        {value !== undefined && value !== null && (
+                            <div className="text-center py-4 mb-4 rounded-xl" style={{ background: 'var(--bg-secondary)' }}>
+                                <div className="text-4xl font-bold font-display" style={{ color: info.color }}>{value}</div>
+                                <div className="text-sm text-[var(--text-muted)]">Il tuo valore attuale</div>
+                            </div>
+                        )}
+                        
+                        <p className="text-[var(--text-secondary)] leading-relaxed mb-4">{info.description}</p>
+                        
+                        <div className="flex items-start gap-2 p-4 rounded-xl mb-6" style={{ background: 'var(--accent-green-dim)' }}>
+                            <span>💡</span>
+                            <p className="text-sm" style={{ color: 'var(--accent-green)' }}>{info.tip}</p>
+                        </div>
+                        
+                        <div className="rounded-xl p-4" style={{ background: 'var(--bg-secondary)' }}>
+                            <div className="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-3">Valori di riferimento</div>
+                            {info.ranges.map((r, i) => (
+                                <div key={i} className="flex justify-between items-center py-2 border-b border-[var(--border)] last:border-0">
+                                    <span className="text-sm">{r.label}</span>
+                                    <span className="text-sm font-medium" style={{ color: r.good ? 'var(--accent-green)' : 'var(--accent-orange)' }}>{r.value}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== CONFIRM MODAL ====================
+        
+        const ConfirmModal = ({ title, message, onConfirm, onCancel }) => (
+            <div className="modal-overlay" onClick={onCancel}>
+                <div className="modal-card text-center" onClick={e => e.stopPropagation()}>
+                    <h3 className="text-xl font-bold mb-4">{title}</h3>
+                    <p className="text-[var(--text-secondary)] mb-8">{message}</p>
+                    <div className="flex gap-4 justify-center">
+                        <button onClick={onCancel} className="btn-ghost px-6 py-3 rounded-xl">Annulla</button>
+                        <button onClick={onConfirm} className="btn-danger px-6 py-3 rounded-xl">Conferma</button>
+                    </div>
+                </div>
+            </div>
+        );
+        
+        // ==================== BIO AGE RING ====================
+        
+        const BioAgeRing = ({ bioAge, realAge, onClick }) => {
+            const diff = realAge && bioAge ? realAge - bioAge : 0;
+            const progress = Math.max(0, Math.min(100, 50 + diff * 8));
+            
+            return (
+                <div className="bio-ring-container cursor-pointer hover:scale-105 transition-transform" onClick={onClick}>
+                    <div className="bio-ring-bg" />
+                    <div className="bio-ring-progress" style={{ '--progress': progress }} />
+                    <div className="bio-ring-inner">
+                        <span className="text-5xl font-bold font-display glow-text-green">{bioAge?.toFixed(1) || '--'}</span>
+                        <span className="text-sm text-[var(--text-muted)] uppercase tracking-widest mt-1">Bio Age</span>
+                        {diff !== 0 && (
+                            <span className={`text-lg font-semibold mt-2 ${diff > 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}`}>
+                                {diff > 0 ? `${diff.toFixed(1)} anni più giovane` : `${Math.abs(diff).toFixed(1)} anni più vecchio`}
+                            </span>
+                        )}
+                        <span className="text-xs text-[var(--accent-blue)] mt-2">ⓘ Clicca per info</span>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== METRIC CARD ====================
+        
+        const MetricCard = ({ metricKey, icon, label, value, unit, color, subtitle, onClick }) => (
+            <div className="metric-card fade-in" onClick={onClick}>
+                <div className="flex items-start justify-between mb-2 sm:mb-3">
+                    <span className="text-xl sm:text-2xl">{icon}</span>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                        <span className="text-[10px] sm:text-xs text-[var(--text-muted)] uppercase tracking-wider">{label}</span>
+                        <span className="text-[10px] sm:text-xs text-[var(--accent-blue)]">ⓘ</span>
+                    </div>
+                </div>
+                <div className="flex items-baseline gap-1">
+                    <span className="text-2xl sm:text-3xl font-bold font-display" style={{ color }}>{value ?? '--'}</span>
+                    {unit && <span className="text-xs sm:text-sm text-[var(--text-muted)]">{unit}</span>}
+                </div>
+                {subtitle && <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-1 sm:mt-2 hidden sm:block">{subtitle}</p>}
+            </div>
+        );
+        
+        // ==================== IMPACT ROW ====================
+        
+        const ImpactRow = ({ metricKey, icon, label, value, description, onClick }) => {
+            const isGood = value <= 0;
+            const width = Math.min(Math.abs(value || 0) / 2.5 * 100, 100);
+            
+            return (
+                <div className="py-4 border-b border-[var(--border)] last:border-0 cursor-pointer hover:bg-[var(--bg-secondary)] rounded-lg px-3 -mx-3 transition-colors" onClick={onClick}>
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                            <span className="text-xl">{icon}</span>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-medium">{label}</span>
+                                    <span className="text-xs text-[var(--accent-blue)]">ⓘ</span>
+                                </div>
+                                {description && <p className="text-xs text-[var(--text-muted)]">{description}</p>}
+                            </div>
+                        </div>
+                        <span className={`text-lg font-bold ${isGood ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}`}>
+                            {value != null ? (isGood ? '' : '+') + value.toFixed(1) : '--'} yr
+                        </span>
+                    </div>
+                    <div className="progress-bar">
+                        <div className="progress-fill" style={{ width: `${width}%`, background: isGood ? 'var(--accent-green)' : 'var(--accent-orange)' }} />
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== CHAT VIEW ====================
+        
+        const ChatView = ({ token, coach }) => {
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [ready, setReady] = useState(false);
+            const [showReset, setShowReset] = useState(false);
+            const [playingAudio, setPlayingAudio] = useState(false);
+            const [isRecording, setIsRecording] = useState(false);
+            const [voiceInputPending, setVoiceInputPending] = useState(false);
+            const chatRef = useRef(null);
+            const inputRef = useRef(null);
+            const audioRef = useRef(null);
+            const recognitionRef = useRef(null);
+            const sendBtnRef = useRef(null);
+            
+            const isSakura = coach === 'sakura';
+            const accent = isSakura ? 'var(--accent-pink)' : 'var(--accent-green)';
+            const coachName = isSakura ? 'Sakura' : 'Sensei';
+            const coachEmoji = isSakura ? '🌸' : '🥋';
+            const coachTitle = isSakura ? 'Mental & Spiritual Coach' : 'Athletic Performance Coach';
+            const bgClass = isSakura ? 'bg-gradient-sakura' : 'bg-gradient-sensei';
+            
+            const toggleRecording = () => {
+                if (isRecording) {
+                    // Stop recording
+                    if (recognitionRef.current) {
+                        recognitionRef.current.stop();
+                    }
+                    setIsRecording(false);
+                } else {
+                    // Start recording
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    if (!SpeechRecognition) {
+                        alert('Il tuo browser non supporta il riconoscimento vocale');
+                        return;
+                    }
+                    
+                    const recognition = new SpeechRecognition();
+                    recognition.lang = 'it-IT';
+                    recognition.continuous = false;
+                    recognition.interimResults = true;
+                    
+                    recognition.onresult = (event) => {
+                        const transcript = Array.from(event.results)
+                            .map(result => result[0].transcript)
+                            .join('');
+                        setInput(transcript);
+                    };
+                    
+                    recognition.onend = () => {
+                        setIsRecording(false);
+                        setVoiceInputPending(true);
+                    };
+                    
+                    recognition.onerror = (event) => {
+                        console.error('Speech recognition error:', event.error);
+                        setIsRecording(false);
+                    };
+                    
+                    recognitionRef.current = recognition;
+                    recognition.start();
+                    setIsRecording(true);
                 }
-            },
-            'real_age': current_user.get_real_age(),
-            'today': _metric_to_dict(metrics[0]) if metrics else None
-        })
-    
-    @app.route('/api/metrics/trend', methods=['GET'])
-    @token_required
-    def get_trend(current_user):
-        """Ottieni trend età biologica"""
-        days = request.args.get('days', 90, type=int)
-        start_date = date.today() - timedelta(days=days)
-        
-        metrics = DailyMetric.query.filter(
-            DailyMetric.user_id == current_user.id,
-            DailyMetric.date >= start_date
-        ).order_by(DailyMetric.date.asc()).all()
-        
-        trend_data = [{
-            'date': m.date.isoformat(),
-            'biological_age': m.biological_age,
-            'recovery': m.recovery_score,
-            'strain': m.strain_score,
-        } for m in metrics]
-        
-        # Calculate pace of aging
-        pace = None
-        if len(metrics) >= 30:
-            recent = [m.biological_age for m in metrics[-15:] if m.biological_age]
-            older = [m.biological_age for m in metrics[:15] if m.biological_age]
-            if recent and older:
-                pace = round((sum(recent)/len(recent) - sum(older)/len(older)) * 12, 1)
-        
-        return jsonify({
-            'data': trend_data,
-            'real_age': current_user.get_real_age(),
-            'pace_of_aging': pace
-        })
-    
-    # ========== ACTIVITIES ==========
-    
-    @app.route('/api/activities', methods=['GET'])
-    @token_required
-    def get_activities(current_user):
-        """Ottieni lista attività"""
-        days = request.args.get('days', 7, type=int)
-        limit = request.args.get('limit', 50, type=int)
-        since = datetime.utcnow() - timedelta(days=days)
-        
-        activities = Activity.query.filter(
-            Activity.user_id == current_user.id,
-            Activity.start_time >= since
-        ).order_by(Activity.start_time.desc()).limit(limit).all()
-        
-        return jsonify([{
-            'id': a.id,
-            'garmin_id': a.garmin_activity_id,
-            'activity_name': a.activity_name,
-            'activity_type': a.activity_type,
-            'start_time': a.start_time.isoformat() if a.start_time else None,
-            'duration_seconds': a.duration_seconds,
-            'distance_meters': a.distance_meters,
-            'calories': a.calories,
-            'avg_hr': a.avg_hr,
-            'max_hr': a.max_hr,
-            'strain_score': a.strain_score,
-            'aerobic_effect': a.aerobic_effect,
-            'anaerobic_effect': a.anaerobic_effect
-        } for a in activities])
-    
-    # ========== HEALTH CHECK ==========
-    
-    @app.route('/api/health', methods=['GET'])
-    def health_check():
-        """Health check per Railway"""
-        return jsonify({
-            'status': 'ok',
-            'timestamp': datetime.utcnow().isoformat()
-        })
-    
-    @app.route('/', methods=['GET'])
-    def index():
-        """Home page"""
-        return send_from_directory(app.static_folder, 'index.html')
-    
-    # ========== AI CHAT ==========
-    
-    openai_client = None
-    if os.environ.get('OPENAI_API_KEY'):
-        from openai import OpenAI
-        openai_client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
-    
-    def _get_sensei_prompt(user, context, memories):
-        name = user.name or "atleta"
-        age = user.get_real_age()
-        memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else "Nessuna"
-        
-        # Helper per formattare tempi gara
-        def fmt_race(secs):
-            if not secs: return 'N/D'
-            h, rem = divmod(int(secs), 3600)
-            m, s = divmod(rem, 60)
-            return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-        
-        # Race predictions
-        race_text = f"5K: {fmt_race(context.get('race_5k'))} | 10K: {fmt_race(context.get('race_10k'))} | Mezza: {fmt_race(context.get('race_half'))} | Maratona: {fmt_race(context.get('race_marathon'))}"
-        
-        # Formatta dati di ieri
-        y = context.get('yesterday', {})
-        yesterday_text = f"""📅 {y.get('date', 'N/D')}
-RECUPERO: {y.get('recovery', 'N/D')}% | Strain: {y.get('strain', 'N/D')}/21
-SONNO: {y.get('sleep_hours', 'N/D')}h (Score: {y.get('sleep_score', 'N/D')}) | {y.get('sleep_start', '?')}-{y.get('sleep_end', '?')}
-  Deep: {y.get('deep_sleep_min', 'N/D')}min | REM: {y.get('rem_sleep_min', 'N/D')}min | Light: {y.get('light_sleep_min', 'N/D')}min | Sveglio: {y.get('awake_min', 'N/D')}min
-CUORE: RHR {y.get('rhr', 'N/D')}bpm | HRV {y.get('hrv', 'N/D')}ms | Max {y.get('max_hr', 'N/D')}bpm
-STRESS: Media {y.get('stress_avg', 'N/D')} | Max {y.get('stress_max', 'N/D')} | Alto: {y.get('high_stress_min', 'N/D')}min
-ATTIVITÀ: {y.get('steps', 'N/D')} passi | {y.get('distance_km', 'N/D')}km | {y.get('active_calories', 'N/D')}kcal attive | {y.get('floors', 'N/D')} piani
-INTENSITÀ: Moderata {y.get('moderate_min', 'N/D')}min | Vigorosa {y.get('vigorous_min', 'N/D')}min
-BODY BATTERY: {y.get('body_battery_low', 'N/D')}-{y.get('body_battery_high', 'N/D')} | +{y.get('body_battery_charged', 'N/D')} -{y.get('body_battery_drained', 'N/D')}
-RESPIRO: {y.get('respiration', 'N/D')} resp/min | SpO2: {y.get('spo2', 'N/D')}%""" if y else "Non disponibili"
-        
-        # Formatta trend
-        t = context.get('trend', {})
-        trend_text = f"""Sonno: {'+' if (t.get('sleep_change', 0) or 0) >= 0 else ''}{t.get('sleep_change', 0)}h | Recovery: {'+' if (t.get('recovery_change', 0) or 0) >= 0 else ''}{t.get('recovery_change', 0)}% | RHR: {'+' if (t.get('rhr_change', 0) or 0) >= 0 else ''}{t.get('rhr_change', 0)}bpm
-HRV: {'+' if (t.get('hrv_change', 0) or 0) >= 0 else ''}{t.get('hrv_change', 0)}ms | Passi: {'+' if (t.get('steps_change', 0) or 0) >= 0 else ''}{t.get('steps_change', 0)} | Stress: {'+' if (t.get('stress_change', 0) or 0) >= 0 else ''}{t.get('stress_change', 0)}""" if t else "Non disponibile"
-        
-        # Formatta attività recenti
-        activities = context.get('recent_activities', [])
-        activities_text = "\n".join([
-            f"• {a['date']}: {a['name']} | {a['duration_min']}min | {a['distance_km']}km | {a['calories']}kcal | HR {a['avg_hr']}/{a['max_hr']}bpm | Strain {a['strain']} | Aerobico {a['aerobic_effect']} Anaerobico {a['anaerobic_effect']} | Z4:{a['hr_zone_4_min']}min Z5:{a['hr_zone_5_min']}min"
-            for a in activities
-        ]) if activities else "Nessuna attività recente"
-        
-        # Riepilogo settimana
-        ws = context.get('week_activity_summary', {})
-        week_summary = f"{ws.get('total_activities', 0)} attività | {round(ws.get('total_duration_min', 0))}min totali | {ws.get('total_distance_km', 0)}km | {ws.get('total_calories', 0)}kcal | Strain medio {ws.get('avg_strain', 'N/D')}" if ws else "N/D"
-        
-        return f"""Sei SENSEI (Dr. Sensei), preparatore atletico italiano con 25 anni di esperienza nel Performance Lab.
-Parli con {name}, {age} anni.
-
-CARATTERE: Diretto, pragmatico, motivante. Parli come un vero coach italiano.
-
-COLLEGA: Dr. Sakura (coach mentale). Per temi emotivi/stress/ansia, suggerisci di parlare con lei.
-
-══════════════════════════════════════
-        DATI COMPLETI DI IERI
-══════════════════════════════════════
-{yesterday_text}
-
-══════════════════════════════════════
-           MEDIE 30 GIORNI
-══════════════════════════════════════
-ETÀ BIOLOGICA: {context.get('biological_age', 'N/D')} (reale: {age}) | FITNESS AGE: {context.get('fitness_age', 'N/D')} | VO2 Max: {context.get('vo2_max', 'N/D')}
-SCORES: Recovery {context.get('recovery', 'N/D')}% | Strain {context.get('strain', 'N/D')}/21 | Sleep {context.get('sleep_performance', 'N/D')}%
-CUORE: RHR {context.get('resting_hr', 'N/D')}bpm | HRV {context.get('hrv', 'N/D')}ms
-SONNO: {context.get('sleep_hours', 'N/D')}h | Deep {context.get('deep_sleep_min', 'N/D')}min | REM {context.get('rem_sleep_min', 'N/D')}min
-STRESS: {context.get('stress_avg', 'N/D')} media
-ATTIVITÀ: {context.get('steps', 'N/D')} passi | {context.get('distance_km', 'N/D')}km | {context.get('active_calories', 'N/D')}kcal
-INTENSITÀ: Moderata {context.get('moderate_min', 'N/D')}min | Vigorosa {context.get('vigorous_min', 'N/D')}min
-
-══════════════════════════════════════
-         PREVISIONI GARA
-══════════════════════════════════════
-{race_text}
-
-══════════════════════════════════════
-      TREND VS SETTIMANA SCORSA
-══════════════════════════════════════
-{trend_text}
-
-══════════════════════════════════════
-       ATTIVITÀ ULTIMI 30 GIORNI
-══════════════════════════════════════
-RIEPILOGO: {week_summary}
-
-DETTAGLIO:
-{activities_text}
-
-══════════════════════════════════════
-              MEMORIE
-══════════════════════════════════════
-{memories_text}
-
-FOCUS: Allenamento, performance, recupero, prevenzione infortuni, nutrizione sportiva, analisi dati.
-REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: injury, goal, training, nutrition, performance
-Rispondi in italiano, max 300 parole. USA I DATI SPECIFICI nelle risposte!"""
-
-    def _get_sakura_prompt(user, context, memories):
-        name = user.name or "amico"
-        age = user.get_real_age()
-        memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else "Nessuna"
-        
-        # Formatta dati di ieri (focus benessere)
-        y = context.get('yesterday', {})
-        yesterday_text = f"""📅 {y.get('date', 'N/D')}
-SONNO: {y.get('sleep_hours', 'N/D')}h (Score: {y.get('sleep_score', 'N/D')}) | Ora: {y.get('sleep_start', '?')}-{y.get('sleep_end', '?')}
-  Deep: {y.get('deep_sleep_min', 'N/D')}min | REM: {y.get('rem_sleep_min', 'N/D')}min | Sveglio: {y.get('awake_min', 'N/D')}min
-RECUPERO: {y.get('recovery', 'N/D')}%
-STRESS: Media {y.get('stress_avg', 'N/D')} | Max {y.get('stress_max', 'N/D')}
-  Riposo: {y.get('rest_stress_min', 'N/D')}min | Basso: {y.get('low_stress_min', 'N/D')}min | Medio: {y.get('medium_stress_min', 'N/D')}min | Alto: {y.get('high_stress_min', 'N/D')}min
-CUORE: HRV {y.get('hrv', 'N/D')}ms | RHR {y.get('rhr', 'N/D')}bpm
-BODY BATTERY: Min {y.get('body_battery_low', 'N/D')} → Max {y.get('body_battery_high', 'N/D')} | Caricato +{y.get('body_battery_charged', 'N/D')} | Consumato -{y.get('body_battery_drained', 'N/D')}
-RESPIRO: {y.get('respiration', 'N/D')} resp/min | SpO2: {y.get('spo2', 'N/D')}%""" if y else "Non disponibili"
-        
-        # Formatta trend
-        t = context.get('trend', {})
-        trend_text = f"""Sonno: {'+' if (t.get('sleep_change', 0) or 0) >= 0 else ''}{t.get('sleep_change', 0)}h | Recovery: {'+' if (t.get('recovery_change', 0) or 0) >= 0 else ''}{t.get('recovery_change', 0)}%
-HRV: {'+' if (t.get('hrv_change', 0) or 0) >= 0 else ''}{t.get('hrv_change', 0)}ms | Stress: {'+' if (t.get('stress_change', 0) or 0) >= 0 else ''}{t.get('stress_change', 0)}""" if t else "Non disponibile"
-        
-        return f"""Sei SAKURA (Dr. Sakura), coach mentale con background in psicologia dello sport e mindfulness nel Performance Lab.
-Parli con {name}, {age} anni.
-
-CARATTERE: Calma, empatica, saggia. Usi metafore dalla natura e filosofia orientale.
-
-COLLEGA: Dr. Sensei (preparatore atletico). Per allenamenti/performance fisica, suggerisci di parlare con lui.
-
-══════════════════════════════════════
-       STATO BENESSERE DI IERI
-══════════════════════════════════════
-{yesterday_text}
-
-══════════════════════════════════════
-           MEDIE 30 GIORNI
-══════════════════════════════════════
-SONNO: {context.get('sleep_hours', 'N/D')}h media | Score {context.get('sleep_performance', 'N/D')}%
-  Deep: {context.get('deep_sleep_min', 'N/D')}min | REM: {context.get('rem_sleep_min', 'N/D')}min
-STRESS: {context.get('stress_avg', 'N/D')} media
-CUORE: HRV {context.get('hrv', 'N/D')}ms | RHR {context.get('resting_hr', 'N/D')}bpm
-RECUPERO: {context.get('recovery', 'N/D')}%
-BODY BATTERY: {context.get('body_battery_low', 'N/D')}-{context.get('body_battery_high', 'N/D')}
-
-══════════════════════════════════════
-      TREND VS SETTIMANA SCORSA
-══════════════════════════════════════
-{trend_text}
-
-══════════════════════════════════════
-              MEMORIE
-══════════════════════════════════════
-{memories_text}
-
-══════════════════════════════════════
-       INTERPRETAZIONE DATI
-══════════════════════════════════════
-HRV (Variabilità Cardiaca):
-- HRV alto (>50ms) = Sistema nervoso equilibrato, buona resilienza
-- HRV basso (<30ms) = Stress accumulato, sistema in allerta
-
-STRESS Garmin:
-- <25 = Riposo/rilassato
-- 25-50 = Basso/normale
-- 50-75 = Medio
-- >75 = Alto, serve recupero
-
-DEEP SLEEP:
-- Basso (<45min) = Possibile stress, ansia, sovraccarico mentale
-- Ottimale (60-90min) = Buon recupero fisico e mentale
-
-REM SLEEP:
-- Basso (<60min) = Possibile esaurimento emotivo, elaborazione incompleta
-- Ottimale (90-120min) = Buona elaborazione emotiva e memoria
-
-BODY BATTERY:
-- Mattina <50 = Non hai recuperato abbastanza
-- Sera >30 = Buona gestione energie
-
-═══ MODALITÀ MEDITAZIONE GUIDATA ═══
-Quando l'utente chiede una meditazione, respirazione guidata, o rilassamento:
-- IMPORTANTE: Usa ESATTAMENTE questo formato per le pause: [PAUSA:XX] dove XX sono i secondi
-- NON scrivere "Pausa (20 sec)" o "**Pausa**" - scrivi SOLO [PAUSA:20]
-- NON usare asterischi ** o formattazione markdown
-- Parla in modo lento, calmo, con frasi brevi
-- Usa molti "..." per creare ritmo lento
-
-ESEMPIO CORRETTO di meditazione:
-"Chiudi gli occhi... trova una posizione comoda... [PAUSA:10] Inspira profondamente dal naso... senti l'aria che riempie i polmoni... [PAUSA:20] Espira lentamente dalla bocca... lascia andare ogni tensione... [PAUSA:20] Continua a respirare... con calma... [PAUSA:30]"
-
-ESEMPIO SBAGLIATO (non fare così):
-"**Inizio** Chiudi gli occhi **Pausa (20 sec)**" ← NO!
-
-FOCUS: Benessere mentale, gestione stress, mindfulness, equilibrio vita-sport, motivazione, crescita personale.
-REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: emotion, stress, mindset, relationship, sleep_mental, life_balance
-Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I DATI SPECIFICI nelle risposte!"""
-
-    def _build_context(user):
-        """Costruisce contesto COMPLETO per i coach AI"""
-        today = date.today()
-        start_date = today - timedelta(days=30)
-        metrics = DailyMetric.query.filter(
-            DailyMetric.user_id == user.id, 
-            DailyMetric.date >= start_date
-        ).order_by(DailyMetric.date.desc()).all()
-        
-        if not metrics: 
-            return {}
-        
-        def avg(lst):
-            vals = [x for x in lst if x is not None]
-            return round(sum(vals)/len(vals), 1) if vals else None
-        
-        def total(lst):
-            vals = [x for x in lst if x is not None]
-            return sum(vals) if vals else None
-        
-        # ═══ MEDIE 30 GIORNI ═══
-        context = {
-            'biological_age': avg([m.biological_age for m in metrics]),
-            'recovery': avg([m.recovery_score for m in metrics]),
-            'strain': avg([m.strain_score for m in metrics]),
-            'sleep_performance': avg([m.sleep_performance for m in metrics]),
-            'vo2_max': avg([m.vo2_max for m in metrics]),
+            };
             
-            # Cuore
-            'resting_hr': avg([m.resting_hr for m in metrics]),
-            'min_hr': avg([m.min_hr for m in metrics]),
-            'max_hr': avg([m.max_hr for m in metrics]),
-            'hrv': avg([m.hrv_last_night for m in metrics]),
-            'hrv_weekly': avg([m.hrv_weekly_avg for m in metrics]),
-            
-            # Sonno
-            'sleep_hours': avg([m.sleep_seconds/3600 if m.sleep_seconds else None for m in metrics]),
-            'deep_sleep_min': avg([m.deep_sleep_seconds/60 if m.deep_sleep_seconds else None for m in metrics]),
-            'rem_sleep_min': avg([m.rem_sleep_seconds/60 if m.rem_sleep_seconds else None for m in metrics]),
-            'light_sleep_min': avg([m.light_sleep_seconds/60 if m.light_sleep_seconds else None for m in metrics]),
-            'awake_min': avg([m.awake_seconds/60 if m.awake_seconds else None for m in metrics]),
-            'sleep_score': avg([m.sleep_score for m in metrics]),
-            
-            # Stress
-            'stress_avg': avg([m.stress_avg for m in metrics]),
-            'stress_max': avg([m.stress_max for m in metrics]),
-            
-            # Attività giornaliera
-            'steps': avg([m.steps for m in metrics]),
-            'total_calories': avg([m.total_calories for m in metrics]),
-            'active_calories': avg([m.active_calories for m in metrics]),
-            'distance_km': avg([m.distance_meters/1000 if m.distance_meters else None for m in metrics]),
-            'floors': avg([m.floors_ascended for m in metrics]),
-            'moderate_min': avg([m.moderate_intensity_minutes for m in metrics]),
-            'vigorous_min': avg([m.vigorous_intensity_minutes for m in metrics]),
-            
-            # Body Battery
-            'body_battery_high': avg([m.body_battery_high for m in metrics]),
-            'body_battery_low': avg([m.body_battery_low for m in metrics]),
-            
-            # Respirazione e SpO2
-            'respiration': avg([m.avg_respiration for m in metrics]),
-            'spo2': avg([m.avg_spo2 for m in metrics]),
-            
-            # Fitness Age (da Garmin)
-            'fitness_age': avg([m.fitness_age for m in metrics]),
-        }
-        
-        # Race Predictions (prendi l'ultimo disponibile)
-        for m in metrics:
-            if m.race_time_5k:
-                context['race_5k'] = m.race_time_5k
-                context['race_10k'] = m.race_time_10k
-                context['race_half'] = m.race_time_half
-                context['race_marathon'] = m.race_time_marathon
-                break
-        
-        # ═══ DATI DI IERI ═══
-        yesterday = metrics[0] if metrics else None
-        if yesterday:
-            sleep_start_str = yesterday.sleep_start.strftime('%H:%M') if yesterday.sleep_start else None
-            sleep_end_str = yesterday.sleep_end.strftime('%H:%M') if yesterday.sleep_end else None
-            
-            context['yesterday'] = {
-                'date': yesterday.date.strftime('%d/%m'),
-                'recovery': yesterday.recovery_score,
-                'strain': yesterday.strain_score,
-                'sleep_performance': yesterday.sleep_performance,
+            const playAudio = async (text) => {
+                if (playingAudio) return;
+                setPlayingAudio(true);
                 
-                # Sonno dettagliato
-                'sleep_hours': round(yesterday.sleep_seconds / 3600, 1) if yesterday.sleep_seconds else None,
-                'sleep_score': yesterday.sleep_score,
-                'deep_sleep_min': round(yesterday.deep_sleep_seconds / 60) if yesterday.deep_sleep_seconds else None,
-                'rem_sleep_min': round(yesterday.rem_sleep_seconds / 60) if yesterday.rem_sleep_seconds else None,
-                'light_sleep_min': round(yesterday.light_sleep_seconds / 60) if yesterday.light_sleep_seconds else None,
-                'awake_min': round(yesterday.awake_seconds / 60) if yesterday.awake_seconds else None,
-                'sleep_start': sleep_start_str,
-                'sleep_end': sleep_end_str,
+                // Check for pause markers [PAUSA:XX]
+                const pausePattern = /\[PAUSA:(\d+)\]/g;
+                const hasPauses = pausePattern.test(text);
                 
-                # Cuore
-                'rhr': yesterday.resting_hr,
-                'min_hr': yesterday.min_hr,
-                'max_hr': yesterday.max_hr,
-                'hrv': yesterday.hrv_last_night,
+                if (hasPauses) {
+                    // Split text by pause markers and play with actual pauses
+                    const segments = text.split(/\[PAUSA:\d+\]/);
+                    const pauses = [...text.matchAll(/\[PAUSA:(\d+)\]/g)].map(m => parseInt(m[1]) * 1000);
+                    
+                    for (let i = 0; i < segments.length; i++) {
+                        const segment = segments[i].trim();
+                        if (segment) {
+                            try {
+                                const res = await fetch(`${API}/api/tts`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                    body: JSON.stringify({ text: segment, coach })
+                                });
+                                const data = await res.json();
+                                
+                                if (data.audio) {
+                                    await new Promise((resolve) => {
+                                        const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+                                        audioRef.current = audio;
+                                        audio.onended = resolve;
+                                        audio.onerror = resolve;
+                                        audio.play();
+                                    });
+                                }
+                            } catch (e) {
+                                console.error('TTS segment error:', e);
+                            }
+                        }
+                        
+                        // Wait for pause duration (if not last segment)
+                        if (i < pauses.length) {
+                            await new Promise(resolve => setTimeout(resolve, pauses[i]));
+                        }
+                    }
+                    setPlayingAudio(false);
+                } else {
+                    // Normal playback without pauses
+                    try {
+                        const res = await fetch(`${API}/api/tts`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ text, coach })
+                        });
+                        const data = await res.json();
+                        
+                        if (data.audio) {
+                            const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+                            audioRef.current = audio;
+                            audio.onended = () => setPlayingAudio(false);
+                            audio.onerror = () => setPlayingAudio(false);
+                            await audio.play();
+                        } else {
+                            setPlayingAudio(false);
+                        }
+                    } catch (e) {
+                        console.error('TTS error:', e);
+                        setPlayingAudio(false);
+                    }
+                }
+            };
+            
+            useEffect(() => {
+                setMessages([]);
+                setReady(false);
+                loadHistory();
+            }, [coach]);
+            
+            useEffect(() => {
+                if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+            }, [messages, loading]);
+            
+            // Auto-send when voice input ends
+            useEffect(() => {
+                if (voiceInputPending && input.trim()) {
+                    setVoiceInputPending(false);
+                    sendWithVoice();
+                } else if (voiceInputPending) {
+                    setVoiceInputPending(false);
+                }
+            }, [voiceInputPending, input]);
+            
+            const loadHistory = async () => {
+                try {
+                    const res = await fetch(`${API}/api/chat/history?coach=${coach}&limit=50`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (Array.isArray(data)) setMessages(data);
+                    }
+                } catch {}
+                setReady(true);
+            };
+            
+            const send = async () => {
+                const text = input.trim();
+                if (!text || loading) return;
                 
-                # Stress dettagliato
-                'stress_avg': yesterday.stress_avg,
-                'stress_max': yesterday.stress_max,
-                'rest_stress_min': round(yesterday.rest_stress_duration / 60) if yesterday.rest_stress_duration else None,
-                'low_stress_min': round(yesterday.low_stress_duration / 60) if yesterday.low_stress_duration else None,
-                'medium_stress_min': round(yesterday.medium_stress_duration / 60) if yesterday.medium_stress_duration else None,
-                'high_stress_min': round(yesterday.high_stress_duration / 60) if yesterday.high_stress_duration else None,
+                setInput('');
+                setMessages(prev => [...prev, { role: 'user', content: text }]);
+                setLoading(true);
                 
-                # Attività
-                'steps': yesterday.steps,
-                'total_calories': yesterday.total_calories,
-                'active_calories': yesterday.active_calories,
-                'distance_km': round(yesterday.distance_meters / 1000, 1) if yesterday.distance_meters else None,
-                'floors': yesterday.floors_ascended,
-                'moderate_min': yesterday.moderate_intensity_minutes,
-                'vigorous_min': yesterday.vigorous_intensity_minutes,
+                try {
+                    const res = await fetch(`${API}/api/chat`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ message: text, coach })
+                    });
+                    const data = await res.json();
+                    const responseText = data.response || data.error || 'Errore';
+                    setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
+                } catch {
+                    setMessages(prev => [...prev, { role: 'assistant', content: 'Errore di connessione' }]);
+                }
+                setLoading(false);
+                inputRef.current?.focus();
+            };
+            
+            const sendWithVoice = async () => {
+                const text = input.trim();
+                if (!text || loading) return;
                 
-                # Body Battery
-                'body_battery_high': yesterday.body_battery_high,
-                'body_battery_low': yesterday.body_battery_low,
-                'body_battery_charged': yesterday.body_battery_charged,
-                'body_battery_drained': yesterday.body_battery_drained,
+                setInput('');
+                setMessages(prev => [...prev, { role: 'user', content: text }]);
+                setLoading(true);
                 
-                # Respirazione e SpO2
-                'respiration': yesterday.avg_respiration,
-                'spo2': yesterday.avg_spo2,
+                try {
+                    const res = await fetch(`${API}/api/chat`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ message: text, coach })
+                    });
+                    const data = await res.json();
+                    const responseText = data.response || data.error || 'Errore';
+                    setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
+                    
+                    // Auto-play audio response
+                    if (responseText) {
+                        setTimeout(() => playAudio(responseText), 500);
+                    }
+                } catch {
+                    setMessages(prev => [...prev, { role: 'assistant', content: 'Errore di connessione' }]);
+                }
+                setLoading(false);
+            };
+            
+            const resetChat = async () => {
+                try {
+                    await fetch(`${API}/api/chat/reset?coach=${coach}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                } catch {}
+                setMessages([]);
+                setShowReset(false);
+            };
+            
+            const suggestions = isSakura 
+                ? ['Come mi sento oggi?', 'Sono stressato', 'Aiutami a rilassarmi', 'Ho bisogno di motivazione']
+                : ['Analizza i miei dati', 'Piano allenamento oggi', 'Come sta il mio recupero?', 'Consigli per migliorare'];
+            
+            if (!ready) return <Loading />;
+            
+            return (
+                <div className={`flex flex-col h-full ${bgClass}`}>
+                    {/* Reset Modal */}
+                    {showReset && (
+                        <ConfirmModal
+                            title={`Resettare la chat con ${coachName}?`}
+                            message="Tutti i messaggi verranno eliminati. Le memorie salvate rimarranno."
+                            onConfirm={resetChat}
+                            onCancel={() => setShowReset(false)}
+                        />
+                    )}
+                    
+                    {/* Header */}
+                        <div className="flex justify-between items-center p-3 sm:p-4 border-b border-[var(--border)]">
+                            <div className="flex items-center gap-2 sm:gap-3">
+                                <span className="text-xl sm:text-2xl">{coachEmoji}</span>
+                                <div>
+                                    <h2 className="font-bold text-sm sm:text-base" style={{ color: accent }}>{coachName}</h2>
+                                    <p className="text-xs text-[var(--text-muted)] hidden sm:block">{coachTitle}</p>
+                                </div>
+                            </div>
+                            {messages.length > 0 && (
+                                <button onClick={() => setShowReset(true)} className="btn-ghost px-3 py-2 sm:px-4 rounded-xl text-xs sm:text-sm">
+                                    <span className="hidden sm:inline">🗑️ Reset</span>
+                                    <span className="sm:hidden">🗑️</span>
+                                </button>
+                            )}
+                        </div>
+                    
+                    {/* Messages */}
+                    <div ref={chatRef} className="flex-1 overflow-y-auto">
+                        {messages.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center px-4 sm:px-6 text-center">
+                                <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full flex items-center justify-center text-3xl sm:text-5xl mb-4 sm:mb-6"
+                                    style={{ background: isSakura ? 'var(--accent-pink-dim)' : 'var(--accent-green-dim)',
+                                        boxShadow: isSakura ? '0 0 60px rgba(255,110,180,0.2)' : '0 0 60px rgba(0,245,147,0.2)' }}>
+                                    {coachEmoji}
+                                </div>
+                                <h2 className="text-2xl sm:text-3xl font-bold font-display mb-2" style={{ color: accent }}>{coachName}</h2>
+                                <p className="text-sm sm:text-base text-[var(--text-secondary)] max-w-md mb-6 sm:mb-8 px-2">
+                                    {isSakura 
+                                        ? 'Sono qui per guidarti nel tuo percorso di benessere mentale. Parliamo di come ti senti, dello stress, e troviamo insieme il tuo equilibrio interiore.'
+                                        : 'Analizzo i tuoi dati Garmin per ottimizzare allenamento e recupero. Chiedimi consigli su performance, nutrizione e preparazione atletica.'}
+                                </p>
+                                <div className="flex flex-wrap justify-center gap-2 sm:gap-3 max-w-lg">
+                                    {suggestions.map((s, i) => (
+                                        <button key={i} onClick={() => setInput(s)}
+                                            className="px-3 py-2 sm:px-5 sm:py-3 rounded-full text-xs sm:text-sm glass-card glass-card-hover">
+                                            {s}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-4 sm:p-6 space-y-3 sm:space-y-4 max-w-4xl mx-auto">
+                                {messages.map((m, i) => (
+                                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} fade-in`}>
+                                        <div className={`chat-bubble ${m.role === 'user' ? 'chat-user' : `chat-ai ${coach}`}`}>
+                                            {m.role === 'assistant' && (
+                                                <div className="flex items-center justify-between gap-3 mb-3 pb-3 border-b border-[var(--border)]">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-2xl">{coachEmoji}</span>
+                                                        <span className="font-semibold" style={{ color: accent }}>{coachName}</span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => playAudio(m.content)}
+                                                        disabled={playingAudio}
+                                                        className={`text-xl transition-opacity ${playingAudio ? 'animate-pulse opacity-100' : 'opacity-60 hover:opacity-100'}`}
+                                                        title="Ascolta"
+                                                    >
+                                                        {playingAudio ? '🔉' : '🔊'}
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {loading && (
+                                    <div className="flex justify-start fade-in">
+                                        <div className={`chat-bubble chat-ai ${coach}`}>
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <span className="text-2xl">{coachEmoji}</span>
+                                                <span className="font-semibold" style={{ color: accent }}>{coachName}</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <div className="typing-dot" style={{ background: accent }} />
+                                                <div className="typing-dot" style={{ background: accent }} />
+                                                <div className="typing-dot" style={{ background: accent }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Input */}
+                    <div className="p-3 sm:p-4 border-t border-[var(--border)]">
+                        <div className="max-w-4xl mx-auto flex gap-2 sm:gap-3">
+                            <button 
+                                onClick={toggleRecording}
+                                className={`p-3 sm:px-4 rounded-xl sm:rounded-2xl text-xl sm:text-2xl transition-all flex-shrink-0 ${
+                                    isRecording 
+                                        ? 'bg-[var(--accent-red)] animate-pulse' 
+                                        : 'bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)]'
+                                }`}
+                                title={isRecording ? 'Stop' : 'Parla'}
+                            >
+                                {isRecording ? '⏹️' : '🎤'}
+                            </button>
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={input}
+                                onChange={e => setInput(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
+                                placeholder={isRecording ? 'Ascoltando...' : `Messaggio...`}
+                                className={`input-premium flex-1 px-3 py-3 sm:px-5 sm:py-4 rounded-xl sm:rounded-2xl text-base ${isSakura ? 'pink' : ''}`}
+                                disabled={loading || isRecording}
+                            />
+                            <button ref={sendBtnRef} onClick={send} disabled={loading || !input.trim()}
+                                className={`${isSakura ? 'btn-pink' : 'btn-primary'} px-4 sm:px-8 rounded-xl sm:rounded-2xl text-base sm:text-lg disabled:opacity-40 flex-shrink-0`}>
+                                <span className="hidden sm:inline">Invia</span>
+                                <span className="sm:hidden">➤</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== DATA VIEW ====================
+        
+        const DataView = ({ summary }) => {
+            const [activeMetric, setActiveMetric] = useState(null);
+            const avgs = summary?.averages || {};
+            const impacts = avgs.bio_impacts || {};
+            const realAge = summary?.real_age || 42;
+            
+            return (
+                <div className="h-full overflow-y-auto bg-gradient-sensei">
+                    {activeMetric && (
+                        <MetricModal
+                            metricKey={activeMetric.key}
+                            value={activeMetric.value}
+                            onClose={() => setActiveMetric(null)}
+                        />
+                    )}
+                    
+                    <div className="max-w-6xl mx-auto p-4 sm:p-8">
+                        <div className="text-center mb-6 sm:mb-10 slide-up">
+                            <h1 className="text-2xl sm:text-4xl font-bold font-display mb-2">Performance Dashboard</h1>
+                            <p className="text-xs sm:text-base text-[var(--text-muted)]">Media ultimi 30 giorni • Tocca per dettagli</p>
+                        </div>
+                        
+                        {/* Bio Age Section */}
+                        <div className="glass-card p-5 sm:p-10 mb-6 sm:mb-8 flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-10 slide-up">
+                            <div className="flex-1 text-center lg:text-left">
+                                <h2 className="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4">Età Biologica</h2>
+                                <p className="text-sm sm:text-base text-[var(--text-secondary)] max-w-md hidden sm:block">
+                                    La tua età biologica è calcolata analizzando frequenza cardiaca, sonno, 
+                                    attività fisica, stress e altri parametri fisiologici.
+                                </p>
+                                <div className="mt-4 sm:mt-6 flex flex-wrap gap-3 sm:gap-4 justify-center lg:justify-start">
+                                    <div className="glass-card px-3 py-2 sm:px-4">
+                                        <span className="text-xs text-[var(--text-muted)]">Anagrafica</span>
+                                        <span className="text-lg sm:text-xl font-bold ml-2">{realAge}</span>
+                                    </div>
+                                    <div className="glass-card px-3 py-2 sm:px-4">
+                                        <span className="text-xs text-[var(--text-muted)]">Giorni</span>
+                                        <span className="text-lg sm:text-xl font-bold ml-2">{summary?.period?.days_with_data || 0}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <BioAgeRing 
+                                bioAge={avgs.biological_age} 
+                                realAge={realAge} 
+                                onClick={() => setActiveMetric({ key: 'bioAge', value: avgs.biological_age?.toFixed(1) })}
+                            />
+                        </div>
+                        
+                        {/* Metrics Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6 sm:mb-8">
+                            <MetricCard 
+                                metricKey="rhr"
+                                icon="❤️" label="RHR" 
+                                value={avgs.resting_hr?.toFixed(0)} unit="bpm"
+                                color="var(--accent-red)" subtitle="Frequenza a riposo"
+                                onClick={() => setActiveMetric({ key: 'rhr', value: avgs.resting_hr?.toFixed(0) })}
+                            />
+                            <MetricCard 
+                                metricKey="vo2"
+                                icon="🫁" label="VO2 Max" 
+                                value={avgs.vo2_max?.toFixed(0)} unit="ml/kg"
+                                color="var(--accent-green)" subtitle="Capacità aerobica"
+                                onClick={() => setActiveMetric({ key: 'vo2', value: avgs.vo2_max?.toFixed(0) })}
+                            />
+                            <MetricCard 
+                                metricKey="steps"
+                                icon="👟" label="Passi" 
+                                value={avgs.steps ? (avgs.steps/1000).toFixed(1) : null} unit="k/day"
+                                color="var(--accent-orange)" subtitle="Media giornaliera"
+                                onClick={() => setActiveMetric({ key: 'steps', value: avgs.steps?.toFixed(0) })}
+                            />
+                            <MetricCard 
+                                metricKey="sleep"
+                                icon="😴" label="Sonno" 
+                                value={avgs.sleep_hours?.toFixed(1)} unit="ore"
+                                color="var(--accent-purple)" subtitle="Durata media"
+                                onClick={() => setActiveMetric({ key: 'sleep', value: avgs.sleep_hours?.toFixed(1) + ' ore' })}
+                            />
+                            <MetricCard 
+                                metricKey="recovery"
+                                icon="⚡" label="Recovery" 
+                                value={avgs.recovery?.toFixed(0)} unit="%"
+                                color="var(--accent-green)" subtitle="Prontezza fisica"
+                                onClick={() => setActiveMetric({ key: 'recovery', value: avgs.recovery?.toFixed(0) + '%' })}
+                            />
+                            <MetricCard 
+                                metricKey="strain"
+                                icon="🔥" label="Strain" 
+                                value={avgs.strain?.toFixed(1)} unit="/21"
+                                color="var(--accent-orange)" subtitle="Carico allenamento"
+                                onClick={() => setActiveMetric({ key: 'strain', value: avgs.strain?.toFixed(1) })}
+                            />
+                        </div>
+                        
+                        {/* Impact Analysis */}
+                        <div className="glass-card p-8 slide-up">
+                            <h3 className="text-xl font-semibold mb-2">Impatto sull'Età Biologica</h3>
+                            <p className="text-[var(--text-muted)] mb-6">
+                                Ogni fattore contribuisce a modificare la tua età biologica. Clicca per approfondire.
+                            </p>
+                            <div className="grid md:grid-cols-2 gap-x-10">
+                                <ImpactRow icon="🫁" label="VO2 Max" value={impacts.vo2} description="Capacità cardiovascolare"
+                                    onClick={() => setActiveMetric({ key: 'vo2', value: avgs.vo2_max?.toFixed(0) })} />
+                                <ImpactRow icon="❤️" label="Frequenza Cardiaca" value={impacts.rhr} description="Efficienza cardiaca"
+                                    onClick={() => setActiveMetric({ key: 'rhr', value: avgs.resting_hr?.toFixed(0) })} />
+                                <ImpactRow icon="😴" label="Qualità Sonno" value={impacts.sleep} description="Ore e profondità"
+                                    onClick={() => setActiveMetric({ key: 'sleep', value: avgs.sleep_hours?.toFixed(1) + ' ore' })} />
+                                <ImpactRow icon="👟" label="Attività Fisica" value={impacts.steps} description="Movimento quotidiano"
+                                    onClick={() => setActiveMetric({ key: 'steps', value: avgs.steps?.toFixed(0) })} />
+                                <ImpactRow icon="😤" label="Gestione Stress" value={impacts.stress} description="Livello medio"
+                                    onClick={() => setActiveMetric({ key: 'stress', value: avgs.stress_avg?.toFixed(0) })} />
+                                <ImpactRow icon="💪" label="Intensità Training" value={impacts.hrz} description="Zone HR elevate"
+                                    onClick={() => setActiveMetric({ key: 'hrz', value: null })} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== TREND VIEW ====================
+        
+        const TrendView = ({ trend, realAge }) => {
+            const canvasRef = useRef(null);
+            const chartRef = useRef(null);
+            
+            useEffect(() => {
+                if (!canvasRef.current || !trend?.data?.length) return;
+                if (chartRef.current) chartRef.current.destroy();
+                
+                const ctx = canvasRef.current.getContext('2d');
+                const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+                gradient.addColorStop(0, 'rgba(0, 245, 147, 0.3)');
+                gradient.addColorStop(1, 'rgba(0, 245, 147, 0)');
+                
+                chartRef.current = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: trend.data.map(d => new Date(d.date).toLocaleDateString('it', { day: '2-digit', month: 'short' })),
+                        datasets: [
+                            { label: 'Età Biologica', data: trend.data.map(d => d.biological_age), borderColor: '#00f593', backgroundColor: gradient, fill: true, tension: 0.4, pointRadius: 0, borderWidth: 3 },
+                            { label: 'Età Reale', data: trend.data.map(() => realAge), borderColor: '#5c5e6a', borderDash: [8, 4], pointRadius: 0, borderWidth: 2 }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: { legend: { labels: { color: '#8b8d98', font: { size: 12 } } } },
+                        scales: {
+                            x: { grid: { color: '#1e2028' }, ticks: { color: '#5c5e6a', maxTicksLimit: 10 } },
+                            y: { grid: { color: '#1e2028' }, ticks: { color: '#5c5e6a' }, suggestedMin: realAge - 6, suggestedMax: realAge + 3 }
+                        }
+                    }
+                });
+                return () => chartRef.current?.destroy();
+            }, [trend, realAge]);
+            
+            if (!trend?.data?.length) {
+                return (
+                    <div className="h-full flex items-center justify-center">
+                        <div className="text-center glass-card p-10">
+                            <span className="text-5xl mb-4 block">📈</span>
+                            <h3 className="text-xl font-semibold mb-2">Dati insufficienti</h3>
+                            <p className="text-[var(--text-muted)]">Servono almeno 30 giorni di dati</p>
+                        </div>
+                    </div>
+                );
             }
-        
-        # ═══ TREND SETTIMANA ═══
-        week1 = [m for m in metrics if m.date >= today - timedelta(days=7)]
-        week2 = [m for m in metrics if today - timedelta(days=14) <= m.date < today - timedelta(days=7)]
-        
-        if week1 and week2:
-            context['trend'] = {
-                'sleep_change': round((avg([m.sleep_seconds/3600 if m.sleep_seconds else None for m in week1]) or 0) - 
-                                      (avg([m.sleep_seconds/3600 if m.sleep_seconds else None for m in week2]) or 0), 1),
-                'recovery_change': round((avg([m.recovery_score for m in week1]) or 0) - 
-                                         (avg([m.recovery_score for m in week2]) or 0), 0),
-                'rhr_change': round((avg([m.resting_hr for m in week1]) or 0) - 
-                                    (avg([m.resting_hr for m in week2]) or 0), 0),
-                'hrv_change': round((avg([m.hrv_last_night for m in week1]) or 0) - 
-                                    (avg([m.hrv_last_night for m in week2]) or 0), 0),
-                'steps_change': round((avg([m.steps for m in week1]) or 0) - 
-                                      (avg([m.steps for m in week2]) or 0), 0),
-                'stress_change': round((avg([m.stress_avg for m in week1]) or 0) - 
-                                       (avg([m.stress_avg for m in week2]) or 0), 0),
-            }
-        
-        # ═══ ATTIVITÀ RECENTI (30gg) - TUTTE ═══
-        activities = Activity.query.filter(
-            Activity.user_id == user.id,
-            Activity.start_time >= datetime.now() - timedelta(days=30)
-        ).order_by(Activity.start_time.desc()).all()
-        
-        if activities:
-            context['recent_activities'] = [{
-                'name': a.activity_name or a.activity_type,
-                'type': a.activity_type,
-                'date': a.start_time.strftime('%d/%m %H:%M') if a.start_time else None,
-                'duration_min': round(a.duration_seconds / 60) if a.duration_seconds else None,
-                'distance_km': round(a.distance_meters / 1000, 2) if a.distance_meters else None,
-                'calories': a.calories,
-                'avg_hr': a.avg_hr,
-                'max_hr': a.max_hr,
-                'strain': a.strain_score,
-                'aerobic_effect': a.aerobic_effect,
-                'anaerobic_effect': a.anaerobic_effect,
-                'hr_zone_1_min': round(a.hr_zone_1 / 60) if a.hr_zone_1 else None,
-                'hr_zone_2_min': round(a.hr_zone_2 / 60) if a.hr_zone_2 else None,
-                'hr_zone_3_min': round(a.hr_zone_3 / 60) if a.hr_zone_3 else None,
-                'hr_zone_4_min': round(a.hr_zone_4 / 60) if a.hr_zone_4 else None,
-                'hr_zone_5_min': round(a.hr_zone_5 / 60) if a.hr_zone_5 else None,
-                'moderate_min': a.moderate_intensity_minutes,
-                'vigorous_min': a.vigorous_intensity_minutes,
-            } for a in activities]
             
-            # Riepilogo settimanale attività
-            context['week_activity_summary'] = {
-                'total_activities': len(activities),
-                'total_duration_min': sum([a.duration_seconds/60 for a in activities if a.duration_seconds]),
-                'total_calories': sum([a.calories for a in activities if a.calories]),
-                'total_distance_km': round(sum([a.distance_meters/1000 for a in activities if a.distance_meters]), 1),
-                'avg_strain': avg([a.strain_score for a in activities]),
-            }
-        
-        return context
-
-    def _extract_memories(response, user_id, coach):
-        import re
-        pattern = r'\[MEMORY:\s*(\w+)\s*\|\s*([^\]]+)\]'
-        for cat, content in re.findall(pattern, response):
-            mem = UserMemory(user_id=user_id, category=cat.lower(), content=content.strip(), coach=coach)
-            db.session.add(mem)
-        return re.sub(pattern, '', response).strip()
-
-    @app.route('/api/chat', methods=['POST'])
-    @token_required
-    def chat(current_user):
-        if not openai_client:
-            return jsonify({'error': 'OpenAI non configurato'}), 500
-        
-        data = request.get_json()
-        msg = data.get('message', '').strip()
-        coach = data.get('coach', 'sensei')
-        if not msg:
-            return jsonify({'error': 'Messaggio vuoto'}), 400
-        
-        context = _build_context(current_user)
-        memories = UserMemory.query.filter_by(user_id=current_user.id, is_active=True).limit(20).all()
-        
-        # Get history
-        if coach == 'sensei':
-            history = ChatMessage.query.filter(
-                ChatMessage.user_id == current_user.id,
-                or_(ChatMessage.coach == 'sensei', ChatMessage.coach == None)
-            ).order_by(ChatMessage.created_at.desc()).limit(10).all()
-        else:
-            history = ChatMessage.query.filter_by(user_id=current_user.id, coach=coach).order_by(ChatMessage.created_at.desc()).limit(10).all()
-        history.reverse()
-        
-        system_prompt = _get_sakura_prompt(current_user, context, memories) if coach == 'sakura' else _get_sensei_prompt(current_user, context, memories)
-        messages = [{"role": "system", "content": system_prompt}]
-        messages += [{"role": m.role, "content": m.content} for m in history]
-        messages.append({"role": "user", "content": msg})
-        
-        try:
-            resp = openai_client.chat.completions.create(model="gpt-4o-mini", messages=messages, max_tokens=800, temperature=0.8)
-            ai_raw = resp.choices[0].message.content
+            const pace = trend.pace_of_aging;
             
-            # Save messages
-            db.session.add(ChatMessage(user_id=current_user.id, role='user', content=msg, coach=coach))
-            ai_clean = _extract_memories(ai_raw, current_user.id, coach)
-            db.session.add(ChatMessage(user_id=current_user.id, role='assistant', content=ai_clean, coach=coach))
-            db.session.commit()
+            return (
+                <div className="h-full overflow-y-auto bg-gradient-sensei">
+                    <div className="max-w-6xl mx-auto p-8">
+                        <div className="text-center mb-10 slide-up">
+                            <h1 className="text-4xl font-bold font-display mb-2">Trend Analysis</h1>
+                            <p className="text-[var(--text-muted)]">Evoluzione dell'età biologica nel tempo</p>
+                        </div>
+                        
+                        <div className="glass-card p-8 mb-8 slide-up">
+                            <div style={{ height: 350 }}><canvas ref={canvasRef} /></div>
+                        </div>
+                        
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div className="glass-card p-8 slide-up">
+                                <h3 className="text-sm text-[var(--text-muted)] uppercase tracking-wider mb-4">Pace of Aging</h3>
+                                <div className={`text-5xl font-bold font-display mb-4 ${pace <= 0 ? 'text-[var(--accent-green)] glow-text-green' : 'text-[var(--accent-orange)]'}`}>
+                                    {pace != null ? (pace <= 0 ? '' : '+') + pace.toFixed(1) : '--'}
+                                    <span className="text-xl ml-2">anni/anno</span>
+                                </div>
+                                <p className="text-[var(--text-secondary)]">
+                                    {pace < -0.5 ? '🎉 Eccellente! Stai ringiovanendo.' : 
+                                     pace < 0 ? '✨ Ottimo! Invecchiamento rallentato.' :
+                                     pace < 0.5 ? '👍 Nella norma.' : '⚠️ Attenzione! Invecchiamento accelerato.'}
+                                </p>
+                            </div>
+                            
+                            <div className="glass-card p-8 slide-up">
+                                <h3 className="text-sm text-[var(--text-muted)] uppercase tracking-wider mb-4">Statistiche</h3>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between"><span className="text-[var(--text-secondary)]">Giorni</span><span className="font-semibold">{trend.data.length}</span></div>
+                                    <div className="flex justify-between"><span className="text-[var(--text-secondary)]">Bio Age min</span><span className="font-semibold text-[var(--accent-green)]">{Math.min(...trend.data.filter(d => d.biological_age).map(d => d.biological_age)).toFixed(1)}</span></div>
+                                    <div className="flex justify-between"><span className="text-[var(--text-secondary)]">Bio Age max</span><span className="font-semibold text-[var(--accent-orange)]">{Math.max(...trend.data.filter(d => d.biological_age).map(d => d.biological_age)).toFixed(1)}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== ACTIVITY VIEW ====================
+        
+        const ActivityView = ({ token, activities, onRefresh }) => {
+            const [commenting, setCommenting] = useState(null);
+            const [comments, setComments] = useState({});
             
-            return jsonify({'response': ai_clean, 'coach': coach})
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-
-    @app.route('/api/chat/history', methods=['GET'])
-    @token_required
-    def chat_history(current_user):
-        coach = request.args.get('coach', 'sensei')
-        limit = request.args.get('limit', 50, type=int)
-        
-        if coach == 'sensei':
-            msgs = ChatMessage.query.filter(
-                ChatMessage.user_id == current_user.id,
-                or_(ChatMessage.coach == 'sensei', ChatMessage.coach == None)
-            ).order_by(ChatMessage.created_at.desc()).limit(limit).all()
-        else:
-            msgs = ChatMessage.query.filter_by(user_id=current_user.id, coach=coach).order_by(ChatMessage.created_at.desc()).limit(limit).all()
-        
-        msgs.reverse()
-        return jsonify([{'role': m.role, 'content': m.content} for m in msgs])
-
-    @app.route('/api/chat/reset', methods=['DELETE'])
-    @token_required
-    def chat_reset(current_user):
-        coach = request.args.get('coach', 'sensei')
-        if coach == 'sensei':
-            ChatMessage.query.filter(
-                ChatMessage.user_id == current_user.id,
-                or_(ChatMessage.coach == 'sensei', ChatMessage.coach == None)
-            ).delete(synchronize_session=False)
-        else:
-            ChatMessage.query.filter_by(user_id=current_user.id, coach=coach).delete(synchronize_session=False)
-        db.session.commit()
-        return jsonify({'message': f'Chat {coach} resettata'})
-
-    @app.route('/api/chat/memories', methods=['GET'])
-    @token_required
-    def get_memories(current_user):
-        mems = UserMemory.query.filter_by(user_id=current_user.id, is_active=True).all()
-        return jsonify([{'id': m.id, 'category': m.category, 'content': m.content, 'coach': m.coach} for m in mems])
-
-    @app.route('/api/chat/memories/<int:mid>', methods=['DELETE'])
-    @token_required
-    def delete_memory(current_user, mid):
-        m = UserMemory.query.filter_by(id=mid, user_id=current_user.id).first()
-        if m: m.is_active = False; db.session.commit()
-        return jsonify({'message': 'OK'})
-    
-    @app.route('/api/recalculate', methods=['POST'])
-    @token_required
-    def recalculate_bio_age(current_user):
-        """Ricalcola età biologica con formula WHOOP-like"""
-        
-        # Prima assicuriamoci che le colonne esistano
-        try:
-            db.session.execute(db.text('''
-                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS biological_age FLOAT;
-                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_rhr_impact FLOAT;
-                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_vo2_impact FLOAT;
-                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_sleep_impact FLOAT;
-                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_steps_impact FLOAT;
-                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_stress_impact FLOAT;
-                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS bio_age_hrz_impact FLOAT;
-                ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS vo2_max FLOAT;
-            '''))
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-        
-        metrics = DailyMetric.query.filter_by(user_id=current_user.id).all()
-        count = 0
-        real_age = current_user.get_real_age()
-        
-        for metric in metrics:
-            total_impact = 0
+            const getActivityIcon = (type) => {
+                const icons = {
+                    'running': '🏃',
+                    'treadmill_running': '🏃',
+                    'trail_running': '🏃',
+                    'cycling': '🚴',
+                    'indoor_cycling': '🚴',
+                    'virtual_ride': '🚴',
+                    'swimming': '🏊',
+                    'pool_swimming': '🏊',
+                    'open_water_swimming': '🌊',
+                    'walking': '🚶',
+                    'hiking': '🥾',
+                    'strength_training': '💪',
+                    'weightlifting': '🏋️',
+                    'yoga': '🧘',
+                    'pilates': '🧘',
+                    'skiing': '⛷️',
+                    'snowboarding': '🏂',
+                    'golf': '⛳',
+                    'tennis': '🎾',
+                    'rowing': '🚣',
+                    'indoor_rowing': '🚣',
+                    'elliptical': '🏃',
+                    'stair_stepper': '🪜',
+                    'climbing': '🧗',
+                    'surfing': '🏄',
+                    'fitness_equipment': '🏋️',
+                    'cardio': '❤️',
+                    'breathwork': '🌬️',
+                    'meditation': '🧘',
+                    'other': '⚡'
+                };
+                return icons[type] || icons['other'];
+            };
             
-            # 1. RHR (formula WHOOP: +1 anno ogni 10 bpm sopra 60)
-            if metric.resting_hr:
-                rhr = metric.resting_hr
-                metric.bio_age_rhr_impact = round((rhr - 60) / 10, 1)
-                metric.bio_age_rhr_impact = max(-3, min(3, metric.bio_age_rhr_impact))
-                total_impact += metric.bio_age_rhr_impact
-            else:
-                metric.bio_age_rhr_impact = None
+            const formatDuration = (seconds) => {
+                if (!seconds) return '--';
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                return h > 0 ? `${h}h ${m}m` : `${m}m`;
+            };
             
-            # 2. VO2 Max (baseline 42, ogni 5 punti = 1 anno)
-            if metric.vo2_max:
-                vo2 = metric.vo2_max
-                metric.bio_age_vo2_impact = round((42 - vo2) / 5, 1)
-                metric.bio_age_vo2_impact = max(-3, min(3, metric.bio_age_vo2_impact))
-                total_impact += metric.bio_age_vo2_impact
-            else:
-                metric.bio_age_vo2_impact = 0.0
+            const formatDistance = (meters) => {
+                if (!meters) return '--';
+                return (meters / 1000).toFixed(2) + ' km';
+            };
             
-            # 3. Sleep (ottimale 7-8.5h = -0.5, altrimenti penalità)
-            if metric.sleep_seconds and metric.sleep_seconds > 0:
-                sleep_hours = metric.sleep_seconds / 3600
-                if sleep_hours >= 7 and sleep_hours <= 8.5:
-                    metric.bio_age_sleep_impact = -0.5
-                else:
-                    diff = abs(sleep_hours - 7.5)
-                    metric.bio_age_sleep_impact = round(diff * 0.6, 1)
-                metric.bio_age_sleep_impact = max(-2, min(2, metric.bio_age_sleep_impact))
-                total_impact += metric.bio_age_sleep_impact
-            else:
-                metric.bio_age_sleep_impact = None
+            const getAIComment = async (activity) => {
+                setCommenting(activity.id);
+                try {
+                    const res = await fetch(`${API}/api/activity/${activity.id}/comment`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    setComments(prev => ({ ...prev, [activity.id]: data.comment }));
+                } catch (e) {
+                    setComments(prev => ({ ...prev, [activity.id]: 'Errore nel generare il commento' }));
+                }
+                setCommenting(null);
+            };
             
-            # 4. Steps (soglie meno severe)
-            if metric.steps and metric.steps > 0:
-                steps = metric.steps
-                if steps >= 10000: metric.bio_age_steps_impact = -1.0
-                elif steps >= 8000: metric.bio_age_steps_impact = -0.5
-                elif steps >= 6000: metric.bio_age_steps_impact = 0.0
-                elif steps >= 4000: metric.bio_age_steps_impact = 0.5
-                else: metric.bio_age_steps_impact = 1.0
-                total_impact += metric.bio_age_steps_impact
-            else:
-                metric.bio_age_steps_impact = None
+            return (
+                <div className="h-full overflow-y-auto">
+                    <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-10">
+                        <div className="text-center mb-6 sm:mb-10 slide-up">
+                            <h1 className="text-2xl sm:text-4xl font-bold font-display mb-2">Attività</h1>
+                            <p className="text-xs sm:text-base text-[var(--text-muted)]">Ultimi 30 giorni</p>
+                        </div>
+                        
+                        {activities.length === 0 ? (
+                            <div className="glass-card p-6 sm:p-10 text-center">
+                                <span className="text-4xl sm:text-6xl mb-4 block">🏃</span>
+                                <p className="text-[var(--text-muted)]">Nessuna attività</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3 sm:space-y-4">
+                                {activities.map((a, i) => (
+                                    <div key={a.id || i} className="glass-card p-4 sm:p-6 slide-up">
+                                        <div className="flex items-start gap-3 sm:gap-4">
+                                            <div className="text-2xl sm:text-4xl">{getActivityIcon(a.activity_type)}</div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between mb-2 gap-2">
+                                                    <h3 className="font-semibold text-sm sm:text-lg truncate">{a.activity_name || a.activity_type || 'Attività'}</h3>
+                                                    <span className="text-xs sm:text-sm text-[var(--text-muted)] flex-shrink-0">
+                                                        {a.start_time ? new Date(a.start_time).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) : '--'}
+                                                    </span>
+                                                </div>
+                                                
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-3 sm:mb-4">
+                                                    <div>
+                                                        <span className="text-[10px] sm:text-xs text-[var(--text-muted)]">Durata</span>
+                                                        <div className="font-semibold text-sm sm:text-base">{formatDuration(a.duration_seconds)}</div>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] sm:text-xs text-[var(--text-muted)]">Distanza</span>
+                                                        <div className="font-semibold text-sm sm:text-base">{formatDistance(a.distance_meters)}</div>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] sm:text-xs text-[var(--text-muted)]">Calorie</span>
+                                                        <div className="font-semibold text-sm sm:text-base">{a.calories || '--'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] sm:text-xs text-[var(--text-muted)]">HR</span>
+                                                        <div className="font-semibold text-sm sm:text-base">{a.avg_hr || '--'} bpm</div>
+                                                    </div>
+                                                </div>
+                                                
+                                                {a.strain_score && (
+                                                    <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                                                        <span className="text-[10px] sm:text-xs text-[var(--text-muted)]">Strain:</span>
+                                                        <div className="flex-1 h-1.5 sm:h-2 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
+                                                            <div 
+                                                                className="h-full bg-gradient-to-r from-[var(--accent-green)] to-[var(--accent-orange)]"
+                                                                style={{ width: `${(a.strain_score / 21) * 100}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-xs sm:text-sm font-semibold">{a.strain_score}/21</span>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* AI Comment Section */}
+                                                {comments[a.id] ? (
+                                                    <div className="mt-3 sm:mt-4 p-3 sm:p-4 rounded-xl bg-[var(--bg-secondary)] border-l-4 border-[var(--accent-green)]">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <span className="text-base sm:text-lg">🥋</span>
+                                                            <span className="text-xs sm:text-sm font-semibold text-[var(--accent-green)]">Sensei</span>
+                                                        </div>
+                                                        <p className="text-xs sm:text-sm text-[var(--text-secondary)]">{comments[a.id]}</p>
+                                                    </div>
+                                                ) : (
+                                                    <button 
+                                                        onClick={() => getAIComment(a)}
+                                                        disabled={commenting === a.id}
+                                                        className="mt-2 text-xs sm:text-sm text-[var(--accent-green)] hover:underline flex items-center gap-2"
+                                                    >
+                                                        {commenting === a.id ? (
+                                                            <>🔄 Analisi...</>
+                                                        ) : (
+                                                            <>💬 Chiedi a Sensei</>
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== PROFILE VIEW ====================
+        
+        const ProfileView = ({ token, user, onUpdate, onLogout }) => {
+            const [form, setForm] = useState({ name: user?.name || '', birth_year: user?.birth_year || '' });
+            const [saving, setSaving] = useState(false);
+            const [saved, setSaved] = useState(false);
+            const [recalculating, setRecalculating] = useState(false);
+            const [recalcResult, setRecalcResult] = useState(null);
+            const [debugData, setDebugData] = useState(null);
             
-            # 5. HR Zones
-            moderate = metric.moderate_intensity_minutes or 0
-            vigorous = metric.vigorous_intensity_minutes or 0
-            intensity_score = moderate + (vigorous * 2)
-            if intensity_score > 0:
-                if intensity_score >= 45: metric.bio_age_hrz_impact = -1.0
-                elif intensity_score >= 30: metric.bio_age_hrz_impact = -0.5
-                elif intensity_score >= 15: metric.bio_age_hrz_impact = 0.0
-                elif intensity_score >= 5: metric.bio_age_hrz_impact = 0.3
-                else: metric.bio_age_hrz_impact = 0.5
-                total_impact += metric.bio_age_hrz_impact
-            else:
-                metric.bio_age_hrz_impact = None
+            const save = async () => {
+                setSaving(true);
+                try {
+                    const res = await fetch(`${API}/api/profile`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ name: form.name, birth_year: form.birth_year ? parseInt(form.birth_year) : null })
+                    });
+                    if (res.ok) {
+                        setSaved(true);
+                        setTimeout(() => setSaved(false), 2000);
+                        const updated = { ...user, name: form.name, birth_year: parseInt(form.birth_year) };
+                        localStorage.setItem('user', JSON.stringify(updated));
+                        onUpdate(updated);
+                    }
+                } catch {}
+                setSaving(false);
+            };
             
-            # 6. Stress - NON usato in WHOOP
-            metric.bio_age_stress_impact = None
+            const recalculate = async () => {
+                setRecalculating(true);
+                setRecalcResult(null);
+                try {
+                    const res = await fetch(`${API}/api/recalculate`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    setRecalcResult(data.message || 'Fatto!');
+                    setTimeout(() => setRecalcResult(null), 5000);
+                } catch (e) {
+                    setRecalcResult('Errore: ' + e.message);
+                }
+                setRecalculating(false);
+            };
             
-            metric.biological_age = round(real_age + total_impact, 1)
-            count += 1
-        
-        db.session.commit()
-        return jsonify({'message': f'Ricalcolati {count} giorni (formula WHOOP)', 'count': count, 'real_age': real_age})
-    
-    @app.route('/api/debug/bio', methods=['GET'])
-    @token_required
-    def debug_bio(current_user):
-        """Debug: mostra ultimi 5 giorni con tutti i valori"""
-        metrics = DailyMetric.query.filter_by(user_id=current_user.id).order_by(DailyMetric.date.desc()).limit(5).all()
-        return jsonify([{
-            'date': m.date.isoformat(),
-            'sleep_seconds': m.sleep_seconds,
-            'sleep_hours': round(m.sleep_seconds / 3600, 2) if m.sleep_seconds else None,
-            'resting_hr': m.resting_hr,
-            'hrv_last_night': m.hrv_last_night,
-            'hrv_weekly_avg': m.hrv_weekly_avg,
-            'steps': m.steps,
-            'stress_avg': m.stress_avg,
-            'recovery_score': m.recovery_score,
-            'strain_score': m.strain_score,
-            'bio_age_sleep_impact': m.bio_age_sleep_impact,
-            'bio_age_rhr_impact': m.bio_age_rhr_impact,
-            'bio_age_steps_impact': m.bio_age_steps_impact,
-            'bio_age_stress_impact': m.bio_age_stress_impact,
-            'bio_age_hrz_impact': m.bio_age_hrz_impact,
-            'biological_age': m.biological_age
-        } for m in metrics])
-    
-    @app.route('/api/debug/hrv', methods=['GET'])
-    @token_required
-    def debug_hrv(current_user):
-        """Debug: verifica TUTTI i dati disponibili da Garmin"""
-        import os
-        
-        try:
-            from garminconnect import Garmin
-        except ImportError as e:
-            return jsonify({'error': f'Import garminconnect fallito: {str(e)}'}), 500
-        
-        if not current_user.garmin_email:
-            return jsonify({'error': 'Garmin non connesso'}), 400
-        
-        encryption_key = os.environ.get('ENCRYPTION_KEY')
-        if not encryption_key:
-            return jsonify({'error': 'ENCRYPTION_KEY non configurata'}), 500
+            const loadDebug = async () => {
+                try {
+                    const res = await fetch(`${API}/api/debug/bio`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    setDebugData(data);
+                } catch (e) {
+                    setDebugData([{ error: e.message }]);
+                }
+            };
             
-        if not current_user.garmin_password_encrypted:
-            return jsonify({'error': 'Password Garmin non salvata'}), 400
-        
-        try:
-            garmin_password = current_user.get_garmin_password(encryption_key)
-        except Exception as e:
-            return jsonify({'error': f'Decrypt password fallito: {str(e)}'}), 500
-        
-        try:
-            client = Garmin(current_user.garmin_email, garmin_password)
-            client.login()
-        except Exception as e:
-            return jsonify({'error': f'Login Garmin fallito: {str(e)}'}), 500
-        
-        today = date.today()
-        yesterday = today - timedelta(days=1)
-        day_str = yesterday.strftime('%Y-%m-%d')
-        
-        results = {'date': day_str, 'data': {}}
-        
-        # Lista di tutti i metodi da testare
-        methods = [
-            ('stats', lambda: client.get_stats(day_str)),
-            ('hrv', lambda: client.get_hrv_data(day_str)),
-            ('body_battery', lambda: client.get_body_battery(day_str)),
-            ('stress', lambda: client.get_stress_data(day_str)),
-            ('heart_rates', lambda: client.get_heart_rates(day_str)),
-            ('respiration', lambda: client.get_respiration_data(day_str)),
-            ('spo2', lambda: client.get_spo2_data(day_str)),
-            ('sleep', lambda: client.get_sleep_data(day_str)),
-            ('steps', lambda: client.get_steps_data(day_str)),
-            ('floors', lambda: client.get_floors(day_str)),
-            ('intensity_minutes', lambda: client.get_intensity_minutes_data(day_str)),
-            ('rhr', lambda: client.get_rhr_day(day_str)),
-            ('training_status', lambda: client.get_training_status(day_str)),
-            ('training_readiness', lambda: client.get_training_readiness(day_str)),
-            ('max_metrics', lambda: client.get_max_metrics(day_str)),
-            ('fitness_age', lambda: client.get_fitnessage_data(day_str)),
-            ('endurance_score', lambda: client.get_endurance_score(day_str)),
-            ('hill_score', lambda: client.get_hill_score(day_str)),
-            ('race_predictions', lambda: client.get_race_predictions()),
-            ('devices', lambda: client.get_devices()),
-        ]
-        
-        for name, method in methods:
-            try:
-                data = method()
-                # Limita output per evitare risposte enormi
-                if isinstance(data, dict):
-                    results['data'][name] = {k: v for k, v in list(data.items())[:20]}
-                elif isinstance(data, list):
-                    results['data'][name] = data[:5] if len(data) > 5 else data
-                else:
-                    results['data'][name] = data
-            except Exception as e:
-                results['data'][name] = {'error': str(e)}
-        
-        return jsonify(results)
-    
-    @app.route('/api/activity/<int:activity_id>/comment', methods=['POST'])
-    @token_required
-    def get_activity_comment(current_user, activity_id):
-        """Genera un commento AI per un'attività"""
-        if not openai_client:
-            return jsonify({'error': 'OpenAI non configurato'}), 500
-        
-        activity = Activity.query.filter_by(id=activity_id, user_id=current_user.id).first()
-        if not activity:
-            return jsonify({'error': 'Attività non trovata'}), 404
-        
-        # Prepara il contesto dell'attività
-        duration_min = round(activity.duration_seconds / 60) if activity.duration_seconds else 0
-        distance_km = round(activity.distance_meters / 1000, 2) if activity.distance_meters else 0
-        
-        prompt = f"""Analizza brevemente questa attività sportiva e dai un commento motivazionale/tecnico in 2-3 frasi.
-
-Attività: {activity.activity_name or activity.activity_type}
-Durata: {duration_min} minuti
-Distanza: {distance_km} km
-Calorie: {activity.calories or 'N/A'}
-HR Media: {activity.avg_hr or 'N/A'} bpm
-HR Max: {activity.max_hr or 'N/A'} bpm
-Effetto Aerobico: {activity.aerobic_effect or 'N/A'}
-Strain: {activity.strain_score or 'N/A'}/21
-
-Rispondi in italiano, in modo diretto e motivante."""
-
-        try:
-            response = openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "Sei Sensei, un coach sportivo esperto. Dai feedback brevi e motivanti sulle attività."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=150,
-                temperature=0.7
-            )
-            comment = response.choices[0].message.content
-            return jsonify({'comment': comment})
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/tts', methods=['POST'])
-    @token_required
-    def text_to_speech(current_user):
-        """Converte testo in audio usando OpenAI TTS con istruzioni vocali"""
-        if not openai_client:
-            return jsonify({'error': 'OpenAI non configurato'}), 500
-        
-        import re
-        import base64
-        
-        data = request.get_json()
-        text = data.get('text', '')[:2000]
-        coach = data.get('coach', 'sensei')
-        
-        if not text:
-            return jsonify({'error': 'Testo vuoto'}), 400
-        
-        # Pulisci testo da formattazioni markdown
-        clean_text = text
-        clean_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', clean_text)
-        clean_text = re.sub(r'\*([^*]+)\*', r'\1', clean_text)
-        clean_text = re.sub(r'#{1,6}\s*', '', clean_text)
-        clean_text = re.sub(r'---+', '', clean_text)
-        clean_text = re.sub(r'\[PAUSA:\d+\]', '', clean_text)
-        clean_text = clean_text.strip()
-        
-        if not clean_text:
-            return jsonify({'error': 'Testo vuoto dopo pulizia'}), 400
-        
-        # Configurazione voci con istruzioni
-        if coach == 'sensei':
-            voice = 'ash'
-            instructions = """Voice Affect: Calm, confident, grounded; embody expertise and trust.
-Tone: Warm, motivating, reassuring; convey genuine support and professionalism.
-Pacing: Measured, steady, natural; pause briefly after key points to let advice sink in.
-Emotion: Encouraging and supportive; express genuine care for the listener's progress.
-Pronunciation: Clear, precise Italian articulation, natural flow.
-Pauses: Use brief pauses after important recommendations, enhancing clarity and impact."""
-        else:
-            voice = 'nova'
-            instructions = """Voice Affect: Soft, gentle, soothing; embody tranquility.
-Tone: Calm, reassuring, peaceful; convey genuine warmth and serenity.
-Pacing: Slow, deliberate, and unhurried; pause gently after instructions to allow the listener time to relax and follow along.
-Emotion: Deeply soothing and comforting; express genuine kindness and care.
-Pronunciation: Smooth, soft articulation, slightly elongating vowels to create a sense of ease.
-Pauses: Use thoughtful pauses, especially between breathing instructions and visualization guidance, enhancing relaxation and mindfulness."""
-        
-        try:
-            response = openai_client.audio.speech.create(
-                model="gpt-4o-mini-tts",
-                voice=voice,
-                input=clean_text,
-                instructions=instructions,
-                response_format="mp3"
-            )
+            const age = form.birth_year ? new Date().getFullYear() - parseInt(form.birth_year) : null;
             
-            audio_b64 = base64.b64encode(response.content).decode('utf-8')
-            return jsonify({'audio': audio_b64, 'format': 'mp3'})
+            return (
+                <div className="h-full overflow-y-auto">
+                    <div className="max-w-2xl mx-auto p-4 sm:p-8">
+                        <div className="text-center mb-6 sm:mb-10 slide-up">
+                            <h1 className="text-2xl sm:text-4xl font-bold font-display mb-2">Profilo</h1>
+                            <p className="text-xs sm:text-base text-[var(--text-muted)]">Gestisci il tuo account</p>
+                        </div>
+                        
+                        <div className="glass-card p-5 sm:p-8 mb-4 sm:mb-6 slide-up">
+                            <h3 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6">Informazioni Personali</h3>
+                            <div className="space-y-4 sm:space-y-5">
+                                <div>
+                                    <label className="text-xs sm:text-sm text-[var(--text-muted)] block mb-2">Nome</label>
+                                    <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})}
+                                        className="input-premium w-full px-4 py-3 sm:px-5 sm:py-4 rounded-xl text-base" placeholder="Il tuo nome" />
+                                </div>
+                                <div>
+                                    <label className="text-xs sm:text-sm text-[var(--text-muted)] block mb-2">Anno di nascita</label>
+                                    <input type="number" value={form.birth_year} onChange={e => setForm({...form, birth_year: e.target.value})}
+                                        className="input-premium w-full px-4 py-3 sm:px-5 sm:py-4 rounded-xl text-base" placeholder="1976" />
+                                    {age && <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-2">Età: {age} anni</p>}
+                                </div>
+                                <button onClick={save} disabled={saving} className="btn-primary w-full py-4 rounded-xl text-lg">
+                                    {saving ? 'Salvataggio...' : saved ? '✓ Salvato!' : 'Salva Modifiche'}
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="glass-card p-8 mb-6 slide-up">
+                            <h3 className="text-lg font-semibold mb-6">Account</h3>
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center py-3 border-b border-[var(--border)]">
+                                    <span className="text-[var(--text-muted)]">Email</span>
+                                    <span>{user?.email}</span>
+                                </div>
+                                <div className="flex justify-between items-center py-3">
+                                    <span className="text-[var(--text-muted)]">Garmin</span>
+                                    <span className={user?.garmin_connected ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}>
+                                        {user?.garmin_connected ? '✓ Connesso' : '✗ Non connesso'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="glass-card p-8 mb-6 slide-up">
+                            <h3 className="text-lg font-semibold mb-4">Ricalcola Età Biologica</h3>
+                            <p className="text-sm text-[var(--text-muted)] mb-4">
+                                Ricalcola l'età biologica per tutti i dati storici usando la formula aggiornata.
+                            </p>
+                            <button onClick={recalculate} disabled={recalculating} 
+                                className="btn-primary w-full py-4 rounded-xl text-lg mb-4">
+                                {recalculating ? '🔄 Ricalcolo in corso...' : '🧬 Ricalcola Tutto'}
+                            </button>
+                            {recalcResult && (
+                                <p className="text-center text-[var(--accent-green)] mb-4">{recalcResult}</p>
+                            )}
+                            
+                            <button onClick={loadDebug} className="btn-ghost w-full py-3 rounded-xl text-sm">
+                                🔍 Debug: Mostra ultimi 5 giorni
+                            </button>
+                            
+                            {debugData && (
+                                <div className="mt-4 p-4 rounded-xl text-xs font-mono overflow-x-auto" style={{ background: 'var(--bg-secondary)' }}>
+                                    {debugData.map((d, i) => (
+                                        <div key={i} className="mb-3 pb-3 border-b border-[var(--border)] last:border-0">
+                                            <div className="text-[var(--accent-green)] font-bold">{d.date}</div>
+                                            <div>Sonno: {d.sleep_hours}h → impatto: <span className={d.bio_age_sleep_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_sleep_impact}</span></div>
+                                            <div>RHR: {d.resting_hr} → impatto: <span className={d.bio_age_rhr_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_rhr_impact}</span></div>
+                                            <div>Passi: {d.steps} → impatto: <span className={d.bio_age_steps_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_steps_impact}</span></div>
+                                            <div>Stress: {d.stress_avg} → impatto: <span className={d.bio_age_stress_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_stress_impact}</span></div>
+                                            <div>HRZ: impatto: <span className={d.bio_age_hrz_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_hrz_impact}</span></div>
+                                            <div className="mt-1 font-bold">Bio Age: {d.biological_age}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        
+                        <button onClick={onLogout} className="btn-ghost w-full py-4 rounded-xl">Logout</button>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== AUTH PAGES ====================
+        
+        const LandingPage = ({ onNavigate }) => (
+            <div className="h-full flex flex-col items-center justify-center p-8">
+                <div className="flex gap-6 mb-8">
+                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl glow-green" style={{ background: 'var(--accent-green-dim)' }}>🥋</div>
+                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl glow-pink" style={{ background: 'var(--accent-pink-dim)' }}>🌸</div>
+                </div>
+                <h1 className="text-5xl font-bold font-display mb-3">SENSEI & SAKURA</h1>
+                <p className="text-xl text-[var(--text-secondary)] mb-2">Performance Lab</p>
+                <p className="text-[var(--text-muted)] mb-10 max-w-md text-center">Il tuo centro medico sportivo digitale. Corpo e mente in perfetto equilibrio.</p>
+                <div className="flex gap-4">
+                    <button onClick={() => onNavigate('login')} className="btn-primary px-10 py-4 rounded-xl text-lg">Accedi</button>
+                    <button onClick={() => onNavigate('register')} className="btn-ghost px-10 py-4 rounded-xl text-lg">Registrati</button>
+                </div>
+            </div>
+        );
+        
+        const LoginPage = ({ onNavigate, onLogin }) => {
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
             
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    
-    return app
-
-
-def _metric_to_dict(m: DailyMetric) -> dict:
-    """Converte DailyMetric in dict"""
-    return {
-        'date': m.date.isoformat(),
-        'scores': {
-            'recovery': m.recovery_score,
-            'strain': m.strain_score,
-            'sleep_performance': m.sleep_performance
-        },
-        'heart': {
-            'resting_hr': m.resting_hr,
-            'min_hr': m.min_hr,
-            'max_hr': m.max_hr,
-            'hrv_last_night': m.hrv_last_night
-        },
-        'body_battery': {
-            'high': m.body_battery_high,
-            'low': m.body_battery_low,
-            'charged': m.body_battery_charged,
-            'drained': m.body_battery_drained
-        },
-        'sleep': {
-            'total_hours': round(m.sleep_seconds / 3600, 1) if m.sleep_seconds else None,
-            'deep_hours': round(m.deep_sleep_seconds / 3600, 1) if m.deep_sleep_seconds else None,
-            'light_hours': round(m.light_sleep_seconds / 3600, 1) if m.light_sleep_seconds else None,
-            'rem_hours': round(m.rem_sleep_seconds / 3600, 1) if m.rem_sleep_seconds else None,
-            'awake_hours': round(m.awake_seconds / 3600, 1) if m.awake_seconds else None,
-            'score': m.sleep_score,
-            'start': m.sleep_start.strftime('%H:%M') if m.sleep_start else None,
-            'end': m.sleep_end.strftime('%H:%M') if m.sleep_end else None
-        },
-        'stress': {
-            'average': m.stress_avg,
-            'max': m.stress_max
-        },
-        'activity': {
-            'steps': m.steps,
-            'calories': m.total_calories,
-            'active_calories': m.active_calories,
-            'distance_km': round(m.distance_meters / 1000, 2) if m.distance_meters else None,
-            'moderate_minutes': m.moderate_intensity_minutes,
-            'vigorous_minutes': m.vigorous_intensity_minutes
-        },
-        'respiration': {
-            'average': m.avg_respiration,
-            'min': m.min_respiration,
-            'max': m.max_respiration
-        },
-        'spo2': {
-            'average': m.avg_spo2,
-            'min': m.min_spo2
-        }
-    }
-
-
-# Entry point
-app = create_app()
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+            const submit = async (e) => {
+                e.preventDefault();
+                setLoading(true); setError('');
+                try {
+                    const res = await fetch(`${API}/api/login`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    const data = await res.json();
+                    if (data.token) {
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                        onLogin(data);
+                    } else setError(data.error || 'Login fallito');
+                } catch { setError('Errore di connessione'); }
+                setLoading(false);
+            };
+            
+            return (
+                <div className="h-full flex items-center justify-center p-8">
+                    <form onSubmit={submit} className="w-full max-w-md">
+                        <div className="text-center mb-10">
+                            <h1 className="text-4xl font-bold font-display mb-2">Bentornato</h1>
+                            <p className="text-[var(--text-muted)]">Accedi al tuo Performance Lab</p>
+                        </div>
+                        {error && <div className="glass-card border-[var(--accent-red)] p-4 mb-6 text-[var(--accent-red)] text-sm">{error}</div>}
+                        <div className="space-y-4 mb-6">
+                            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Email" required />
+                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Password" required />
+                        </div>
+                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 rounded-xl text-lg mb-6">{loading ? 'Accesso...' : 'Accedi'}</button>
+                        <p className="text-center text-[var(--text-muted)]">Non hai un account? <button type="button" onClick={() => onNavigate('register')} className="text-[var(--accent-green)]">Registrati</button></p>
+                    </form>
+                </div>
+            );
+        };
+        
+        const RegisterPage = ({ onNavigate }) => {
+            const [form, setForm] = useState({ email: '', password: '', birth_year: '', name: '' });
+            const [error, setError] = useState('');
+            const [success, setSuccess] = useState(false);
+            const [loading, setLoading] = useState(false);
+            
+            const submit = async (e) => {
+                e.preventDefault();
+                if (!form.birth_year) { setError('Anno di nascita richiesto'); return; }
+                setLoading(true); setError('');
+                try {
+                    const res = await fetch(`${API}/api/register`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...form, birth_year: parseInt(form.birth_year) })
+                    });
+                    const data = await res.json();
+                    if (data.user_id) setSuccess(true);
+                    else setError(data.error || 'Errore');
+                } catch { setError('Errore di connessione'); }
+                setLoading(false);
+            };
+            
+            if (success) return (
+                <div className="h-full flex items-center justify-center p-8">
+                    <div className="text-center glass-card p-12">
+                        <div className="text-6xl mb-6">🎉</div>
+                        <h2 className="text-3xl font-bold font-display text-[var(--accent-green)] mb-4">Account Creato!</h2>
+                        <button onClick={() => onNavigate('login')} className="btn-primary px-10 py-4 rounded-xl text-lg">Accedi Ora</button>
+                    </div>
+                </div>
+            );
+            
+            return (
+                <div className="h-full flex items-center justify-center p-8">
+                    <form onSubmit={submit} className="w-full max-w-md">
+                        <div className="text-center mb-10">
+                            <h1 className="text-4xl font-bold font-display mb-2">Registrazione</h1>
+                            <p className="text-[var(--text-muted)]">Crea il tuo account Performance Lab</p>
+                        </div>
+                        {error && <div className="glass-card border-[var(--accent-red)] p-4 mb-6 text-[var(--accent-red)] text-sm">{error}</div>}
+                        <div className="space-y-4 mb-6">
+                            <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Nome" />
+                            <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Email" required />
+                            <input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Password (min 6)" required minLength="6" />
+                            <input type="number" value={form.birth_year} onChange={e => setForm({...form, birth_year: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Anno di nascita *" required />
+                        </div>
+                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 rounded-xl text-lg mb-6">{loading ? 'Registrazione...' : 'Crea Account'}</button>
+                        <p className="text-center text-[var(--text-muted)]">Hai già un account? <button type="button" onClick={() => onNavigate('login')} className="text-[var(--accent-green)]">Accedi</button></p>
+                    </form>
+                </div>
+            );
+        };
+        
+        const SetupPage = ({ token, onComplete }) => {
+            const [garmin, setGarmin] = useState({ email: '', password: '' });
+            const [error, setError] = useState('');
+            const [step, setStep] = useState(1);
+            const [loading, setLoading] = useState(false);
+            
+            const connect = async (e) => {
+                e.preventDefault();
+                setLoading(true); setError('');
+                try {
+                    const res = await fetch(`${API}/api/garmin/connect`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ garmin_email: garmin.email, garmin_password: garmin.password })
+                    });
+                    const data = await res.json();
+                    if (data.message?.includes('collegato')) {
+                        setStep(2);
+                        await fetch(`${API}/api/sync`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ days_back: 90 })
+                        });
+                        setStep(3);
+                        setTimeout(onComplete, 2000);
+                    } else setError(data.error || 'Errore');
+                } catch { setError('Errore di connessione'); }
+                setLoading(false);
+            };
+            
+            if (step >= 2) return (
+                <div className="h-full flex items-center justify-center">
+                    <div className="text-center glass-card p-12">
+                        {step === 2 ? (
+                            <>
+                                <div className="w-16 h-16 border-4 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin mx-auto mb-6" />
+                                <h3 className="text-2xl font-bold mb-2">Sincronizzazione</h3>
+                                <p className="text-[var(--text-muted)]">Importazione dati degli ultimi 90 giorni...</p>
+                            </>
+                        ) : (
+                            <>
+                                <div className="text-6xl mb-6">✓</div>
+                                <h3 className="text-2xl font-bold text-[var(--accent-green)] mb-2">Tutto Pronto!</h3>
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+            
+            return (
+                <div className="h-full flex items-center justify-center p-8">
+                    <form onSubmit={connect} className="w-full max-w-md">
+                        <div className="text-center mb-10">
+                            <div className="text-5xl mb-4">⌚</div>
+                            <h1 className="text-4xl font-bold font-display mb-2">Connetti Garmin</h1>
+                            <p className="text-[var(--text-muted)]">Sincronizza i tuoi dati</p>
+                        </div>
+                        {error && <div className="glass-card border-[var(--accent-red)] p-4 mb-6 text-[var(--accent-red)] text-sm">{error}</div>}
+                        <div className="glass-card p-4 mb-6 text-sm text-[var(--text-muted)]">🔒 Le tue credenziali sono criptate</div>
+                        <div className="space-y-4 mb-6">
+                            <input type="email" value={garmin.email} onChange={e => setGarmin({...garmin, email: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Email Garmin" required />
+                            <input type="password" value={garmin.password} onChange={e => setGarmin({...garmin, password: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Password Garmin" required />
+                        </div>
+                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 rounded-xl text-lg">{loading ? 'Connessione...' : 'Connetti'}</button>
+                    </form>
+                </div>
+            );
+        };
+        
+        // ==================== DASHBOARD ====================
+        
+        const Dashboard = ({ token, user, onLogout, onUserUpdate }) => {
+            const [tab, setTab] = useState('data');
+            const [summary, setSummary] = useState(null);
+            const [trend, setTrend] = useState(null);
+            const [activities, setActivities] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [syncing, setSyncing] = useState(false);
+            
+            useEffect(() => { fetchData(); }, []);
+            
+            const fetchData = async () => {
+                try {
+                    const headers = { 'Authorization': `Bearer ${token}` };
+                    const [s, t, a] = await Promise.all([
+                        fetch(`${API}/api/metrics/summary?days=30`, { headers }).then(r => r.ok ? r.json() : {}),
+                        fetch(`${API}/api/metrics/trend?days=90`, { headers }).then(r => r.ok ? r.json() : {}),
+                        fetch(`${API}/api/activities?days=30`, { headers }).then(r => r.ok ? r.json() : [])
+                    ]);
+                    setSummary(s); setTrend(t); setActivities(a);
+                } catch {}
+                setLoading(false);
+            };
+            
+            const sync = async () => {
+                setSyncing(true);
+                try {
+                    await fetch(`${API}/api/sync`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ days_back: 14 })
+                    });
+                    await fetchData();
+                } catch {}
+                setSyncing(false);
+            };
+            
+            if (loading) return <Loading />;
+            
+            return (
+                <div className="h-full flex">
+                    {/* Sidebar */}
+                    <nav className="w-16 sm:w-20 lg:w-72 border-r border-[var(--border)] bg-[var(--bg-secondary)] flex flex-col flex-shrink-0">
+                        <div className="p-2 sm:p-4 lg:p-6 border-b border-[var(--border)]">
+                            <h1 className="hidden lg:block text-xl font-bold font-display">Performance Lab</h1>
+                            <span className="lg:hidden text-xl sm:text-2xl block text-center">⚡</span>
+                        </div>
+                        
+                        <div className="flex-1 p-2 sm:p-3 space-y-1 sm:space-y-2 overflow-y-auto">
+                            {/* Dashboard */}
+                            <button onClick={() => setTab('data')}
+                                className={`nav-item w-full ${tab === 'data' ? 'active' : ''}`}>
+                                <span className="text-lg sm:text-xl lg:text-2xl">📊</span>
+                                <span className="hidden lg:block text-sm">Dashboard</span>
+                            </button>
+                            
+                            {/* Coaches Section */}
+                            <div className="pt-2 sm:pt-4 pb-1 sm:pb-2">
+                                <span className="hidden lg:block text-xs text-[var(--text-muted)] uppercase tracking-wider px-3">I tuoi coach</span>
+                            </div>
+                            
+                            {/* Sensei */}
+                            <button onClick={() => setTab('sensei')}
+                                className={`w-full rounded-xl p-2 sm:p-3 transition-all ${tab === 'sensei' ? 'bg-[var(--accent-green-dim)] border border-[var(--accent-green)]' : 'hover:bg-[var(--bg-card)]'}`}>
+                                <div className="flex flex-col lg:flex-row items-center gap-2 sm:gap-3">
+                                    <img src="/images/sensei.png" alt="Sensei" className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full object-cover border-2 border-[var(--accent-green)]" />
+                                    <div className="hidden lg:block text-left">
+                                        <div className="font-semibold text-[var(--accent-green)]">Dr. Sensei</div>
+                                        <div className="text-xs text-[var(--text-muted)]">Sport & Performance</div>
+                                    </div>
+                                </div>
+                            </button>
+                            
+                            {/* Sakura */}
+                            <button onClick={() => setTab('sakura')}
+                                className={`w-full rounded-xl p-2 sm:p-3 transition-all ${tab === 'sakura' ? 'bg-[var(--accent-pink-dim)] border border-[var(--accent-pink)]' : 'hover:bg-[var(--bg-card)]'}`}>
+                                <div className="flex flex-col lg:flex-row items-center gap-2 sm:gap-3">
+                                    <img src="/images/sakura.png" alt="Sakura" className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full object-cover border-2 border-[var(--accent-pink)]" />
+                                    <div className="hidden lg:block text-left">
+                                        <div className="font-semibold text-[var(--accent-pink)]">Dr. Sakura</div>
+                                        <div className="text-xs text-[var(--text-muted)]">Mente & Benessere</div>
+                                    </div>
+                                </div>
+                            </button>
+                            
+                            {/* Other nav items */}
+                            <div className="pt-2 sm:pt-4 pb-1 sm:pb-2">
+                                <span className="hidden lg:block text-xs text-[var(--text-muted)] uppercase tracking-wider px-3">Analisi</span>
+                            </div>
+                            
+                            <button onClick={() => setTab('trend')}
+                                className={`nav-item w-full ${tab === 'trend' ? 'active' : ''}`}>
+                                <span className="text-lg sm:text-xl lg:text-2xl">📈</span>
+                                <span className="hidden lg:block text-sm">Trend</span>
+                            </button>
+                            
+                            <button onClick={() => setTab('activities')}
+                                className={`nav-item w-full ${tab === 'activities' ? 'active' : ''}`}>
+                                <span className="text-lg sm:text-xl lg:text-2xl">🏃</span>
+                                <span className="hidden lg:block text-sm">Attività</span>
+                            </button>
+                            
+                            <button onClick={() => setTab('profile')}
+                                className={`nav-item w-full ${tab === 'profile' ? 'active' : ''}`}>
+                                <span className="text-lg sm:text-xl lg:text-2xl">⚙️</span>
+                                <span className="hidden lg:block text-sm">Impostazioni</span>
+                            </button>
+                        </div>
+                        
+                        <div className="p-2 sm:p-3 border-t border-[var(--border)]">
+                            <button onClick={sync} disabled={syncing} className="nav-item w-full">
+                                <span className={`text-lg sm:text-xl ${syncing ? 'animate-spin' : ''}`}>🔄</span>
+                                <span className="hidden lg:block text-sm">{syncing ? 'Sync...' : 'Sincronizza'}</span>
+                            </button>
+                        </div>
+                    </nav>
+                    
+                    {/* Content */}
+                    <main className="flex-1 overflow-hidden">
+                        {tab === 'data' && <DataView summary={summary} />}
+                        {tab === 'sensei' && <ChatView token={token} coach="sensei" />}
+                        {tab === 'sakura' && <ChatView token={token} coach="sakura" />}
+                        {tab === 'trend' && <TrendView trend={trend} realAge={summary?.real_age || 42} />}
+                        {tab === 'activities' && <ActivityView token={token} activities={activities} onRefresh={fetchData} />}
+                        {tab === 'profile' && <ProfileView token={token} user={user} onUpdate={onUserUpdate} onLogout={onLogout} />}
+                    </main>
+                </div>
+            );
+        };
+        
+        // ==================== APP ====================
+        
+        const App = () => {
+            const [page, setPage] = useState('landing');
+            const [token, setToken] = useState(localStorage.getItem('token'));
+            const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
+            
+            useEffect(() => {
+                if (token && user) setPage(user.garmin_connected ? 'dashboard' : 'setup');
+            }, []);
+            
+            const handleLogin = (data) => { setToken(data.token); setUser(data.user); setPage(data.user.garmin_connected ? 'dashboard' : 'setup'); };
+            const handleLogout = () => { localStorage.clear(); setToken(null); setUser(null); setPage('landing'); };
+            const handleSetupComplete = () => { const u = { ...user, garmin_connected: true }; setUser(u); localStorage.setItem('user', JSON.stringify(u)); setPage('dashboard'); };
+            
+            return (
+                <div className="h-full">
+                    {page === 'landing' && <LandingPage onNavigate={setPage} />}
+                    {page === 'login' && <LoginPage onNavigate={setPage} onLogin={handleLogin} />}
+                    {page === 'register' && <RegisterPage onNavigate={setPage} />}
+                    {page === 'setup' && <SetupPage token={token} onComplete={handleSetupComplete} />}
+                    {page === 'dashboard' && <Dashboard token={token} user={user} onLogout={handleLogout} onUserUpdate={setUser} />}
+                </div>
+            );
+        };
+        
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
