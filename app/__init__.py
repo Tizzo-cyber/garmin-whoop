@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.5.1 - Ask coach from Stats - 2024-12-07
+Version: 2.6.0 - Time-aware coach + period comparison + year sync - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -347,74 +347,65 @@ def create_app():
     @app.route('/api/metrics/period', methods=['GET'])
     @token_required
     def get_period_metrics(current_user):
-        """Ottieni metriche per periodo: day, week, month, year"""
+        """Ottieni metriche per periodo: day, week, month, year + 3 precedenti"""
         period_type = request.args.get('type', 'week')
         offset = request.args.get('offset', 0, type=int)
         
         today = date.today()
         
-        # Calcola date in base al periodo
-        if period_type == 'day':
-            target_date = today + timedelta(days=offset)
-            start_date = target_date
-            end_date = target_date
-            label = target_date.strftime('%d %b %Y')
-        elif period_type == 'week':
-            start_of_week = today - timedelta(days=today.weekday())
-            start_date = start_of_week + timedelta(weeks=offset)
-            end_date = start_date + timedelta(days=6)
-            label = f"{start_date.strftime('%d %b')} - {end_date.strftime('%d %b')}"
-        elif period_type == 'month':
-            target_month = today.month + offset
-            target_year = today.year
-            while target_month < 1:
-                target_month += 12
-                target_year -= 1
-            while target_month > 12:
-                target_month -= 12
-                target_year += 1
-            start_date = date(target_year, target_month, 1)
-            if target_month == 12:
-                end_date = date(target_year + 1, 1, 1) - timedelta(days=1)
-            else:
-                end_date = date(target_year, target_month + 1, 1) - timedelta(days=1)
-            label = start_date.strftime('%B %Y')
-        else:  # year
-            target_year = today.year + offset
-            start_date = date(target_year, 1, 1)
-            end_date = date(target_year, 12, 31)
-            label = str(target_year)
+        def get_period_range(ptype, off):
+            """Calcola range date per un periodo"""
+            if ptype == 'day':
+                target_date = today + timedelta(days=off)
+                return target_date, target_date, target_date.strftime('%d %b')
+            elif ptype == 'week':
+                start_of_week = today - timedelta(days=today.weekday())
+                start_date = start_of_week + timedelta(weeks=off)
+                end_date = start_date + timedelta(days=6)
+                return start_date, end_date, f"{start_date.strftime('%d %b')} - {end_date.strftime('%d %b')}"
+            elif ptype == 'month':
+                target_month = today.month + off
+                target_year = today.year
+                while target_month < 1:
+                    target_month += 12
+                    target_year -= 1
+                while target_month > 12:
+                    target_month -= 12
+                    target_year += 1
+                start_date = date(target_year, target_month, 1)
+                if target_month == 12:
+                    end_date = date(target_year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    end_date = date(target_year, target_month + 1, 1) - timedelta(days=1)
+                return start_date, end_date, start_date.strftime('%B %Y')
+            else:  # year
+                target_year = today.year + off
+                return date(target_year, 1, 1), date(target_year, 12, 31), str(target_year)
         
-        metrics = DailyMetric.query.filter(
-            DailyMetric.user_id == current_user.id,
-            DailyMetric.date >= start_date,
-            DailyMetric.date <= end_date
-        ).order_by(DailyMetric.date.asc()).all()
-        
-        activities = Activity.query.filter(
-            Activity.user_id == current_user.id,
-            Activity.start_time >= datetime.combine(start_date, datetime.min.time()),
-            Activity.start_time <= datetime.combine(end_date, datetime.max.time())
-        ).order_by(Activity.start_time.desc()).all()
-        
-        def avg(lst):
-            vals = [x for x in lst if x is not None]
-            return round(sum(vals)/len(vals), 1) if vals else None
-        
-        def total(lst):
-            vals = [x for x in lst if x is not None]
-            return sum(vals) if vals else 0
-        
-        data = {
-            'period': {
-                'type': period_type,
-                'label': label,
-                'start': start_date.isoformat(),
-                'end': end_date.isoformat(),
-                'days_total': (end_date - start_date).days + 1,
-                'days_with_data': len(metrics)
-            },
-            'metrics': {
+        def calc_metrics(start_date, end_date):
+            """Calcola metriche per un range di date"""
+            metrics = DailyMetric.query.filter(
+                DailyMetric.user_id == current_user.id,
+                DailyMetric.date >= start_date,
+                DailyMetric.date <= end_date
+            ).all()
+            
+            activities = Activity.query.filter(
+                Activity.user_id == current_user.id,
+                Activity.start_time >= datetime.combine(start_date, datetime.min.time()),
+                Activity.start_time <= datetime.combine(end_date, datetime.max.time())
+            ).all()
+            
+            def avg(lst):
+                vals = [x for x in lst if x is not None]
+                return round(sum(vals)/len(vals), 1) if vals else None
+            
+            def total(lst):
+                vals = [x for x in lst if x is not None]
+                return sum(vals) if vals else 0
+            
+            return {
+                'days_with_data': len(metrics),
                 'rhr': avg([m.resting_hr for m in metrics]),
                 'hrv': avg([m.hrv_last_night for m in metrics]),
                 'sleep_hours': avg([m.sleep_seconds/3600 if m.sleep_seconds else None for m in metrics]),
@@ -435,7 +426,54 @@ def create_app():
                 'recovery': avg([m.recovery_score for m in metrics]),
                 'strain': avg([m.strain_score for m in metrics]),
                 'spo2': avg([m.avg_spo2 for m in metrics]),
+                'activity_count': len(activities),
+                'activity_duration_min': round(sum([a.duration_seconds/60 for a in activities if a.duration_seconds])),
+                'activity_calories': sum([a.calories for a in activities if a.calories]),
+            }
+        
+        # Periodo corrente
+        start_date, end_date, label = get_period_range(period_type, offset)
+        current_metrics = calc_metrics(start_date, end_date)
+        
+        # 3 periodi precedenti per confronto
+        previous = []
+        for i in range(1, 4):
+            prev_start, prev_end, prev_label = get_period_range(period_type, offset - i)
+            prev_metrics = calc_metrics(prev_start, prev_end)
+            previous.append({
+                'label': prev_label,
+                'start': prev_start.isoformat(),
+                'end': prev_end.isoformat(),
+                'metrics': prev_metrics
+            })
+        
+        # Dati giornalieri per il periodo corrente
+        daily_metrics = DailyMetric.query.filter(
+            DailyMetric.user_id == current_user.id,
+            DailyMetric.date >= start_date,
+            DailyMetric.date <= end_date
+        ).order_by(DailyMetric.date.asc()).all()
+        
+        # Attività del periodo corrente
+        activities = Activity.query.filter(
+            Activity.user_id == current_user.id,
+            Activity.start_time >= datetime.combine(start_date, datetime.min.time()),
+            Activity.start_time <= datetime.combine(end_date, datetime.max.time())
+        ).order_by(Activity.start_time.desc()).all()
+        
+        data = {
+            'period': {
+                'type': period_type,
+                'label': label,
+                'start': start_date.isoformat(),
+                'end': end_date.isoformat(),
+                'days_total': (end_date - start_date).days + 1,
+                'days_with_data': current_metrics['days_with_data']
             },
+            'current_time': datetime.now().strftime('%H:%M'),
+            'current_hour': datetime.now().hour,
+            'metrics': current_metrics,
+            'previous': previous,
             'daily': [{
                 'date': m.date.isoformat(),
                 'day': m.date.strftime('%a'),
@@ -447,7 +485,7 @@ def create_app():
                 'recovery': m.recovery_score,
                 'strain': m.strain_score,
                 'body_battery_high': m.body_battery_high,
-            } for m in metrics],
+            } for m in daily_metrics],
             'activities': [{
                 'name': a.activity_name or a.activity_type,
                 'type': a.activity_type,

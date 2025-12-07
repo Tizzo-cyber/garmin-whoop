@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Version 2.5.1 - Ask coach from Stats - 2024-12-07 -->
+<!-- Version 2.6.0 - Time-aware coach + period comparison + year sync - 2024-12-07 -->
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -1039,24 +1039,61 @@
                 if (!data) return;
                 const m = data.metrics;
                 const periodLabel = getPeriodLabel();
+                const hour = data.current_hour;
+                const time = data.current_time;
+                
+                // Intro con ora
+                let timeContext = '';
+                if (period === 'day' && offset === 0) {
+                    if (hour < 12) timeContext = `Sono le ${time}, mattina. `;
+                    else if (hour < 17) timeContext = `Sono le ${time}, pomeriggio. `;
+                    else timeContext = `Sono le ${time}, sera. `;
+                }
                 
                 // Costruisci messaggio con i dati del periodo
-                let msg = `Analizza i miei dati di ${periodLabel}:\n`;
-                msg += `📊 Passi: ${m.steps_total?.toLocaleString() || 'N/D'} totali`;
-                if (m.steps_avg) msg += ` (${Math.round(m.steps_avg)}/giorno)`;
-                msg += `\n🔥 Calorie: ${m.calories_total?.toLocaleString() || 'N/D'}`;
-                msg += `\n📏 Distanza: ${m.distance_km || 0} km`;
-                msg += `\n😴 Sonno: ${m.sleep_hours?.toFixed(1) || 'N/D'}h media`;
+                let msg = `${timeContext}Analizza i miei dati di ${periodLabel}:\n\n`;
+                msg += `📊 **PERIODO ATTUALE**\n`;
+                msg += `• Passi: ${m.steps_total?.toLocaleString() || 'N/D'}`;
+                if (m.steps_avg && period !== 'day') msg += ` (${Math.round(m.steps_avg)}/giorno)`;
+                msg += `\n• Calorie: ${m.calories_total?.toLocaleString() || 'N/D'}`;
+                msg += `\n• Distanza: ${m.distance_km || 0} km`;
+                msg += `\n• Sonno: ${m.sleep_hours?.toFixed(1) || 'N/D'}h media`;
                 if (m.deep_sleep_min) msg += ` (Deep: ${Math.round(m.deep_sleep_min)}min)`;
-                msg += `\n❤️ RHR: ${m.rhr || 'N/D'} bpm`;
-                msg += `\n😤 Stress: ${m.stress_avg || 'N/D'} medio`;
-                msg += `\n⚡ Recovery: ${m.recovery || 'N/D'}%`;
-                msg += `\n🔥 Strain: ${m.strain?.toFixed(1) || 'N/D'}/21`;
-                msg += `\n🔋 Body Battery: ${m.body_battery_low || 'N/D'}-${m.body_battery_high || 'N/D'}`;
-                if (data.activity_count > 0) {
-                    msg += `\n🏃 Attività: ${data.activity_count}`;
+                msg += `\n• RHR: ${m.rhr || 'N/D'} bpm`;
+                msg += `\n• Stress: ${m.stress_avg || 'N/D'} medio`;
+                msg += `\n• Recovery: ${m.recovery || 'N/D'}%`;
+                msg += `\n• Strain: ${m.strain?.toFixed(1) || 'N/D'}/21`;
+                msg += `\n• Body Battery: ${m.body_battery_low || 'N/D'}-${m.body_battery_high || 'N/D'}`;
+                if (m.activity_count > 0) {
+                    msg += `\n• Attività: ${m.activity_count} (${m.activity_duration_min}min totali)`;
                 }
-                msg += `\n\nCosa ne pensi? Come posso migliorare?`;
+                
+                // Aggiungi confronto con periodi precedenti
+                if (data.previous?.length > 0) {
+                    msg += `\n\n📈 **CONFRONTO PERIODI PRECEDENTI**`;
+                    data.previous.forEach((prev, i) => {
+                        const pm = prev.metrics;
+                        const label = period === 'day' 
+                            ? (i === 0 ? 'Ieri' : i === 1 ? "L'altro ieri" : prev.label)
+                            : period === 'week'
+                            ? (i === 0 ? 'Settimana scorsa' : i === 1 ? '2 settimane fa' : prev.label)
+                            : prev.label;
+                        
+                        msg += `\n\n${label}:`;
+                        msg += ` Passi ${pm.steps_total?.toLocaleString() || 'N/D'}`;
+                        msg += ` | Sonno ${pm.sleep_hours?.toFixed(1) || 'N/D'}h`;
+                        msg += ` | Stress ${pm.stress_avg || 'N/D'}`;
+                        msg += ` | Recovery ${pm.recovery || 'N/D'}%`;
+                        if (pm.activity_count > 0) msg += ` | ${pm.activity_count} attività`;
+                    });
+                }
+                
+                msg += `\n\n`;
+                if (period === 'day' && offset === 0 && hour < 18) {
+                    msg += `Come sto andando? Cosa mi consigli per il resto della giornata?`;
+                } else {
+                    msg += `Cosa ne pensi? Come posso migliorare rispetto ai periodi precedenti?`;
+                }
                 
                 onAskCoach(coach, msg);
             };
@@ -1511,6 +1548,32 @@
             const [recalculating, setRecalculating] = useState(false);
             const [recalcResult, setRecalcResult] = useState(null);
             const [debugData, setDebugData] = useState(null);
+            const [syncingYear, setSyncingYear] = useState(false);
+            const [syncProgress, setSyncProgress] = useState(null);
+            
+            const syncYear = async () => {
+                if (!confirm('Questo scaricherà tutti i dati da inizio anno. Può richiedere qualche minuto. Continuare?')) return;
+                setSyncingYear(true);
+                setSyncProgress('Avvio sync anno...');
+                
+                const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+                const daysBack = Math.ceil((new Date() - startOfYear) / (1000 * 60 * 60 * 24));
+                
+                try {
+                    setSyncProgress(`Scaricando ${daysBack} giorni di dati...`);
+                    const res = await fetch(`${API}/api/sync`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ days_back: daysBack })
+                    });
+                    const data = await res.json();
+                    setSyncProgress(`✅ Completato! ${data.days_synced || daysBack} giorni sincronizzati`);
+                    setTimeout(() => setSyncProgress(null), 5000);
+                } catch (e) {
+                    setSyncProgress('❌ Errore: ' + e.message);
+                }
+                setSyncingYear(false);
+            };
             
             const save = async () => {
                 setSaving(true);
@@ -1604,6 +1667,20 @@
                                     </span>
                                 </div>
                             </div>
+                        </div>
+                        
+                        <div className="glass-card p-8 mb-6 slide-up">
+                            <h3 className="text-lg font-semibold mb-4">Sincronizzazione Dati</h3>
+                            <p className="text-sm text-[var(--text-muted)] mb-4">
+                                Scarica tutti i dati Garmin da inizio anno per avere uno storico completo.
+                            </p>
+                            <button onClick={syncYear} disabled={syncingYear} 
+                                className="btn-primary w-full py-4 rounded-xl text-lg">
+                                {syncingYear ? '🔄 Sincronizzazione...' : '📅 Sincronizza Anno Intero'}
+                            </button>
+                            {syncProgress && (
+                                <p className="text-center text-[var(--text-secondary)] mt-4">{syncProgress}</p>
+                            )}
                         </div>
                         
                         <div className="glass-card p-8 mb-6 slide-up">
