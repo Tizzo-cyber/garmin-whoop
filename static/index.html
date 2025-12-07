@@ -1,4 +1,4 @@
-¨<!DOCTYPE html>
+<!DOCTYPE html>
 <!-- Version 2.8.0 - Healthspan with explanations + fixed pace formula - 2024-12-07 -->
 <html lang="it">
 <head>
@@ -850,7 +850,7 @@
                                 className={`input-premium flex-1 px-3 py-3 sm:px-5 sm:py-4 rounded-xl sm:rounded-2xl text-base ${isSakura ? 'pink' : ''}`}
                                 disabled={loading || isRecording}
                             />
-                            <button ref={sendBtnRef} onClick={send} disabled={loading || !input.trim()}
+                            <button ref={sendBtnRef} onClick={() => send()} disabled={loading || !input.trim()}
                                 className={`${isSakura ? 'btn-pink' : 'btn-primary'} px-4 sm:px-8 rounded-xl sm:rounded-2xl text-base sm:text-lg disabled:opacity-40 flex-shrink-0`}>
                                 <span className="hidden sm:inline">Invia</span>
                                 <span className="sm:hidden">➤</span>
