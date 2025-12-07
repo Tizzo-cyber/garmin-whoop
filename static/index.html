@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+¨<!DOCTYPE html>
 <!-- Version 2.8.0 - Healthspan with explanations + fixed pace formula - 2024-12-07 -->
 <html lang="it">
 <head>
@@ -1003,7 +1003,7 @@
                                     </div>
                                     
                                     {/* Pace of Aging */}
-                                    {hs.pace_of_aging !== null && (
+                                    {hs?.pace_of_aging !== null && hs?.pace_of_aging !== undefined && (
                                         <div className="glass-card px-6 py-4 text-center">
                                             <div className="text-sm text-[var(--text-muted)]">Pace of Aging</div>
                                             <div className={`text-2xl font-bold mt-1 ${hs.pace_of_aging < -0.05 ? 'text-[var(--accent-green)]' : hs.pace_of_aging > 0.05 ? 'text-[var(--accent-red)]' : ''}`}>
@@ -1144,7 +1144,7 @@
                         </div>
                         
                         {/* Pace of Aging Explanation */}
-                        {hs?.pace_of_aging !== null && (
+                        {hs && hs.pace_of_aging !== null && hs.pace_of_aging !== undefined && (
                             <div className="glass-card p-4 sm:p-6 slide-up">
                                 <h3 className="text-lg font-semibold mb-3">📈 Pace of Aging</h3>
                                 <p className="text-sm text-[var(--text-secondary)] mb-4">
