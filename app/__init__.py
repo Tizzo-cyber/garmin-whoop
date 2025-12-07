@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.6.1 - Chunked year sync (45 day limit) - 2024-12-07
+Version: 2.7.0 - Healthspan (6 months, 8 metrics) - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -500,6 +500,190 @@ def create_app():
         }
         
         return jsonify(data)
+    
+    @app.route('/api/metrics/healthspan', methods=['GET'])
+    @token_required
+    def get_healthspan_age(current_user):
+        """Calcola Healthspan su 6 mesi di dati"""
+        import statistics
+        
+        today = date.today()
+        six_months_ago = today - timedelta(days=180)
+        
+        metrics = DailyMetric.query.filter(
+            DailyMetric.user_id == current_user.id,
+            DailyMetric.date >= six_months_ago
+        ).order_by(DailyMetric.date.desc()).all()
+        
+        activities = Activity.query.filter(
+            Activity.user_id == current_user.id,
+            Activity.start_time >= datetime.combine(six_months_ago, datetime.min.time())
+        ).all()
+        
+        if len(metrics) < 30:
+            return jsonify({'error': 'Servono almeno 30 giorni di dati', 'days': len(metrics)}), 400
+        
+        real_age = current_user.get_real_age()
+        
+        def avg(lst):
+            vals = [x for x in lst if x is not None]
+            return sum(vals)/len(vals) if vals else None
+        
+        def stdev(lst):
+            vals = [x for x in lst if x is not None]
+            return statistics.stdev(vals) if len(vals) >= 2 else 0
+        
+        # ═══ CALCOLO 9 METRICHE WHOOP ═══
+        impacts = {}
+        total_impact = 0
+        
+        # 1. DURATA SONNO (media)
+        sleep_hours = [m.sleep_seconds/3600 for m in metrics if m.sleep_seconds]
+        avg_sleep = avg(sleep_hours)
+        if avg_sleep:
+            # 7-8h ottimale, -0.5 per ora di differenza
+            diff = abs(avg_sleep - 7.5)
+            if 7 <= avg_sleep <= 8.5:
+                impacts['sleep_duration'] = {'value': round(avg_sleep, 1), 'impact': -0.5, 'unit': 'h', 'status': '🟢'}
+            else:
+                impacts['sleep_duration'] = {'value': round(avg_sleep, 1), 'impact': round(diff * 0.5, 1), 'unit': 'h', 'status': '🟡' if diff < 1.5 else '🔴'}
+            total_impact += impacts['sleep_duration']['impact']
+        
+        # 2. CONSISTENZA SONNO (deviazione std ora addormentamento)
+        sleep_starts = [m.sleep_start.hour + m.sleep_start.minute/60 for m in metrics if m.sleep_start]
+        sleep_consistency = stdev(sleep_starts) if sleep_starts else None
+        if sleep_consistency is not None:
+            # < 30min dev = ottimale, > 90min = male
+            if sleep_consistency < 0.5:  # < 30 min
+                impacts['sleep_consistency'] = {'value': round(sleep_consistency * 60), 'impact': -0.5, 'unit': 'min std', 'status': '🟢'}
+            elif sleep_consistency < 1.0:  # < 60 min
+                impacts['sleep_consistency'] = {'value': round(sleep_consistency * 60), 'impact': 0, 'unit': 'min std', 'status': '🟡'}
+            elif sleep_consistency < 1.5:  # < 90 min
+                impacts['sleep_consistency'] = {'value': round(sleep_consistency * 60), 'impact': 0.5, 'unit': 'min std', 'status': '🟡'}
+            else:
+                impacts['sleep_consistency'] = {'value': round(sleep_consistency * 60), 'impact': 1.0, 'unit': 'min std', 'status': '🔴'}
+            total_impact += impacts['sleep_consistency']['impact']
+        
+        # 3. ZONE HR 1-3 (cardio moderato da attività)
+        zone_low = sum([(a.hr_zone_1 or 0) + (a.hr_zone_2 or 0) + (a.hr_zone_3 or 0) for a in activities]) / 60  # minuti
+        weekly_low = zone_low / 26  # media settimanale su 6 mesi
+        if weekly_low > 0:
+            # WHO: 150 min/settimana moderato = ottimale
+            if weekly_low >= 150:
+                impacts['zone_low'] = {'value': round(weekly_low), 'impact': -1.0, 'unit': 'min/sett', 'status': '🟢'}
+            elif weekly_low >= 100:
+                impacts['zone_low'] = {'value': round(weekly_low), 'impact': -0.5, 'unit': 'min/sett', 'status': '🟢'}
+            elif weekly_low >= 50:
+                impacts['zone_low'] = {'value': round(weekly_low), 'impact': 0, 'unit': 'min/sett', 'status': '🟡'}
+            else:
+                impacts['zone_low'] = {'value': round(weekly_low), 'impact': 0.5, 'unit': 'min/sett', 'status': '🔴'}
+            total_impact += impacts['zone_low']['impact']
+        
+        # 4. ZONE HR 4-5 (cardio intenso)
+        zone_high = sum([(a.hr_zone_4 or 0) + (a.hr_zone_5 or 0) for a in activities]) / 60  # minuti
+        weekly_high = zone_high / 26
+        if weekly_high > 0:
+            # WHO: 75 min/settimana vigoroso = ottimale
+            if weekly_high >= 75:
+                impacts['zone_high'] = {'value': round(weekly_high), 'impact': -1.5, 'unit': 'min/sett', 'status': '🟢'}
+            elif weekly_high >= 50:
+                impacts['zone_high'] = {'value': round(weekly_high), 'impact': -1.0, 'unit': 'min/sett', 'status': '🟢'}
+            elif weekly_high >= 25:
+                impacts['zone_high'] = {'value': round(weekly_high), 'impact': -0.5, 'unit': 'min/sett', 'status': '🟡'}
+            else:
+                impacts['zone_high'] = {'value': round(weekly_high), 'impact': 0.5, 'unit': 'min/sett', 'status': '🔴'}
+            total_impact += impacts['zone_high']['impact']
+        
+        # 5. ATTIVITÀ FORZA (strength training)
+        strength_activities = [a for a in activities if a.activity_type and 'strength' in a.activity_type.lower()]
+        strength_weekly = len(strength_activities) / 26
+        if strength_weekly > 0 or len(activities) > 0:
+            if strength_weekly >= 2:
+                impacts['strength'] = {'value': round(strength_weekly, 1), 'impact': -1.0, 'unit': 'x/sett', 'status': '🟢'}
+            elif strength_weekly >= 1:
+                impacts['strength'] = {'value': round(strength_weekly, 1), 'impact': -0.5, 'unit': 'x/sett', 'status': '🟡'}
+            else:
+                impacts['strength'] = {'value': round(strength_weekly, 1), 'impact': 0.5, 'unit': 'x/sett', 'status': '🔴'}
+            total_impact += impacts['strength']['impact']
+        
+        # 6. PASSI GIORNALIERI
+        steps = [m.steps for m in metrics if m.steps]
+        avg_steps = avg(steps)
+        if avg_steps:
+            if avg_steps >= 10000:
+                impacts['steps'] = {'value': round(avg_steps), 'impact': -1.0, 'unit': '/giorno', 'status': '🟢'}
+            elif avg_steps >= 7500:
+                impacts['steps'] = {'value': round(avg_steps), 'impact': -0.5, 'unit': '/giorno', 'status': '🟢'}
+            elif avg_steps >= 5000:
+                impacts['steps'] = {'value': round(avg_steps), 'impact': 0, 'unit': '/giorno', 'status': '🟡'}
+            else:
+                impacts['steps'] = {'value': round(avg_steps), 'impact': 1.0, 'unit': '/giorno', 'status': '🔴'}
+            total_impact += impacts['steps']['impact']
+        
+        # 7. RHR (Resting Heart Rate)
+        rhr_values = [m.resting_hr for m in metrics if m.resting_hr]
+        avg_rhr = avg(rhr_values)
+        if avg_rhr:
+            # Baseline 60, +1 anno ogni 10 bpm
+            rhr_impact = round((avg_rhr - 60) / 10, 1)
+            rhr_impact = max(-2, min(2, rhr_impact))
+            status = '🟢' if avg_rhr < 60 else '🟡' if avg_rhr < 70 else '🔴'
+            impacts['rhr'] = {'value': round(avg_rhr), 'impact': rhr_impact, 'unit': 'bpm', 'status': status}
+            total_impact += rhr_impact
+        
+        # 8. VO2 MAX
+        vo2_values = [m.vo2_max for m in metrics if m.vo2_max]
+        avg_vo2 = avg(vo2_values)
+        if avg_vo2:
+            # Baseline 42, +1 anno ogni 5 punti sotto
+            vo2_impact = round((42 - avg_vo2) / 5, 1)
+            vo2_impact = max(-3, min(3, vo2_impact))
+            status = '🟢' if avg_vo2 > 45 else '🟡' if avg_vo2 > 38 else '🔴'
+            impacts['vo2_max'] = {'value': round(avg_vo2, 1), 'impact': vo2_impact, 'unit': 'ml/kg/min', 'status': status}
+            total_impact += vo2_impact
+        
+        # 9. LEAN BODY MASS (non disponibile da Garmin - skip)
+        # impacts['lean_mass'] = {'value': None, 'impact': 0, 'unit': '%', 'status': '⚪'}
+        
+        # ═══ CALCOLO FINALE ═══
+        healthspan_age = round(real_age + total_impact, 1)
+        
+        # Pace of aging (ultimi 30gg vs 6 mesi)
+        recent_metrics = [m for m in metrics if m.date >= today - timedelta(days=30)]
+        if len(recent_metrics) >= 7:
+            recent_impact = 0
+            # Ricalcola solo per ultimi 30gg
+            recent_sleep = avg([m.sleep_seconds/3600 for m in recent_metrics if m.sleep_seconds])
+            if recent_sleep:
+                diff = abs(recent_sleep - 7.5)
+                recent_impact += -0.5 if 7 <= recent_sleep <= 8.5 else diff * 0.5
+            recent_steps = avg([m.steps for m in recent_metrics if m.steps])
+            if recent_steps:
+                if recent_steps >= 10000: recent_impact -= 1.0
+                elif recent_steps >= 7500: recent_impact -= 0.5
+                elif recent_steps < 5000: recent_impact += 1.0
+            recent_rhr = avg([m.resting_hr for m in recent_metrics if m.resting_hr])
+            if recent_rhr:
+                recent_impact += max(-2, min(2, (recent_rhr - 60) / 10))
+            
+            recent_age = real_age + recent_impact
+            pace = round((recent_age - healthspan_age) / 0.5, 2)  # Normalizzato
+            pace_status = '🟢' if pace < 0 else '🟡' if pace < 0.5 else '🔴'
+        else:
+            pace = None
+            pace_status = '⚪'
+        
+        return jsonify({
+            'healthspan_age': healthspan_age,
+            'real_age': real_age,
+            'difference': round(healthspan_age - real_age, 1),
+            'total_impact': round(total_impact, 1),
+            'pace_of_aging': pace,
+            'pace_status': pace_status,
+            'days_analyzed': len(metrics),
+            'activities_analyzed': len(activities),
+            'impacts': impacts
+        })
     
     @app.route('/', methods=['GET'])
     def index():

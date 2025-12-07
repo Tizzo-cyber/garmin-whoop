@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Version 2.6.1 - Chunked year sync (45 day limit) - 2024-12-07 -->
+<!-- Version 2.7.0 - Healthspan (6 months, 8 metrics) - 2024-12-07 -->
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -863,11 +863,44 @@
         
         // ==================== DATA VIEW ====================
         
-        const DataView = ({ summary }) => {
+        const DataView = ({ token, summary }) => {
             const [activeMetric, setActiveMetric] = useState(null);
+            const [healthspan, setHealthspan] = useState(null);
+            const [hsLoading, setHsLoading] = useState(true);
             const avgs = summary?.averages || {};
             const impacts = avgs.bio_impacts || {};
             const realAge = summary?.real_age || 42;
+            
+            // Carica Healthspan (6 mesi)
+            useEffect(() => {
+                const fetchHS = async () => {
+                    try {
+                        const res = await fetch(`${API}/api/metrics/healthspan`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (res.ok) setHealthspan(await res.json());
+                    } catch (e) { console.error(e); }
+                    setHsLoading(false);
+                };
+                fetchHS();
+            }, [token]);
+            
+            const hs = healthspan;
+            const diff = hs?.difference || 0;
+            const isYounger = diff < 0;
+            const ringColor = isYounger ? 'var(--accent-green)' : diff > 2 ? 'var(--accent-red)' : 'var(--accent-orange)';
+            
+            // 8 metriche Healthspan
+            const metricOrder = [
+                { key: 'sleep_duration', label: 'Sonno', icon: '😴' },
+                { key: 'sleep_consistency', label: 'Consistenza', icon: '🌙' },
+                { key: 'zone_low', label: 'Cardio Mod.', icon: '💚' },
+                { key: 'zone_high', label: 'Cardio Int.', icon: '❤️‍🔥' },
+                { key: 'strength', label: 'Forza', icon: '💪' },
+                { key: 'steps', label: 'Passi', icon: '👟' },
+                { key: 'rhr', label: 'RHR', icon: '❤️' },
+                { key: 'vo2_max', label: 'VO2 Max', icon: '🫁' },
+            ];
             
             return (
                 <div className="h-full overflow-y-auto bg-gradient-sensei">
@@ -880,102 +913,143 @@
                     )}
                     
                     <div className="max-w-6xl mx-auto p-4 sm:p-8">
-                        <div className="text-center mb-6 sm:mb-10 slide-up">
-                            <h1 className="text-2xl sm:text-4xl font-bold font-display mb-2">Performance Dashboard</h1>
-                            <p className="text-xs sm:text-base text-[var(--text-muted)]">Media ultimi 30 giorni • Tocca per dettagli</p>
+                        <div className="text-center mb-6 sm:mb-8 slide-up">
+                            <h1 className="text-2xl sm:text-4xl font-bold font-display mb-2">Healthspan</h1>
+                            <p className="text-xs sm:text-base text-[var(--text-muted)]">
+                                {hs ? `Basato su ${hs.days_analyzed} giorni e ${hs.activities_analyzed} attività` : 'Calcolo età biologica...'}
+                            </p>
                         </div>
                         
-                        {/* Bio Age Section */}
-                        <div className="glass-card p-5 sm:p-10 mb-6 sm:mb-8 flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-10 slide-up">
-                            <div className="flex-1 text-center lg:text-left">
-                                <h2 className="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4">Età Biologica</h2>
-                                <p className="text-sm sm:text-base text-[var(--text-secondary)] max-w-md hidden sm:block">
-                                    La tua età biologica è calcolata analizzando frequenza cardiaca, sonno, 
-                                    attività fisica, stress e altri parametri fisiologici.
-                                </p>
-                                <div className="mt-4 sm:mt-6 flex flex-wrap gap-3 sm:gap-4 justify-center lg:justify-start">
-                                    <div className="glass-card px-3 py-2 sm:px-4">
-                                        <span className="text-xs text-[var(--text-muted)]">Anagrafica</span>
-                                        <span className="text-lg sm:text-xl font-bold ml-2">{realAge}</span>
-                                    </div>
-                                    <div className="glass-card px-3 py-2 sm:px-4">
-                                        <span className="text-xs text-[var(--text-muted)]">Giorni</span>
-                                        <span className="text-lg sm:text-xl font-bold ml-2">{summary?.period?.days_with_data || 0}</span>
+                        {/* Healthspan Age Section */}
+                        <div className="glass-card p-5 sm:p-8 mb-6 slide-up">
+                            {hsLoading ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="text-center">
+                                        <div className="text-3xl mb-2 animate-pulse">⏳</div>
+                                        <p className="text-sm text-[var(--text-muted)]">Analisi 6 mesi di dati...</p>
                                     </div>
                                 </div>
+                            ) : hs ? (
+                                <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+                                    {/* Age Ring */}
+                                    <div className="flex items-center gap-6">
+                                        <div className="relative cursor-pointer" onClick={() => setActiveMetric({ key: 'bioAge', value: hs.healthspan_age })}>
+                                            <svg width="140" height="140" viewBox="0 0 140 140">
+                                                <circle cx="70" cy="70" r="60" fill="none" stroke="var(--bg-tertiary)" strokeWidth="10" />
+                                                <circle cx="70" cy="70" r="60" fill="none" stroke={ringColor} strokeWidth="10"
+                                                    strokeLinecap="round"
+                                                    strokeDasharray={`${Math.min(100, Math.abs(diff) * 10 + 50) * 3.77} 377`}
+                                                    transform="rotate(-90 70 70)"
+                                                    style={{ filter: `drop-shadow(0 0 8px ${ringColor})` }} />
+                                            </svg>
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                <span className="text-4xl font-bold font-display" style={{ color: ringColor }}>
+                                                    {hs.healthspan_age}
+                                                </span>
+                                                <span className="text-xs text-[var(--text-muted)]">Età Biologica</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-center lg:text-left">
+                                            <div className="text-sm text-[var(--text-muted)]">Età Anagrafica</div>
+                                            <div className="text-3xl font-bold">{hs.real_age}</div>
+                                            <div className={`text-xl font-semibold mt-2 ${isYounger ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}`}>
+                                                {isYounger ? '' : '+'}{diff} anni
+                                            </div>
+                                            <div className="text-sm text-[var(--text-muted)] mt-1">
+                                                {isYounger ? '🎉 Più giovane!' : diff > 3 ? '⚠️ Da migliorare' : '👍 Nella norma'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Pace of Aging */}
+                                    {hs.pace_of_aging !== null && (
+                                        <div className="glass-card px-6 py-4 text-center">
+                                            <div className="text-sm text-[var(--text-muted)]">Pace of Aging</div>
+                                            <div className="text-2xl font-bold mt-1">
+                                                {hs.pace_status} {hs.pace_of_aging > 0 ? '+' : ''}{hs.pace_of_aging}x
+                                            </div>
+                                            <div className="text-xs text-[var(--text-muted)] mt-1">
+                                                {hs.pace_of_aging < 0 ? 'Ringiovanendo' : hs.pace_of_aging < 0.5 ? 'Rallentato' : 'Accelerato'}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-center py-6">
+                                    <div className="text-3xl mb-2">📊</div>
+                                    <p className="text-[var(--text-muted)]">Sincronizza più dati per calcolare Healthspan</p>
+                                    <p className="text-xs text-[var(--text-muted)] mt-2">Vai in Impostazioni → Sincronizza Anno Intero</p>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* 8 Metriche Grid */}
+                        {hs?.impacts && (
+                            <div className="glass-card p-4 sm:p-6 mb-6 slide-up">
+                                <h3 className="text-lg font-semibold mb-4">Le 8 Metriche Healthspan</h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    {metricOrder.map(({ key, label, icon }) => {
+                                        const m = hs.impacts[key];
+                                        if (!m) return null;
+                                        const impactColor = m.impact < 0 ? 'text-[var(--accent-green)]' : m.impact > 0 ? 'text-[var(--accent-orange)]' : 'text-[var(--text-secondary)]';
+                                        return (
+                                            <div key={key} className="p-3 rounded-xl bg-[var(--bg-secondary)] text-center">
+                                                <div className="text-2xl mb-1">{icon}</div>
+                                                <div className="text-xs text-[var(--text-muted)]">{label}</div>
+                                                <div className="font-semibold">{m.value}<span className="text-xs ml-1">{m.unit}</span></div>
+                                                <div className={`text-xs font-semibold ${impactColor}`}>
+                                                    {m.status} {m.impact > 0 ? '+' : ''}{m.impact}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                            <BioAgeRing 
-                                bioAge={avgs.biological_age} 
-                                realAge={realAge} 
-                                onClick={() => setActiveMetric({ key: 'bioAge', value: avgs.biological_age?.toFixed(1) })}
-                            />
-                        </div>
+                        )}
                         
-                        {/* Metrics Grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6 sm:mb-8">
-                            <MetricCard 
-                                metricKey="rhr"
-                                icon="❤️" label="RHR" 
-                                value={avgs.resting_hr?.toFixed(0)} unit="bpm"
-                                color="var(--accent-red)" subtitle="Frequenza a riposo"
-                                onClick={() => setActiveMetric({ key: 'rhr', value: avgs.resting_hr?.toFixed(0) })}
-                            />
-                            <MetricCard 
-                                metricKey="vo2"
-                                icon="🫁" label="VO2 Max" 
-                                value={avgs.vo2_max?.toFixed(0)} unit="ml/kg"
-                                color="var(--accent-green)" subtitle="Capacità aerobica"
-                                onClick={() => setActiveMetric({ key: 'vo2', value: avgs.vo2_max?.toFixed(0) })}
-                            />
-                            <MetricCard 
-                                metricKey="steps"
-                                icon="👟" label="Passi" 
-                                value={avgs.steps ? (avgs.steps/1000).toFixed(1) : null} unit="k/day"
-                                color="var(--accent-orange)" subtitle="Media giornaliera"
-                                onClick={() => setActiveMetric({ key: 'steps', value: avgs.steps?.toFixed(0) })}
-                            />
-                            <MetricCard 
-                                metricKey="sleep"
-                                icon="😴" label="Sonno" 
-                                value={avgs.sleep_hours?.toFixed(1)} unit="ore"
-                                color="var(--accent-purple)" subtitle="Durata media"
-                                onClick={() => setActiveMetric({ key: 'sleep', value: avgs.sleep_hours?.toFixed(1) + ' ore' })}
-                            />
-                            <MetricCard 
-                                metricKey="recovery"
-                                icon="⚡" label="Recovery" 
-                                value={avgs.recovery?.toFixed(0)} unit="%"
-                                color="var(--accent-green)" subtitle="Prontezza fisica"
-                                onClick={() => setActiveMetric({ key: 'recovery', value: avgs.recovery?.toFixed(0) + '%' })}
-                            />
-                            <MetricCard 
-                                metricKey="strain"
-                                icon="🔥" label="Strain" 
-                                value={avgs.strain?.toFixed(1)} unit="/21"
-                                color="var(--accent-orange)" subtitle="Carico allenamento"
-                                onClick={() => setActiveMetric({ key: 'strain', value: avgs.strain?.toFixed(1) })}
-                            />
-                        </div>
-                        
-                        {/* Impact Analysis */}
-                        <div className="glass-card p-8 slide-up">
-                            <h3 className="text-xl font-semibold mb-2">Impatto sull'Età Biologica</h3>
-                            <p className="text-[var(--text-muted)] mb-6">
-                                Ogni fattore contribuisce a modificare la tua età biologica. Clicca per approfondire.
-                            </p>
-                            <div className="grid md:grid-cols-2 gap-x-10">
-                                <ImpactRow icon="🫁" label="VO2 Max" value={impacts.vo2} description="Capacità cardiovascolare"
-                                    onClick={() => setActiveMetric({ key: 'vo2', value: avgs.vo2_max?.toFixed(0) })} />
-                                <ImpactRow icon="❤️" label="Frequenza Cardiaca" value={impacts.rhr} description="Efficienza cardiaca"
-                                    onClick={() => setActiveMetric({ key: 'rhr', value: avgs.resting_hr?.toFixed(0) })} />
-                                <ImpactRow icon="😴" label="Qualità Sonno" value={impacts.sleep} description="Ore e profondità"
-                                    onClick={() => setActiveMetric({ key: 'sleep', value: avgs.sleep_hours?.toFixed(1) + ' ore' })} />
-                                <ImpactRow icon="👟" label="Attività Fisica" value={impacts.steps} description="Movimento quotidiano"
-                                    onClick={() => setActiveMetric({ key: 'steps', value: avgs.steps?.toFixed(0) })} />
-                                <ImpactRow icon="😤" label="Gestione Stress" value={impacts.stress} description="Livello medio"
+                        {/* Daily Metrics - from 30 day avg */}
+                        <div className="glass-card p-4 sm:p-6 mb-6 slide-up">
+                            <h3 className="text-lg font-semibold mb-4">Metriche Giornaliere <span className="text-sm font-normal text-[var(--text-muted)]">(media 30gg)</span></h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                                <MetricCard metricKey="recovery" icon="⚡" label="Recovery" 
+                                    value={avgs.recovery?.toFixed(0)} unit="%"
+                                    color="var(--accent-green)" subtitle="Prontezza"
+                                    onClick={() => setActiveMetric({ key: 'recovery', value: avgs.recovery?.toFixed(0) + '%' })} />
+                                <MetricCard metricKey="strain" icon="🔥" label="Strain" 
+                                    value={avgs.strain?.toFixed(1)} unit="/21"
+                                    color="var(--accent-orange)" subtitle="Carico"
+                                    onClick={() => setActiveMetric({ key: 'strain', value: avgs.strain?.toFixed(1) })} />
+                                <MetricCard metricKey="sleep" icon="😴" label="Sonno" 
+                                    value={avgs.sleep_hours?.toFixed(1)} unit="h"
+                                    color="var(--accent-purple)" subtitle="Durata"
+                                    onClick={() => setActiveMetric({ key: 'sleep', value: avgs.sleep_hours?.toFixed(1) + 'h' })} />
+                                <MetricCard metricKey="stress" icon="😤" label="Stress" 
+                                    value={avgs.stress_avg?.toFixed(0)} unit=""
+                                    color="var(--accent-red)" subtitle="Medio"
                                     onClick={() => setActiveMetric({ key: 'stress', value: avgs.stress_avg?.toFixed(0) })} />
-                                <ImpactRow icon="💪" label="Intensità Training" value={impacts.hrz} description="Zone HR elevate"
-                                    onClick={() => setActiveMetric({ key: 'hrz', value: null })} />
+                                <MetricCard metricKey="hrv" icon="💓" label="HRV" 
+                                    value={avgs.hrv?.toFixed(0)} unit="ms"
+                                    color="var(--accent-green)" subtitle="Variabilità"
+                                    onClick={() => setActiveMetric({ key: 'hrv', value: avgs.hrv?.toFixed(0) + 'ms' })} />
+                                <MetricCard metricKey="bodyBattery" icon="🔋" label="Battery" 
+                                    value={avgs.body_battery_high?.toFixed(0)} unit="%"
+                                    color="var(--accent-orange)" subtitle="Body Battery"
+                                    onClick={() => setActiveMetric({ key: 'bodyBattery', value: avgs.body_battery_high?.toFixed(0) })} />
+                            </div>
+                        </div>
+                        
+                        {/* Impact Factors */}
+                        <div className="glass-card p-4 sm:p-6 slide-up">
+                            <h3 className="text-lg font-semibold mb-4">Fattori di Impatto <span className="text-sm font-normal text-[var(--text-muted)]">(30gg)</span></h3>
+                            <div className="grid sm:grid-cols-2 gap-3">
+                                <ImpactRow icon="❤️" label="Frequenza Cardiaca" value={impacts.rhr} description="RHR rispetto a baseline 60"
+                                    onClick={() => setActiveMetric({ key: 'rhr', value: avgs.resting_hr?.toFixed(0) })} />
+                                <ImpactRow icon="🫁" label="VO2 Max" value={impacts.vo2} description="Capacità aerobica"
+                                    onClick={() => setActiveMetric({ key: 'vo2', value: avgs.vo2_max?.toFixed(0) })} />
+                                <ImpactRow icon="😴" label="Qualità Sonno" value={impacts.sleep} description="7-8h = ottimale"
+                                    onClick={() => setActiveMetric({ key: 'sleep', value: null })} />
+                                <ImpactRow icon="👟" label="Attività Fisica" value={impacts.steps} description="Passi giornalieri"
+                                    onClick={() => setActiveMetric({ key: 'steps', value: null })} />
                             </div>
                         </div>
                     </div>
@@ -2046,7 +2120,7 @@
                     
                     {/* Content */}
                     <main className="flex-1 overflow-hidden">
-                        {tab === 'data' && <DataView summary={summary} />}
+                        {tab === 'data' && <DataView token={token} summary={summary} />}
                         {tab === 'stats' && <StatsView token={token} onAskCoach={handleAskCoach} />}
                         {tab === 'sensei' && <ChatView token={token} coach="sensei" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
                         {tab === 'sakura' && <ChatView token={token} coach="sakura" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
