@@ -2,8 +2,8 @@
 const CACHE_NAME = 'sensei-v1';
 const urlsToCache = [
   '/',
-  '/static/index.html',
-  '/static/manifest.json'
+  '/index.html',
+  '/manifest.json'
 ];
 
 // Install

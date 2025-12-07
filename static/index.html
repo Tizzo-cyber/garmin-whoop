@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<!-- Version 2.8.3 - Intraday Body Battery chart + PWA - 2024-12-07 -->
+<!-- Version 2.8.4 - Fixed PWA paths + null check - 2024-12-07 -->
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#22c55e">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SENSEI">
     <meta name="description" content="AI Coach per i tuoi dati Garmin - Healthspan, Recovery, Training">
-    <link rel="manifest" href="/static/manifest.json">
-    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon-192.png">
     <title>SENSEI & SAKURA — Performance Lab</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -505,7 +505,7 @@
                                         <span className="text-[var(--text-muted)]">Nessun dato oggi</span>
                                     </div>
                                 )}
-                                {intradayData?.min !== null && intradayData?.max !== null && (
+                                {intradayData && intradayData.min != null && intradayData.max != null && (
                                     <div className="flex justify-between mt-2 text-xs">
                                         <span className="text-[var(--accent-red)]">Min: {intradayData.min}</span>
                                         <span className="text-[var(--accent-green)]">Max: {intradayData.max}</span>
@@ -2440,7 +2440,7 @@
         // Register Service Worker for PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/sw.js')
+                navigator.serviceWorker.register('/sw.js')
                     .then(reg => console.log('SW registered:', reg.scope))
                     .catch(err => console.log('SW registration failed:', err));
             });
