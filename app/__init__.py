@@ -695,7 +695,7 @@ def create_app():
                 raw_impacts['zone_low'] = 0
                 impacts['zone_low'] = {'value': round(weekly_low), 'impact': 0, 'unit': 'min/sett', 'status': '🟡'}
             else:
-                raw_impacts['zone_low'] = 0.5
+                raw_impacts['zone_low'] = 0.2  # Ridotto da 0.5
                 impacts['zone_low'] = {'value': round(weekly_low), 'impact': 0, 'unit': 'min/sett', 'status': '🔴'}
         
         # 3. ZONE HR 4-5 (cardio intenso)
@@ -712,7 +712,7 @@ def create_app():
                 raw_impacts['zone_high'] = -0.2
                 impacts['zone_high'] = {'value': round(weekly_high), 'impact': 0, 'unit': 'min/sett', 'status': '🟡'}
             else:
-                raw_impacts['zone_high'] = 0.5
+                raw_impacts['zone_high'] = 0.2  # Ridotto da 0.5
                 impacts['zone_high'] = {'value': round(weekly_high), 'impact': 0, 'unit': 'min/sett', 'status': '🔴'}
         
         # 4. ATTIVITÀ FORZA
@@ -726,7 +726,7 @@ def create_app():
                 raw_impacts['strength'] = -0.2
                 impacts['strength'] = {'value': round(strength_weekly, 1), 'impact': 0, 'unit': 'x/sett', 'status': '🟡'}
             else:
-                raw_impacts['strength'] = 0.5
+                raw_impacts['strength'] = 0.15  # Ridotto da 0.5
                 impacts['strength'] = {'value': round(strength_weekly, 1), 'impact': 0, 'unit': 'x/sett', 'status': '🔴'}
         
         # 5. PASSI GIORNALIERI
