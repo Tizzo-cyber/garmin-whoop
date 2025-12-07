@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Version 2.5.0 - Stats view with period selector - 2024-12-07 -->
+<!-- Version 2.5.1 - Ask coach from Stats - 2024-12-07 -->
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -475,7 +475,7 @@
         
         // ==================== CHAT VIEW ====================
         
-        const ChatView = ({ token, coach }) => {
+        const ChatView = ({ token, coach, initialMessage, onMessageSent }) => {
             const [messages, setMessages] = useState([]);
             const [input, setInput] = useState('');
             const [loading, setLoading] = useState(false);
@@ -484,6 +484,7 @@
             const [playingAudio, setPlayingAudio] = useState(false);
             const [isRecording, setIsRecording] = useState(false);
             const [voiceInputPending, setVoiceInputPending] = useState(false);
+            const [pendingInitialMessage, setPendingInitialMessage] = useState(null);
             const chatRef = useRef(null);
             const inputRef = useRef(null);
             const audioRef = useRef(null);
@@ -496,6 +497,14 @@
             const coachEmoji = isSakura ? '🌸' : '🥋';
             const coachTitle = isSakura ? 'Mental & Spiritual Coach' : 'Athletic Performance Coach';
             const bgClass = isSakura ? 'bg-gradient-sakura' : 'bg-gradient-sensei';
+            
+            // Handle initial message from Stats view
+            useEffect(() => {
+                if (initialMessage && ready && !loading) {
+                    setPendingInitialMessage(initialMessage);
+                    if (onMessageSent) onMessageSent();
+                }
+            }, [initialMessage, ready]);
             
             const toggleRecording = () => {
                 if (isRecording) {
@@ -643,8 +652,8 @@
                 setReady(true);
             };
             
-            const send = async () => {
-                const text = input.trim();
+            const send = async (customMessage = null) => {
+                const text = customMessage || input.trim();
                 if (!text || loading) return;
                 
                 setInput('');
@@ -666,6 +675,14 @@
                 setLoading(false);
                 inputRef.current?.focus();
             };
+            
+            // Send pending message from Stats view
+            useEffect(() => {
+                if (pendingInitialMessage && ready && !loading) {
+                    send(pendingInitialMessage);
+                    setPendingInitialMessage(null);
+                }
+            }, [pendingInitialMessage, ready, loading]);
             
             const sendWithVoice = async () => {
                 const text = input.trim();
@@ -968,7 +985,7 @@
         
         // ==================== STATS VIEW (Connect-style) ====================
         
-        const StatsView = ({ token }) => {
+        const StatsView = ({ token, onAskCoach }) => {
             const [period, setPeriod] = useState('week'); // day, week, month, year
             const [offset, setOffset] = useState(0);
             const [data, setData] = useState(null);
@@ -995,6 +1012,53 @@
             const getActivityIcon = (type) => {
                 const icons = { 'running': '🏃', 'cycling': '🚴', 'swimming': '🏊', 'walking': '🚶', 'hiking': '🥾', 'strength_training': '💪', 'yoga': '🧘' };
                 return icons[type] || '⚡';
+            };
+            
+            const getPeriodLabel = () => {
+                if (!data?.period) return '';
+                const p = data.period;
+                if (period === 'day') {
+                    if (offset === 0) return 'oggi';
+                    if (offset === -1) return 'ieri';
+                    return p.label;
+                }
+                if (period === 'week') {
+                    if (offset === 0) return 'questa settimana';
+                    if (offset === -1) return 'la settimana scorsa';
+                    return `la settimana del ${p.label}`;
+                }
+                if (period === 'month') {
+                    if (offset === 0) return 'questo mese';
+                    if (offset === -1) return 'il mese scorso';
+                    return p.label;
+                }
+                return p.label;
+            };
+            
+            const handleAskCoach = (coach) => {
+                if (!data) return;
+                const m = data.metrics;
+                const periodLabel = getPeriodLabel();
+                
+                // Costruisci messaggio con i dati del periodo
+                let msg = `Analizza i miei dati di ${periodLabel}:\n`;
+                msg += `📊 Passi: ${m.steps_total?.toLocaleString() || 'N/D'} totali`;
+                if (m.steps_avg) msg += ` (${Math.round(m.steps_avg)}/giorno)`;
+                msg += `\n🔥 Calorie: ${m.calories_total?.toLocaleString() || 'N/D'}`;
+                msg += `\n📏 Distanza: ${m.distance_km || 0} km`;
+                msg += `\n😴 Sonno: ${m.sleep_hours?.toFixed(1) || 'N/D'}h media`;
+                if (m.deep_sleep_min) msg += ` (Deep: ${Math.round(m.deep_sleep_min)}min)`;
+                msg += `\n❤️ RHR: ${m.rhr || 'N/D'} bpm`;
+                msg += `\n😤 Stress: ${m.stress_avg || 'N/D'} medio`;
+                msg += `\n⚡ Recovery: ${m.recovery || 'N/D'}%`;
+                msg += `\n🔥 Strain: ${m.strain?.toFixed(1) || 'N/D'}/21`;
+                msg += `\n🔋 Body Battery: ${m.body_battery_low || 'N/D'}-${m.body_battery_high || 'N/D'}`;
+                if (data.activity_count > 0) {
+                    msg += `\n🏃 Attività: ${data.activity_count}`;
+                }
+                msg += `\n\nCosa ne pensi? Come posso migliorare?`;
+                
+                onAskCoach(coach, msg);
             };
             
             const m = data?.metrics || {};
@@ -1159,6 +1223,26 @@
                                         </div>
                                     </div>
                                 )}
+                                
+                                {/* Ask Coach Buttons */}
+                                <div className="glass-card p-4">
+                                    <h3 className="text-sm font-semibold mb-3 text-center">Chiedi al coach</h3>
+                                    <div className="flex gap-3 justify-center">
+                                        <button onClick={() => handleAskCoach('sensei')}
+                                            className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[var(--accent-green-dim)] border border-[var(--accent-green)] hover:bg-[var(--accent-green)] hover:text-black transition-all">
+                                            <span className="text-xl">🥋</span>
+                                            <span className="text-sm font-medium">Sensei</span>
+                                        </button>
+                                        <button onClick={() => handleAskCoach('sakura')}
+                                            className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[var(--accent-pink-dim)] border border-[var(--accent-pink)] hover:bg-[var(--accent-pink)] hover:text-black transition-all">
+                                            <span className="text-xl">🌸</span>
+                                            <span className="text-sm font-medium">Sakura</span>
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-[var(--text-muted)] text-center mt-2">
+                                        Invia i dati di {getPeriodLabel() || 'questo periodo'} al coach
+                                    </p>
+                                </div>
                             </>
                         )}
                     </div>
@@ -1754,6 +1838,7 @@
             const [activities, setActivities] = useState([]);
             const [loading, setLoading] = useState(true);
             const [syncing, setSyncing] = useState(false);
+            const [initialMessage, setInitialMessage] = useState(null);
             
             useEffect(() => { fetchData(); }, []);
             
@@ -1781,6 +1866,11 @@
                     await fetchData();
                 } catch {}
                 setSyncing(false);
+            };
+            
+            const handleAskCoach = (coach, message) => {
+                setInitialMessage(message);
+                setTab(coach);
             };
             
             if (loading) return <Loading />;
@@ -1872,9 +1962,9 @@
                     {/* Content */}
                     <main className="flex-1 overflow-hidden">
                         {tab === 'data' && <DataView summary={summary} />}
-                        {tab === 'stats' && <StatsView token={token} />}
-                        {tab === 'sensei' && <ChatView token={token} coach="sensei" />}
-                        {tab === 'sakura' && <ChatView token={token} coach="sakura" />}
+                        {tab === 'stats' && <StatsView token={token} onAskCoach={handleAskCoach} />}
+                        {tab === 'sensei' && <ChatView token={token} coach="sensei" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
+                        {tab === 'sakura' && <ChatView token={token} coach="sakura" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
                         {tab === 'trend' && <TrendView trend={trend} realAge={summary?.real_age || 42} />}
                         {tab === 'activities' && <ActivityView token={token} activities={activities} onRefresh={fetchData} />}
                         {tab === 'profile' && <ProfileView token={token} user={user} onUpdate={onUserUpdate} onLogout={onLogout} />}

@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.5.0 - Stats view with period selector - 2024-12-07
+Version: 2.5.1 - Ask coach from Stats - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
