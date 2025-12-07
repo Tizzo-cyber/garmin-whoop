@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.2.1 - HRV debug endpoint - 2024-12-07
+Version: 2.2.2 - Fixed HRV debug - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -910,32 +910,48 @@ Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I
     @token_required
     def debug_hrv(current_user):
         """Debug: verifica dati HRV raw da Garmin"""
-        from .garmin_sync import get_garmin_client
+        from garminconnect import Garmin
         from datetime import date, timedelta
+        import os
         
-        client = get_garmin_client(current_user)
-        if not client:
+        if not current_user.garmin_email:
             return jsonify({'error': 'Garmin non connesso'}), 400
         
-        results = []
-        today = date.today()
+        # Ottieni password Garmin
+        encryption_key = os.environ.get('ENCRYPTION_KEY')
+        if not encryption_key or not current_user.garmin_password_encrypted:
+            return jsonify({'error': 'Password Garmin non disponibile'}), 400
         
-        for i in range(3):
-            day = today - timedelta(days=i)
-            day_str = day.strftime('%Y-%m-%d')
+        from cryptography.fernet import Fernet
+        fernet = Fernet(encryption_key.encode())
+        garmin_password = fernet.decrypt(current_user.garmin_password_encrypted.encode()).decode()
+        
+        results = []
+        
+        try:
+            client = Garmin(current_user.garmin_email, garmin_password)
+            client.login()
             
-            try:
-                hrv_data = client.get_hrv_data(day_str)
-                results.append({
-                    'date': day_str,
-                    'raw_hrv': hrv_data,
-                    'type': str(type(hrv_data))
-                })
-            except Exception as e:
-                results.append({
-                    'date': day_str,
-                    'error': str(e)
-                })
+            today = date.today()
+            
+            for i in range(3):
+                day = today - timedelta(days=i)
+                day_str = day.strftime('%Y-%m-%d')
+                
+                try:
+                    hrv_data = client.get_hrv_data(day_str)
+                    results.append({
+                        'date': day_str,
+                        'raw_hrv': hrv_data
+                    })
+                except Exception as e:
+                    results.append({
+                        'date': day_str,
+                        'error': str(e)
+                    })
+                    
+        except Exception as e:
+            return jsonify({'error': f'Login Garmin fallito: {str(e)}'}), 500
         
         return jsonify(results)
     
