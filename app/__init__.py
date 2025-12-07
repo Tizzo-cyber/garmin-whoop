@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.2.0 - Mobile optimized - 2024-12-07
+Version: 2.2.1 - HRV debug endpoint - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -905,6 +905,39 @@ Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I
             'bio_age_hrz_impact': m.bio_age_hrz_impact,
             'biological_age': m.biological_age
         } for m in metrics])
+    
+    @app.route('/api/debug/hrv', methods=['GET'])
+    @token_required
+    def debug_hrv(current_user):
+        """Debug: verifica dati HRV raw da Garmin"""
+        from .garmin_sync import get_garmin_client
+        from datetime import date, timedelta
+        
+        client = get_garmin_client(current_user)
+        if not client:
+            return jsonify({'error': 'Garmin non connesso'}), 400
+        
+        results = []
+        today = date.today()
+        
+        for i in range(3):
+            day = today - timedelta(days=i)
+            day_str = day.strftime('%Y-%m-%d')
+            
+            try:
+                hrv_data = client.get_hrv_data(day_str)
+                results.append({
+                    'date': day_str,
+                    'raw_hrv': hrv_data,
+                    'type': str(type(hrv_data))
+                })
+            except Exception as e:
+                results.append({
+                    'date': day_str,
+                    'error': str(e)
+                })
+        
+        return jsonify(results)
     
     @app.route('/api/activity/<int:activity_id>/comment', methods=['POST'])
     @token_required
