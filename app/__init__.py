@@ -307,6 +307,120 @@ def create_app():
             'pace_of_aging': pace
         })
     
+    # ========== INTRADAY DATA ==========
+    
+    @app.route('/api/intraday/body-battery', methods=['GET'])
+    @token_required
+    def get_body_battery_intraday(current_user):
+        """Ottieni dati intraday Body Battery"""
+        from garminconnect import Garmin
+        
+        day = request.args.get('date', date.today().isoformat())
+        
+        if not current_user.garmin_email or not current_user.garmin_password_encrypted:
+            return jsonify({'error': 'Garmin non connesso'}), 400
+        
+        try:
+            # Decrypt e connetti
+            from cryptography.fernet import Fernet
+            fernet = Fernet(app.config['ENCRYPTION_KEY'])
+            password = fernet.decrypt(current_user.garmin_password_encrypted.encode()).decode()
+            
+            client = Garmin(current_user.garmin_email, password)
+            client.login()
+            
+            # Ottieni dati body battery
+            bb_data = client.get_body_battery(day)
+            
+            if not bb_data:
+                return jsonify({'data': [], 'date': day})
+            
+            # Estrai i datapoint
+            datapoints = []
+            if isinstance(bb_data, list):
+                for item in bb_data:
+                    if 'bodyBatteryValuesArray' in item:
+                        for val in item['bodyBatteryValuesArray']:
+                            if val and len(val) >= 2:
+                                ts = val[0]  # timestamp in ms
+                                value = val[1]  # body battery value
+                                if value is not None:
+                                    datapoints.append({
+                                        'timestamp': ts,
+                                        'time': datetime.fromtimestamp(ts/1000).strftime('%H:%M'),
+                                        'value': value
+                                    })
+            elif isinstance(bb_data, dict):
+                if 'bodyBatteryValuesArray' in bb_data:
+                    for val in bb_data['bodyBatteryValuesArray']:
+                        if val and len(val) >= 2:
+                            ts = val[0]
+                            value = val[1]
+                            if value is not None:
+                                datapoints.append({
+                                    'timestamp': ts,
+                                    'time': datetime.fromtimestamp(ts/1000).strftime('%H:%M'),
+                                    'value': value
+                                })
+            
+            # Ordina per timestamp
+            datapoints.sort(key=lambda x: x['timestamp'])
+            
+            return jsonify({
+                'data': datapoints,
+                'date': day,
+                'min': min([d['value'] for d in datapoints]) if datapoints else None,
+                'max': max([d['value'] for d in datapoints]) if datapoints else None
+            })
+            
+        except Exception as e:
+            return jsonify({'error': str(e), 'data': []}), 500
+    
+    @app.route('/api/intraday/stress', methods=['GET'])
+    @token_required  
+    def get_stress_intraday(current_user):
+        """Ottieni dati intraday Stress"""
+        from garminconnect import Garmin
+        
+        day = request.args.get('date', date.today().isoformat())
+        
+        if not current_user.garmin_email or not current_user.garmin_password_encrypted:
+            return jsonify({'error': 'Garmin non connesso'}), 400
+        
+        try:
+            from cryptography.fernet import Fernet
+            fernet = Fernet(app.config['ENCRYPTION_KEY'])
+            password = fernet.decrypt(current_user.garmin_password_encrypted.encode()).decode()
+            
+            client = Garmin(current_user.garmin_email, password)
+            client.login()
+            
+            stress_data = client.get_stress_data(day)
+            
+            datapoints = []
+            if stress_data and 'stressValuesArray' in stress_data:
+                for val in stress_data['stressValuesArray']:
+                    if val and len(val) >= 2:
+                        ts = val[0]
+                        value = val[1]
+                        if value is not None and value >= 0:  # -1 = no data
+                            datapoints.append({
+                                'timestamp': ts,
+                                'time': datetime.fromtimestamp(ts/1000).strftime('%H:%M'),
+                                'value': value
+                            })
+            
+            datapoints.sort(key=lambda x: x['timestamp'])
+            
+            return jsonify({
+                'data': datapoints,
+                'date': day,
+                'avg': round(sum(d['value'] for d in datapoints) / len(datapoints)) if datapoints else None
+            })
+            
+        except Exception as e:
+            return jsonify({'error': str(e), 'data': []}), 500
+    
     # ========== ACTIVITIES ==========
     
     @app.route('/api/activities', methods=['GET'])
