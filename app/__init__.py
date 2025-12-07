@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.2.4 - Use get_fernet - 2024-12-07
+Version: 2.3.0 - Full Garmin debug - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -909,7 +909,7 @@ Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I
     @app.route('/api/debug/hrv', methods=['GET'])
     @token_required
     def debug_hrv(current_user):
-        """Debug: verifica dati HRV raw da Garmin"""
+        """Debug: verifica TUTTI i dati disponibili da Garmin"""
         import os
         
         try:
@@ -920,7 +920,6 @@ Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I
         if not current_user.garmin_email:
             return jsonify({'error': 'Garmin non connesso'}), 400
         
-        # Ottieni password Garmin usando il metodo del model
         encryption_key = os.environ.get('ENCRYPTION_KEY')
         if not encryption_key:
             return jsonify({'error': 'ENCRYPTION_KEY non configurata'}), 500
@@ -933,8 +932,6 @@ Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I
         except Exception as e:
             return jsonify({'error': f'Decrypt password fallito: {str(e)}'}), 500
         
-        results = []
-        
         try:
             client = Garmin(current_user.garmin_email, garmin_password)
             client.login()
@@ -942,22 +939,47 @@ Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I
             return jsonify({'error': f'Login Garmin fallito: {str(e)}'}), 500
         
         today = date.today()
+        yesterday = today - timedelta(days=1)
+        day_str = yesterday.strftime('%Y-%m-%d')
         
-        for i in range(3):
-            day = today - timedelta(days=i)
-            day_str = day.strftime('%Y-%m-%d')
-            
+        results = {'date': day_str, 'data': {}}
+        
+        # Lista di tutti i metodi da testare
+        methods = [
+            ('stats', lambda: client.get_stats(day_str)),
+            ('hrv', lambda: client.get_hrv_data(day_str)),
+            ('body_battery', lambda: client.get_body_battery(day_str)),
+            ('stress', lambda: client.get_stress_data(day_str)),
+            ('heart_rates', lambda: client.get_heart_rates(day_str)),
+            ('respiration', lambda: client.get_respiration_data(day_str)),
+            ('spo2', lambda: client.get_spo2_data(day_str)),
+            ('sleep', lambda: client.get_sleep_data(day_str)),
+            ('steps', lambda: client.get_steps_data(day_str)),
+            ('floors', lambda: client.get_floors(day_str)),
+            ('intensity_minutes', lambda: client.get_intensity_minutes_data(day_str)),
+            ('rhr', lambda: client.get_rhr_day(day_str)),
+            ('training_status', lambda: client.get_training_status(day_str)),
+            ('training_readiness', lambda: client.get_training_readiness(day_str)),
+            ('max_metrics', lambda: client.get_max_metrics(day_str)),
+            ('fitness_age', lambda: client.get_fitnessage_data(day_str)),
+            ('endurance_score', lambda: client.get_endurance_score(day_str)),
+            ('hill_score', lambda: client.get_hill_score(day_str)),
+            ('race_predictions', lambda: client.get_race_predictions()),
+            ('devices', lambda: client.get_devices()),
+        ]
+        
+        for name, method in methods:
             try:
-                hrv_data = client.get_hrv_data(day_str)
-                results.append({
-                    'date': day_str,
-                    'raw_hrv': hrv_data
-                })
+                data = method()
+                # Limita output per evitare risposte enormi
+                if isinstance(data, dict):
+                    results['data'][name] = {k: v for k, v in list(data.items())[:20]}
+                elif isinstance(data, list):
+                    results['data'][name] = data[:5] if len(data) > 5 else data
+                else:
+                    results['data'][name] = data
             except Exception as e:
-                results.append({
-                    'date': day_str,
-                    'error': str(e)
-                })
+                results['data'][name] = {'error': str(e)}
         
         return jsonify(results)
     
