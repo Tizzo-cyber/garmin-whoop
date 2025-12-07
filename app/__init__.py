@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.3.0 - Full Garmin debug - 2024-12-07
+Version: 2.4.1 - Auto-migration for new fields - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -28,6 +28,26 @@ def create_app():
     # Create tables
     with app.app_context():
         db.create_all()
+        
+        # Auto-migration: aggiungi nuove colonne se non esistono
+        try:
+            from sqlalchemy import text
+            migrations = [
+                "ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS fitness_age INTEGER",
+                "ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS race_time_5k INTEGER",
+                "ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS race_time_10k INTEGER",
+                "ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS race_time_half INTEGER",
+                "ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS race_time_marathon INTEGER",
+            ]
+            for sql in migrations:
+                try:
+                    db.session.execute(text(sql))
+                except Exception:
+                    pass  # Colonna già esiste o altro errore non critico
+            db.session.commit()
+            print("✅ Auto-migration completata")
+        except Exception as e:
+            print(f"⚠️ Auto-migration warning: {e}")
     
     # ========== AUTH HELPERS ==========
     
@@ -341,6 +361,16 @@ def create_app():
         age = user.get_real_age()
         memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else "Nessuna"
         
+        # Helper per formattare tempi gara
+        def fmt_race(secs):
+            if not secs: return 'N/D'
+            h, rem = divmod(int(secs), 3600)
+            m, s = divmod(rem, 60)
+            return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+        
+        # Race predictions
+        race_text = f"5K: {fmt_race(context.get('race_5k'))} | 10K: {fmt_race(context.get('race_10k'))} | Mezza: {fmt_race(context.get('race_half'))} | Maratona: {fmt_race(context.get('race_marathon'))}"
+        
         # Formatta dati di ieri
         y = context.get('yesterday', {})
         yesterday_text = f"""📅 {y.get('date', 'N/D')}
@@ -385,13 +415,18 @@ COLLEGA: Dr. Sakura (coach mentale). Per temi emotivi/stress/ansia, suggerisci d
 ══════════════════════════════════════
            MEDIE 30 GIORNI
 ══════════════════════════════════════
-ETÀ BIOLOGICA: {context.get('biological_age', 'N/D')} (reale: {age}) | VO2 Max: {context.get('vo2_max', 'N/D')}
+ETÀ BIOLOGICA: {context.get('biological_age', 'N/D')} (reale: {age}) | FITNESS AGE: {context.get('fitness_age', 'N/D')} | VO2 Max: {context.get('vo2_max', 'N/D')}
 SCORES: Recovery {context.get('recovery', 'N/D')}% | Strain {context.get('strain', 'N/D')}/21 | Sleep {context.get('sleep_performance', 'N/D')}%
 CUORE: RHR {context.get('resting_hr', 'N/D')}bpm | HRV {context.get('hrv', 'N/D')}ms
 SONNO: {context.get('sleep_hours', 'N/D')}h | Deep {context.get('deep_sleep_min', 'N/D')}min | REM {context.get('rem_sleep_min', 'N/D')}min
 STRESS: {context.get('stress_avg', 'N/D')} media
 ATTIVITÀ: {context.get('steps', 'N/D')} passi | {context.get('distance_km', 'N/D')}km | {context.get('active_calories', 'N/D')}kcal
 INTENSITÀ: Moderata {context.get('moderate_min', 'N/D')}min | Vigorosa {context.get('vigorous_min', 'N/D')}min
+
+══════════════════════════════════════
+         PREVISIONI GARA
+══════════════════════════════════════
+{race_text}
 
 ══════════════════════════════════════
       TREND VS SETTIMANA SCORSA
@@ -575,7 +610,19 @@ Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I
             # Respirazione e SpO2
             'respiration': avg([m.avg_respiration for m in metrics]),
             'spo2': avg([m.avg_spo2 for m in metrics]),
+            
+            # Fitness Age (da Garmin)
+            'fitness_age': avg([m.fitness_age for m in metrics]),
         }
+        
+        # Race Predictions (prendi l'ultimo disponibile)
+        for m in metrics:
+            if m.race_time_5k:
+                context['race_5k'] = m.race_time_5k
+                context['race_10k'] = m.race_time_10k
+                context['race_half'] = m.race_time_half
+                context['race_marathon'] = m.race_time_marathon
+                break
         
         # ═══ DATI DI IERI ═══
         yesterday = metrics[0] if metrics else None

@@ -206,6 +206,34 @@ class GarminSyncService:
         except Exception as e:
             raw_data['spo2_error'] = str(e)
         
+        # Fitness Age
+        try:
+            fitness = client.get_fitnessage_data(day_str)
+            raw_data['fitness_age'] = fitness
+            
+            if fitness:
+                # fitness_age può essere un int diretto o in un dict
+                if isinstance(fitness, dict):
+                    # Cerca il campo corretto
+                    metric.fitness_age = fitness.get('fitnessAge') or fitness.get('chronologicalAge')
+                elif isinstance(fitness, (int, float)):
+                    metric.fitness_age = int(fitness)
+        except Exception as e:
+            raw_data['fitness_age_error'] = str(e)
+        
+        # Race Predictions
+        try:
+            race = client.get_race_predictions()
+            raw_data['race_predictions'] = race
+            
+            if race:
+                metric.race_time_5k = race.get('time5K')
+                metric.race_time_10k = race.get('time10K')
+                metric.race_time_half = race.get('timeHalfMarathon')
+                metric.race_time_marathon = race.get('timeMarathon')
+        except Exception as e:
+            raw_data['race_predictions_error'] = str(e)
+        
         # Calcola metriche derivate
         self._calculate_scores(metric, user)
         

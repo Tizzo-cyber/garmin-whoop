@@ -123,6 +123,15 @@ class DailyMetric(db.Model):
     # VO2 Max
     vo2_max = db.Column(db.Float)
     
+    # Fitness Age (da Garmin)
+    fitness_age = db.Column(db.Integer)
+    
+    # Race Predictions (secondi)
+    race_time_5k = db.Column(db.Integer)
+    race_time_10k = db.Column(db.Integer)
+    race_time_half = db.Column(db.Integer)
+    race_time_marathon = db.Column(db.Integer)
+    
     # Metriche calcolate
     recovery_score = db.Column(db.Integer)  # 0-100
     strain_score = db.Column(db.Float)      # 0-21 stile WHOOP
