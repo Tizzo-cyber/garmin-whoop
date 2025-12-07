@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.4.2 - All activities 30 days - 2024-12-07
+Version: 2.4.3 - Sakura sees activities too - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -455,6 +455,17 @@ Rispondi in italiano, max 300 parole. USA I DATI SPECIFICI nelle risposte!"""
         age = user.get_real_age()
         memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else "Nessuna"
         
+        # Formatta attività recenti (per capire carico e stress)
+        activities = context.get('recent_activities', [])
+        activities_text = "\n".join([
+            f"• {a['date']}: {a['name']} | {a['duration_min']}min | Strain {a['strain']}"
+            for a in activities
+        ]) if activities else "Nessuna attività recente"
+        
+        # Riepilogo settimana
+        ws = context.get('week_activity_summary', {})
+        week_summary = f"{ws.get('total_activities', 0)} attività | {round(ws.get('total_duration_min', 0))}min | Strain medio {ws.get('avg_strain', 'N/D')}" if ws else "N/D"
+        
         # Formatta dati di ieri (focus benessere)
         y = context.get('yesterday', {})
         yesterday_text = f"""📅 {y.get('date', 'N/D')}
@@ -500,6 +511,13 @@ BODY BATTERY: {context.get('body_battery_low', 'N/D')}-{context.get('body_batter
 {trend_text}
 
 ══════════════════════════════════════
+      ATTIVITÀ (per valutare carico)
+══════════════════════════════════════
+RIEPILOGO: {week_summary}
+
+{activities_text}
+
+══════════════════════════════════════
               MEMORIE
 ══════════════════════════════════════
 {memories_text}
@@ -528,6 +546,12 @@ REM SLEEP:
 BODY BATTERY:
 - Mattina <50 = Non hai recuperato abbastanza
 - Sera >30 = Buona gestione energie
+
+ATTIVITÀ E BENESSERE MENTALE:
+- Troppe attività intense + stress alto = rischio burnout/overtraining
+- Poche attività + stress alto = serve movimento per scaricare
+- Alto strain + poco sonno = recupero insufficiente
+- Yoga/meditation nel calendario = buona cura di sé
 
 ═══ MODALITÀ MEDITAZIONE GUIDATA ═══
 Quando l'utente chiede una meditazione, respirazione guidata, o rilassamento:
