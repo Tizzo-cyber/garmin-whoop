@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Version 2.8.4 - Fixed PWA paths + null check - 2024-12-07 -->
+<!-- Version 2.8.5 - Fixed chat mobile keyboard + scroll - 2024-12-07 -->
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -41,11 +41,19 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body, #root { 
             height: 100%; 
+            height: 100dvh; /* Dynamic viewport height for mobile keyboard */ 
             overflow: hidden; 
             font-family: 'Inter', -apple-system, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
+            /* iOS keyboard fixes */
+            position: fixed;
+            width: 100%;
+            -webkit-overflow-scrolling: touch;
         }
+        
+        /* Prevent iOS bounce */
+        body { overscroll-behavior: none; }
         
         .font-display { font-family: 'Space Grotesk', sans-serif; }
         
@@ -810,6 +818,11 @@
                 setMessages(prev => [...prev, { role: 'user', content: text }]);
                 setLoading(true);
                 
+                // Scroll to bottom after sending
+                setTimeout(() => {
+                    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+                }, 50);
+                
                 try {
                     const res = await fetch(`${API}/api/chat`, {
                         method: 'POST',
@@ -823,7 +836,11 @@
                     setMessages(prev => [...prev, { role: 'assistant', content: 'Errore di connessione' }]);
                 }
                 setLoading(false);
-                inputRef.current?.focus();
+                
+                // Scroll again after response
+                setTimeout(() => {
+                    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+                }, 100);
             };
             
             // Send pending message from Stats view
@@ -995,7 +1012,7 @@
                                 type="text"
                                 value={input}
                                 onChange={e => setInput(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
+                                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
                                 placeholder={isRecording ? 'Ascoltando...' : `Messaggio...`}
                                 className={`input-premium flex-1 px-3 py-3 sm:px-5 sm:py-4 rounded-xl sm:rounded-2xl text-base ${isSakura ? 'pink' : ''}`}
                                 disabled={loading || isRecording}
