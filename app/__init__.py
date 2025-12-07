@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.4.1 - Auto-migration for new fields - 2024-12-07
+Version: 2.4.2 - All activities 30 days - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -434,7 +434,7 @@ INTENSITÀ: Moderata {context.get('moderate_min', 'N/D')}min | Vigorosa {context
 {trend_text}
 
 ══════════════════════════════════════
-       ATTIVITÀ ULTIMI 7 GIORNI
+       ATTIVITÀ ULTIMI 30 GIORNI
 ══════════════════════════════════════
 RIEPILOGO: {week_summary}
 
@@ -700,11 +700,11 @@ Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I
                                        (avg([m.stress_avg for m in week2]) or 0), 0),
             }
         
-        # ═══ ATTIVITÀ RECENTI (7gg) - DETTAGLIATE ═══
+        # ═══ ATTIVITÀ RECENTI (30gg) - TUTTE ═══
         activities = Activity.query.filter(
             Activity.user_id == user.id,
-            Activity.start_time >= datetime.now() - timedelta(days=7)
-        ).order_by(Activity.start_time.desc()).limit(10).all()
+            Activity.start_time >= datetime.now() - timedelta(days=30)
+        ).order_by(Activity.start_time.desc()).all()
         
         if activities:
             context['recent_activities'] = [{
