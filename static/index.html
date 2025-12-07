@@ -1006,11 +1006,11 @@
                                     {hs.pace_of_aging !== null && (
                                         <div className="glass-card px-6 py-4 text-center">
                                             <div className="text-sm text-[var(--text-muted)]">Pace of Aging</div>
-                                            <div className="text-2xl font-bold mt-1">
-                                                {hs.pace_status} {hs.pace_of_aging}x
+                                            <div className={`text-2xl font-bold mt-1 ${hs.pace_of_aging < -0.05 ? 'text-[var(--accent-green)]' : hs.pace_of_aging > 0.05 ? 'text-[var(--accent-red)]' : ''}`}>
+                                                {hs.pace_status} {hs.pace_of_aging > 0 ? '+' : ''}{hs.pace_of_aging}
                                             </div>
                                             <div className="text-xs text-[var(--text-muted)] mt-1">
-                                                {hs.pace_label || (hs.pace_of_aging < 0.95 ? 'Ringiovanendo' : hs.pace_of_aging <= 1.05 ? 'Stabile' : 'Accelerato')}
+                                                {hs.pace_label || (hs.pace_of_aging < -0.05 ? 'Ringiovanendo' : hs.pace_of_aging <= 0.05 ? 'Stabile' : 'Accelerato')}
                                             </div>
                                         </div>
                                     )}
@@ -1144,27 +1144,37 @@
                         </div>
                         
                         {/* Pace of Aging Explanation */}
-                        {hs?.pace_of_aging && (
+                        {hs?.pace_of_aging !== null && (
                             <div className="glass-card p-4 sm:p-6 slide-up">
                                 <h3 className="text-lg font-semibold mb-3">📈 Pace of Aging</h3>
                                 <p className="text-sm text-[var(--text-secondary)] mb-4">
                                     Confronta i tuoi ultimi 30 giorni con la media dei 6 mesi. 
-                                    Indica se stai migliorando o peggiorando.
+                                    Negativo = stai migliorando, Positivo = stai peggiorando.
                                 </p>
                                 <div className="flex items-center gap-4">
-                                    <div className="flex-1 h-3 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
-                                        <div className="h-full rounded-full transition-all"
+                                    <span className="text-xs">-0.5</span>
+                                    <div className="flex-1 h-3 bg-[var(--bg-secondary)] rounded-full overflow-hidden relative">
+                                        {/* Center marker */}
+                                        <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-[var(--text-muted)]" />
+                                        {/* Progress bar */}
+                                        <div className="absolute top-0 bottom-0 rounded-full transition-all"
                                             style={{ 
-                                                width: `${Math.min(100, (hs.pace_of_aging / 1.5) * 100)}%`,
-                                                background: hs.pace_of_aging < 0.95 ? 'var(--accent-green)' : hs.pace_of_aging <= 1.05 ? 'var(--accent-orange)' : 'var(--accent-red)'
+                                                left: hs.pace_of_aging < 0 ? `${50 + (hs.pace_of_aging * 100)}%` : '50%',
+                                                width: `${Math.abs(hs.pace_of_aging) * 100}%`,
+                                                background: hs.pace_of_aging < -0.05 ? 'var(--accent-green)' : hs.pace_of_aging > 0.05 ? 'var(--accent-red)' : 'var(--accent-orange)'
                                             }} />
                                     </div>
-                                    <span className="text-lg font-bold">{hs.pace_of_aging}x</span>
+                                    <span className="text-xs">+0.5</span>
                                 </div>
                                 <div className="flex justify-between text-xs text-[var(--text-muted)] mt-2">
-                                    <span>🟢 0.5x Ringiovanendo</span>
-                                    <span>🟡 1.0x Stabile</span>
-                                    <span>🔴 1.5x Accelerato</span>
+                                    <span>🟢 Ringiovanendo</span>
+                                    <span>🟡 Stabile</span>
+                                    <span>🔴 Invecchiando</span>
+                                </div>
+                                <div className="text-center mt-3">
+                                    <span className={`text-xl font-bold ${hs.pace_of_aging < -0.05 ? 'text-[var(--accent-green)]' : hs.pace_of_aging > 0.05 ? 'text-[var(--accent-red)]' : 'text-[var(--accent-orange)]'}`}>
+                                        {hs.pace_of_aging > 0 ? '+' : ''}{hs.pace_of_aging}
+                                    </span>
                                 </div>
                             </div>
                         )}

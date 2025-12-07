@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.8.0 - Healthspan with explanations + fixed pace formula - 2024-12-07
+Version: 2.8.1 - Pace with negative values for improvement - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -649,7 +649,7 @@ def create_app():
         healthspan_age = round(real_age + total_impact, 1)
         
         # Pace of aging (ultimi 30gg vs 6 mesi)
-        # WHOOP style: 1.0 = normale, <1.0 = ringiovanendo, >1.0 = invecchiamento accelerato
+        # Negativo = ringiovanendo, Zero = stabile, Positivo = invecchiamento accelerato
         recent_metrics = [m for m in metrics if m.date >= today - timedelta(days=30)]
         if len(recent_metrics) >= 7:
             # Calcola età biologica solo ultimi 30gg
@@ -677,15 +677,14 @@ def create_app():
             
             recent_age = real_age + recent_impact
             
-            # Pace = differenza tra trend recente e baseline, normalizzata
-            # Se recent_age < healthspan_age = miglioramento = pace negativo
+            # Pace = differenza tra trend recente e baseline
+            # Negativo = miglioramento, Positivo = peggioramento
             age_diff = recent_age - healthspan_age
-            # Scala: ogni 0.5 anni di differenza = 0.1x di pace
-            pace = round(1.0 + (age_diff * 0.2), 2)
-            pace = max(0.5, min(1.5, pace))  # Clamp tra 0.5x e 1.5x
+            pace = round(age_diff * 0.2, 2)  # Scala ridotta
+            pace = max(-0.5, min(0.5, pace))  # Clamp tra -0.5 e +0.5
             
-            pace_status = '🟢' if pace < 0.95 else '🟡' if pace <= 1.05 else '🔴'
-            pace_label = 'Ringiovanendo' if pace < 0.95 else 'Stabile' if pace <= 1.05 else 'Invecchiamento accelerato'
+            pace_status = '🟢' if pace < -0.05 else '🟡' if pace <= 0.05 else '🔴'
+            pace_label = 'Ringiovanendo' if pace < -0.05 else 'Stabile' if pace <= 0.05 else 'Invecchiamento accelerato'
         else:
             pace = None
             pace_status = '⚪'
