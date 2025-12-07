@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Version 2.7.0 - Healthspan (6 months, 8 metrics) - 2024-12-07 -->
+<!-- Version 2.8.0 - Healthspan with explanations + fixed pace formula - 2024-12-07 -->
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -867,6 +867,7 @@
             const [activeMetric, setActiveMetric] = useState(null);
             const [healthspan, setHealthspan] = useState(null);
             const [hsLoading, setHsLoading] = useState(true);
+            const [showInfo, setShowInfo] = useState(false);
             const avgs = summary?.averages || {};
             const impacts = avgs.bio_impacts || {};
             const realAge = summary?.real_age || 42;
@@ -890,17 +891,57 @@
             const isYounger = diff < 0;
             const ringColor = isYounger ? 'var(--accent-green)' : diff > 2 ? 'var(--accent-red)' : 'var(--accent-orange)';
             
-            // 8 metriche Healthspan
-            const metricOrder = [
-                { key: 'sleep_duration', label: 'Sonno', icon: '😴' },
-                { key: 'sleep_consistency', label: 'Consistenza', icon: '🌙' },
-                { key: 'zone_low', label: 'Cardio Mod.', icon: '💚' },
-                { key: 'zone_high', label: 'Cardio Int.', icon: '❤️‍🔥' },
-                { key: 'strength', label: 'Forza', icon: '💪' },
-                { key: 'steps', label: 'Passi', icon: '👟' },
-                { key: 'rhr', label: 'RHR', icon: '❤️' },
-                { key: 'vo2_max', label: 'VO2 Max', icon: '🫁' },
-            ];
+            // 8 metriche Healthspan con spiegazioni
+            const metricInfo = {
+                sleep_duration: { 
+                    label: 'Sonno', icon: '😴', 
+                    desc: 'Durata media del sonno',
+                    target: '7-8.5 ore/notte',
+                    science: 'Il sonno ottimale (7-8h) è associato a minor rischio cardiovascolare, migliore funzione cognitiva e longevità.'
+                },
+                sleep_consistency: { 
+                    label: 'Consistenza', icon: '🌙',
+                    desc: 'Variabilità orario sonno',
+                    target: '<30 min di variazione',
+                    science: 'Andare a dormire sempre alla stessa ora regola il ritmo circadiano e migliora la qualità del sonno.'
+                },
+                zone_low: { 
+                    label: 'Cardio Mod.', icon: '💚',
+                    desc: 'Tempo in zone HR 1-3',
+                    target: '150+ min/settimana',
+                    science: 'WHO raccomanda 150 min/sett di attività moderata per ridurre mortalità cardiovascolare del 30%.'
+                },
+                zone_high: { 
+                    label: 'Cardio Int.', icon: '❤️‍🔥',
+                    desc: 'Tempo in zone HR 4-5',
+                    target: '75+ min/settimana',
+                    science: 'L\'esercizio vigoroso migliora VO2 Max e ha effetti anti-aging a livello cellulare (telomeri).'
+                },
+                strength: { 
+                    label: 'Forza', icon: '💪',
+                    desc: 'Allenamenti di forza',
+                    target: '2+ sessioni/settimana',
+                    science: 'Il resistance training preserva massa muscolare, densità ossea e metabolismo con l\'età.'
+                },
+                steps: { 
+                    label: 'Passi', icon: '👟',
+                    desc: 'Passi giornalieri medi',
+                    target: '8000+ passi/giorno',
+                    science: '8000 passi/giorno riducono mortalità del 51% rispetto a 4000 passi (studio JAMA 2020).'
+                },
+                rhr: { 
+                    label: 'RHR', icon: '❤️',
+                    desc: 'Frequenza cardiaca a riposo',
+                    target: '<60 bpm',
+                    science: 'RHR basso indica cuore efficiente. Ogni 10 bpm sopra 60 aumenta rischio cardiovascolare.'
+                },
+                vo2_max: { 
+                    label: 'VO2 Max', icon: '🫁',
+                    desc: 'Capacità aerobica massima',
+                    target: '>42 ml/kg/min',
+                    science: 'VO2 Max è il miglior predittore di longevità. Alto VO2 = 5x meno rischio di morte prematura.'
+                },
+            };
             
             return (
                 <div className="h-full overflow-y-auto bg-gradient-sensei">
@@ -966,10 +1007,10 @@
                                         <div className="glass-card px-6 py-4 text-center">
                                             <div className="text-sm text-[var(--text-muted)]">Pace of Aging</div>
                                             <div className="text-2xl font-bold mt-1">
-                                                {hs.pace_status} {hs.pace_of_aging > 0 ? '+' : ''}{hs.pace_of_aging}x
+                                                {hs.pace_status} {hs.pace_of_aging}x
                                             </div>
                                             <div className="text-xs text-[var(--text-muted)] mt-1">
-                                                {hs.pace_of_aging < 0 ? 'Ringiovanendo' : hs.pace_of_aging < 0.5 ? 'Rallentato' : 'Accelerato'}
+                                                {hs.pace_label || (hs.pace_of_aging < 0.95 ? 'Ringiovanendo' : hs.pace_of_aging <= 1.05 ? 'Stabile' : 'Accelerato')}
                                             </div>
                                         </div>
                                     )}
@@ -983,19 +1024,54 @@
                             )}
                         </div>
                         
+                        {/* Suggestions */}
+                        {hs?.suggestions?.length > 0 && (
+                            <div className="glass-card p-4 sm:p-6 mb-6 slide-up border-l-4 border-[var(--accent-orange)]">
+                                <h3 className="text-lg font-semibold mb-3">💡 Consigli per migliorare</h3>
+                                <div className="space-y-2">
+                                    {hs.suggestions.map((s, i) => (
+                                        <div key={i} className="text-sm text-[var(--text-secondary)]">{s}</div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        
                         {/* 8 Metriche Grid */}
                         {hs?.impacts && (
                             <div className="glass-card p-4 sm:p-6 mb-6 slide-up">
-                                <h3 className="text-lg font-semibold mb-4">Le 8 Metriche Healthspan</h3>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-semibold">Le 8 Metriche Healthspan</h3>
+                                    <button onClick={() => setShowInfo(!showInfo)} className="text-sm text-[var(--accent-green)] hover:underline">
+                                        {showInfo ? 'Nascondi info' : 'ℹ️ Come funziona?'}
+                                    </button>
+                                </div>
+                                
+                                {/* Info Panel */}
+                                {showInfo && (
+                                    <div className="mb-4 p-4 rounded-xl bg-[var(--bg-secondary)] text-sm">
+                                        <p className="mb-3 text-[var(--text-secondary)]">
+                                            <strong>Healthspan</strong> misura la tua età biologica basandosi su 6 mesi di dati. 
+                                            Ogni metrica contribuisce positivamente (verde, ti ringiovanisce) o negativamente (rosso, ti invecchia).
+                                        </p>
+                                        <div className="flex flex-wrap gap-3">
+                                            <span className="text-[var(--accent-green)]">🟢 Ottimale: -0.5 a -1.5 anni</span>
+                                            <span className="text-[var(--text-muted)]">🟡 Neutro: 0 anni</span>
+                                            <span className="text-[var(--accent-orange)]">🔴 Da migliorare: +0.5 a +1 anni</span>
+                                        </div>
+                                    </div>
+                                )}
+                                
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                    {metricOrder.map(({ key, label, icon }) => {
+                                    {Object.entries(metricInfo).map(([key, info]) => {
                                         const m = hs.impacts[key];
                                         if (!m) return null;
                                         const impactColor = m.impact < 0 ? 'text-[var(--accent-green)]' : m.impact > 0 ? 'text-[var(--accent-orange)]' : 'text-[var(--text-secondary)]';
                                         return (
-                                            <div key={key} className="p-3 rounded-xl bg-[var(--bg-secondary)] text-center">
-                                                <div className="text-2xl mb-1">{icon}</div>
-                                                <div className="text-xs text-[var(--text-muted)]">{label}</div>
+                                            <div key={key} 
+                                                className="p-3 rounded-xl bg-[var(--bg-secondary)] text-center cursor-pointer hover:bg-[var(--bg-card)] transition-colors"
+                                                onClick={() => setActiveMetric({ key: key, value: m.value, info: info })}>
+                                                <div className="text-2xl mb-1">{info.icon}</div>
+                                                <div className="text-xs text-[var(--text-muted)]">{info.label}</div>
                                                 <div className="font-semibold">{m.value}<span className="text-xs ml-1">{m.unit}</span></div>
                                                 <div className={`text-xs font-semibold ${impactColor}`}>
                                                     {m.status} {m.impact > 0 ? '+' : ''}{m.impact}
@@ -1004,6 +1080,35 @@
                                         );
                                     })}
                                 </div>
+                                
+                                {/* Detailed explanations */}
+                                {showInfo && (
+                                    <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                                        <h4 className="font-semibold mb-3">Dettaglio metriche</h4>
+                                        <div className="space-y-3">
+                                            {Object.entries(metricInfo).map(([key, info]) => {
+                                                const m = hs.impacts[key];
+                                                if (!m) return null;
+                                                return (
+                                                    <div key={key} className="p-3 rounded-lg bg-[var(--bg-secondary)]">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span>{info.icon}</span>
+                                                            <span className="font-medium">{info.label}</span>
+                                                            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bg-card)]">{m.status}</span>
+                                                        </div>
+                                                        <div className="text-sm text-[var(--text-secondary)] mb-1">{info.desc}</div>
+                                                        <div className="text-xs text-[var(--text-muted)]">
+                                                            <strong>Target:</strong> {info.target}
+                                                        </div>
+                                                        <div className="text-xs text-[var(--text-muted)] mt-1">
+                                                            <strong>Perché:</strong> {info.science}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                         
@@ -1038,20 +1143,31 @@
                             </div>
                         </div>
                         
-                        {/* Impact Factors */}
-                        <div className="glass-card p-4 sm:p-6 slide-up">
-                            <h3 className="text-lg font-semibold mb-4">Fattori di Impatto <span className="text-sm font-normal text-[var(--text-muted)]">(30gg)</span></h3>
-                            <div className="grid sm:grid-cols-2 gap-3">
-                                <ImpactRow icon="❤️" label="Frequenza Cardiaca" value={impacts.rhr} description="RHR rispetto a baseline 60"
-                                    onClick={() => setActiveMetric({ key: 'rhr', value: avgs.resting_hr?.toFixed(0) })} />
-                                <ImpactRow icon="🫁" label="VO2 Max" value={impacts.vo2} description="Capacità aerobica"
-                                    onClick={() => setActiveMetric({ key: 'vo2', value: avgs.vo2_max?.toFixed(0) })} />
-                                <ImpactRow icon="😴" label="Qualità Sonno" value={impacts.sleep} description="7-8h = ottimale"
-                                    onClick={() => setActiveMetric({ key: 'sleep', value: null })} />
-                                <ImpactRow icon="👟" label="Attività Fisica" value={impacts.steps} description="Passi giornalieri"
-                                    onClick={() => setActiveMetric({ key: 'steps', value: null })} />
+                        {/* Pace of Aging Explanation */}
+                        {hs?.pace_of_aging && (
+                            <div className="glass-card p-4 sm:p-6 slide-up">
+                                <h3 className="text-lg font-semibold mb-3">📈 Pace of Aging</h3>
+                                <p className="text-sm text-[var(--text-secondary)] mb-4">
+                                    Confronta i tuoi ultimi 30 giorni con la media dei 6 mesi. 
+                                    Indica se stai migliorando o peggiorando.
+                                </p>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex-1 h-3 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full transition-all"
+                                            style={{ 
+                                                width: `${Math.min(100, (hs.pace_of_aging / 1.5) * 100)}%`,
+                                                background: hs.pace_of_aging < 0.95 ? 'var(--accent-green)' : hs.pace_of_aging <= 1.05 ? 'var(--accent-orange)' : 'var(--accent-red)'
+                                            }} />
+                                    </div>
+                                    <span className="text-lg font-bold">{hs.pace_of_aging}x</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-[var(--text-muted)] mt-2">
+                                    <span>🟢 0.5x Ringiovanendo</span>
+                                    <span>🟡 1.0x Stabile</span>
+                                    <span>🔴 1.5x Accelerato</span>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             );

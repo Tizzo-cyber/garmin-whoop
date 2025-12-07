@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.7.0 - Healthspan (6 months, 8 metrics) - 2024-12-07
+Version: 2.8.0 - Healthspan with explanations + fixed pace formula - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -649,29 +649,64 @@ def create_app():
         healthspan_age = round(real_age + total_impact, 1)
         
         # Pace of aging (ultimi 30gg vs 6 mesi)
+        # WHOOP style: 1.0 = normale, <1.0 = ringiovanendo, >1.0 = invecchiamento accelerato
         recent_metrics = [m for m in metrics if m.date >= today - timedelta(days=30)]
         if len(recent_metrics) >= 7:
+            # Calcola età biologica solo ultimi 30gg
             recent_impact = 0
-            # Ricalcola solo per ultimi 30gg
+            
             recent_sleep = avg([m.sleep_seconds/3600 for m in recent_metrics if m.sleep_seconds])
             if recent_sleep:
                 diff = abs(recent_sleep - 7.5)
                 recent_impact += -0.5 if 7 <= recent_sleep <= 8.5 else diff * 0.5
+            
             recent_steps = avg([m.steps for m in recent_metrics if m.steps])
             if recent_steps:
                 if recent_steps >= 10000: recent_impact -= 1.0
                 elif recent_steps >= 7500: recent_impact -= 0.5
-                elif recent_steps < 5000: recent_impact += 1.0
+                elif recent_steps >= 5000: recent_impact += 0
+                else: recent_impact += 0.5
+            
             recent_rhr = avg([m.resting_hr for m in recent_metrics if m.resting_hr])
             if recent_rhr:
                 recent_impact += max(-2, min(2, (recent_rhr - 60) / 10))
             
+            recent_vo2 = avg([m.vo2_max for m in recent_metrics if m.vo2_max])
+            if recent_vo2:
+                recent_impact += max(-2, min(2, (42 - recent_vo2) / 5))
+            
             recent_age = real_age + recent_impact
-            pace = round((recent_age - healthspan_age) / 0.5, 2)  # Normalizzato
-            pace_status = '🟢' if pace < 0 else '🟡' if pace < 0.5 else '🔴'
+            
+            # Pace = differenza tra trend recente e baseline, normalizzata
+            # Se recent_age < healthspan_age = miglioramento = pace negativo
+            age_diff = recent_age - healthspan_age
+            # Scala: ogni 0.5 anni di differenza = 0.1x di pace
+            pace = round(1.0 + (age_diff * 0.2), 2)
+            pace = max(0.5, min(1.5, pace))  # Clamp tra 0.5x e 1.5x
+            
+            pace_status = '🟢' if pace < 0.95 else '🟡' if pace <= 1.05 else '🔴'
+            pace_label = 'Ringiovanendo' if pace < 0.95 else 'Stabile' if pace <= 1.05 else 'Invecchiamento accelerato'
         else:
             pace = None
             pace_status = '⚪'
+            pace_label = 'Dati insufficienti'
+        
+        # Calcola suggerimenti
+        suggestions = []
+        for key, data in impacts.items():
+            if data['status'] == '🔴':
+                if key == 'sleep_duration':
+                    suggestions.append('😴 Dormi di più: punta a 7-8 ore per notte')
+                elif key == 'zone_low':
+                    suggestions.append('💚 Aggiungi cardio moderato: camminate, bici, nuoto (150 min/sett)')
+                elif key == 'zone_high':
+                    suggestions.append('❤️‍🔥 Aggiungi cardio intenso: corsa, HIIT, spinning (75 min/sett)')
+                elif key == 'strength':
+                    suggestions.append('💪 Aggiungi allenamento forza: 2 sessioni/settimana')
+                elif key == 'steps':
+                    suggestions.append('👟 Cammina di più: punta a 8000+ passi/giorno')
+                elif key == 'rhr':
+                    suggestions.append('❤️ Migliora fitness cardiovascolare per abbassare RHR')
         
         return jsonify({
             'healthspan_age': healthspan_age,
@@ -680,9 +715,11 @@ def create_app():
             'total_impact': round(total_impact, 1),
             'pace_of_aging': pace,
             'pace_status': pace_status,
+            'pace_label': pace_label,
             'days_analyzed': len(metrics),
             'activities_analyzed': len(activities),
-            'impacts': impacts
+            'impacts': impacts,
+            'suggestions': suggestions
         })
     
     @app.route('/', methods=['GET'])
