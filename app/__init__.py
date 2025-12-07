@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.4.3 - Sakura sees activities too - 2024-12-07
+Version: 2.5.0 - Stats view with period selector - 2024-12-07
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -343,6 +343,123 @@ def create_app():
             'status': 'ok',
             'timestamp': datetime.utcnow().isoformat()
         })
+    
+    @app.route('/api/metrics/period', methods=['GET'])
+    @token_required
+    def get_period_metrics(current_user):
+        """Ottieni metriche per periodo: day, week, month, year"""
+        period_type = request.args.get('type', 'week')
+        offset = request.args.get('offset', 0, type=int)
+        
+        today = date.today()
+        
+        # Calcola date in base al periodo
+        if period_type == 'day':
+            target_date = today + timedelta(days=offset)
+            start_date = target_date
+            end_date = target_date
+            label = target_date.strftime('%d %b %Y')
+        elif period_type == 'week':
+            start_of_week = today - timedelta(days=today.weekday())
+            start_date = start_of_week + timedelta(weeks=offset)
+            end_date = start_date + timedelta(days=6)
+            label = f"{start_date.strftime('%d %b')} - {end_date.strftime('%d %b')}"
+        elif period_type == 'month':
+            target_month = today.month + offset
+            target_year = today.year
+            while target_month < 1:
+                target_month += 12
+                target_year -= 1
+            while target_month > 12:
+                target_month -= 12
+                target_year += 1
+            start_date = date(target_year, target_month, 1)
+            if target_month == 12:
+                end_date = date(target_year + 1, 1, 1) - timedelta(days=1)
+            else:
+                end_date = date(target_year, target_month + 1, 1) - timedelta(days=1)
+            label = start_date.strftime('%B %Y')
+        else:  # year
+            target_year = today.year + offset
+            start_date = date(target_year, 1, 1)
+            end_date = date(target_year, 12, 31)
+            label = str(target_year)
+        
+        metrics = DailyMetric.query.filter(
+            DailyMetric.user_id == current_user.id,
+            DailyMetric.date >= start_date,
+            DailyMetric.date <= end_date
+        ).order_by(DailyMetric.date.asc()).all()
+        
+        activities = Activity.query.filter(
+            Activity.user_id == current_user.id,
+            Activity.start_time >= datetime.combine(start_date, datetime.min.time()),
+            Activity.start_time <= datetime.combine(end_date, datetime.max.time())
+        ).order_by(Activity.start_time.desc()).all()
+        
+        def avg(lst):
+            vals = [x for x in lst if x is not None]
+            return round(sum(vals)/len(vals), 1) if vals else None
+        
+        def total(lst):
+            vals = [x for x in lst if x is not None]
+            return sum(vals) if vals else 0
+        
+        data = {
+            'period': {
+                'type': period_type,
+                'label': label,
+                'start': start_date.isoformat(),
+                'end': end_date.isoformat(),
+                'days_total': (end_date - start_date).days + 1,
+                'days_with_data': len(metrics)
+            },
+            'metrics': {
+                'rhr': avg([m.resting_hr for m in metrics]),
+                'hrv': avg([m.hrv_last_night for m in metrics]),
+                'sleep_hours': avg([m.sleep_seconds/3600 if m.sleep_seconds else None for m in metrics]),
+                'sleep_score': avg([m.sleep_score for m in metrics]),
+                'deep_sleep_min': avg([m.deep_sleep_seconds/60 if m.deep_sleep_seconds else None for m in metrics]),
+                'rem_sleep_min': avg([m.rem_sleep_seconds/60 if m.rem_sleep_seconds else None for m in metrics]),
+                'stress_avg': avg([m.stress_avg for m in metrics]),
+                'steps_avg': avg([m.steps for m in metrics]),
+                'steps_total': total([m.steps for m in metrics]),
+                'calories_total': total([m.total_calories for m in metrics]),
+                'active_calories': total([m.active_calories for m in metrics]),
+                'distance_km': round(total([m.distance_meters for m in metrics]) / 1000, 1) if metrics else 0,
+                'floors': total([m.floors_ascended for m in metrics]),
+                'moderate_min': total([m.moderate_intensity_minutes for m in metrics]),
+                'vigorous_min': total([m.vigorous_intensity_minutes for m in metrics]),
+                'body_battery_high': avg([m.body_battery_high for m in metrics]),
+                'body_battery_low': avg([m.body_battery_low for m in metrics]),
+                'recovery': avg([m.recovery_score for m in metrics]),
+                'strain': avg([m.strain_score for m in metrics]),
+                'spo2': avg([m.avg_spo2 for m in metrics]),
+            },
+            'daily': [{
+                'date': m.date.isoformat(),
+                'day': m.date.strftime('%a'),
+                'steps': m.steps,
+                'calories': m.total_calories,
+                'sleep_hours': round(m.sleep_seconds/3600, 1) if m.sleep_seconds else None,
+                'stress': m.stress_avg,
+                'rhr': m.resting_hr,
+                'recovery': m.recovery_score,
+                'strain': m.strain_score,
+                'body_battery_high': m.body_battery_high,
+            } for m in metrics],
+            'activities': [{
+                'name': a.activity_name or a.activity_type,
+                'type': a.activity_type,
+                'date': a.start_time.strftime('%d/%m %H:%M') if a.start_time else None,
+                'duration_min': round(a.duration_seconds / 60) if a.duration_seconds else None,
+                'distance_km': round(a.distance_meters / 1000, 2) if a.distance_meters else None,
+                'calories': a.calories,
+            } for a in activities[:10]],
+            'activity_count': len(activities)
+        }
+        
+        return jsonify(data)
     
     @app.route('/', methods=['GET'])
     def index():
