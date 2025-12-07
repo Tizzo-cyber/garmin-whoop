@@ -1,9 +1,16 @@
 <!DOCTYPE html>
-<!-- Version 2.8.0 - Healthspan with explanations + fixed pace formula - 2024-12-07 -->
+<!-- Version 2.8.2 - PWA support + Healthspan fixes - 2024-12-07 -->
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#22c55e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SENSEI">
+    <meta name="description" content="AI Coach per i tuoi dati Garmin - Healthspan, Recovery, Training">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
     <title>SENSEI & SAKURA — Performance Lab</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -2285,6 +2292,15 @@
         };
         
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(reg => console.log('SW registered:', reg.scope))
+                    .catch(err => console.log('SW registration failed:', err));
+            });
+        }
     </script>
 </body>
 </html>

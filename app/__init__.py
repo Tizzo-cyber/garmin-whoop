@@ -259,6 +259,8 @@ def create_app():
                 'steps': safe_avg([m.steps for m in metrics]),
                 'stress_avg': safe_avg([m.stress_avg for m in metrics]),
                 'hrv': safe_avg([m.hrv_last_night for m in metrics]),
+                'body_battery_high': safe_avg([m.body_battery_high for m in metrics]),
+                'body_battery_low': safe_avg([m.body_battery_low for m in metrics]),
                 'bio_impacts': {
                     'rhr': safe_avg([m.bio_age_rhr_impact for m in metrics]),
                     'vo2': safe_avg([m.bio_age_vo2_impact for m in metrics]),
