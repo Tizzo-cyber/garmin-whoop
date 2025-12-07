@@ -277,7 +277,7 @@ def create_app():
     @app.route('/api/metrics/trend', methods=['GET'])
     @token_required
     def get_trend(current_user):
-        """Ottieni trend età biologica"""
+        """Ottieni trend età biologica e altre metriche"""
         days = request.args.get('days', 90, type=int)
         start_date = date.today() - timedelta(days=days)
         
@@ -291,6 +291,14 @@ def create_app():
             'biological_age': m.biological_age,
             'recovery': m.recovery_score,
             'strain': m.strain_score,
+            'sleep_hours': round(m.sleep_seconds / 3600, 1) if m.sleep_seconds else None,
+            'stress': m.stress_avg,
+            'hrv': m.hrv_last_night,
+            'rhr': m.resting_hr,
+            'body_battery_high': m.body_battery_high,
+            'body_battery_low': m.body_battery_low,
+            'steps': m.steps,
+            'vo2_max': m.vo2_max,
         } for m in metrics]
         
         # Calculate pace of aging

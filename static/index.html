@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Version 2.8.7 - Fixed send button overflow - 2024-12-07 -->
+<!-- Version 2.9.0 - Multi-metric Trend + Info modals everywhere - 2024-12-07 -->
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -1354,6 +1354,20 @@
             const [offset, setOffset] = useState(0);
             const [data, setData] = useState(null);
             const [loading, setLoading] = useState(true);
+            const [showInfo, setShowInfo] = useState(null);
+            
+            const statsInfo = {
+                steps: { icon: '👟', title: 'Passi', desc: 'I passi misurano il tuo movimento quotidiano. Target: 10.000/giorno per benefici cardiovascolari. Ogni 2.000 passi in più riducono il rischio di morte prematura del 8-11%.' },
+                calories: { icon: '🔥', title: 'Calorie', desc: 'Calorie totali bruciate = metabolismo basale + attività. Le calorie attive sono quelle bruciate con movimento intenzionale (esercizio, camminare, ecc.).' },
+                distance: { icon: '📏', title: 'Distanza', desc: 'Km percorsi a piedi o in attività. Include passeggiate, corsa, escursioni. Non include ciclismo o nuoto nella maggior parte dei casi.' },
+                intensity: { icon: '⏱️', title: 'Minuti Intensi', desc: 'Minuti in zone cardiache moderate (50-70% HR max) e vigorose (70-85% HR max). OMS raccomanda 150-300 min/settimana moderati o 75-150 vigorosi.' },
+                sleep: { icon: '😴', title: 'Sonno', desc: 'Ore di sonno notturno. Deep sleep = recupero fisico (memoria muscolare). REM = recupero mentale (memoria, sogni). Target: 7-9 ore, con 1.5-2h deep e 1.5-2h REM.' },
+                heart: { icon: '❤️', title: 'Cuore', desc: 'RHR = Frequenza a riposo, misura efficienza cardiaca. Atleti: 40-50 bpm. HRV = Variabilità cardiaca, indica resilienza del sistema nervoso. Più alto = meglio.' },
+                stress: { icon: '😤', title: 'Stress', desc: 'Calcolato dalla variabilità cardiaca durante il giorno. 0-25 rilassato, 26-50 normale, 51-75 moderato, 76-100 alto. Lo stress cronico accelera l\'invecchiamento.' },
+                recovery: { icon: '⚡', title: 'Recovery', desc: 'Prontezza fisica al risveglio basata su HRV, sonno, RHR. >66% = pronto per allenamento intenso. 33-66% = allenamento moderato. <33% = riposo o recupero attivo.' },
+                strain: { icon: '🔥', title: 'Strain', desc: 'Carico cardiovascolare accumulato (0-21). 0-9 leggero, 10-14 moderato, 15-17 intenso, 18-21 massimo. Bilancia strain e recovery per risultati ottimali.' },
+                bodyBattery: { icon: '🔋', title: 'Body Battery', desc: 'Energia disponibile (0-100). Si carica con riposo e sonno, si scarica con attività e stress. Mattina ideale: 80-100. Se < 25 hai bisogno di recupero.' }
+            };
             
             const fetchData = async () => {
                 setLoading(true);
@@ -1465,8 +1479,31 @@
             const m = data?.metrics || {};
             const p = data?.period || {};
             
+            const InfoCard = ({ infoKey, children }) => (
+                <div className="glass-card p-4 relative cursor-pointer hover:border-[var(--accent-blue)] transition-all" onClick={() => setShowInfo(infoKey)}>
+                    <button className="absolute top-2 right-2 text-xs text-[var(--accent-blue)] opacity-60 hover:opacity-100">ℹ️</button>
+                    {children}
+                </div>
+            );
+            
             return (
                 <div className="h-full overflow-y-auto bg-gradient-sensei">
+                    {/* Info Modal */}
+                    {showInfo && statsInfo[showInfo] && (
+                        <div className="modal-overlay" onClick={() => setShowInfo(null)}>
+                            <div className="modal-card" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-3xl">{statsInfo[showInfo].icon}</span>
+                                        <h3 className="text-xl font-bold text-[var(--accent-green)]">{statsInfo[showInfo].title}</h3>
+                                    </div>
+                                    <button onClick={() => setShowInfo(null)} className="text-2xl text-[var(--text-muted)]">&times;</button>
+                                </div>
+                                <p className="text-[var(--text-secondary)] leading-relaxed">{statsInfo[showInfo].desc}</p>
+                            </div>
+                        </div>
+                    )}
+                    
                     <div className="max-w-4xl mx-auto p-4 sm:p-6">
                         
                         {/* Period Selector */}
@@ -1497,43 +1534,43 @@
                             <>
                                 {/* Main Stats */}
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-                                    <div className="glass-card p-4 text-center">
+                                    <InfoCard infoKey="steps">
                                         <div className="text-2xl mb-1">👟</div>
                                         <div className="text-xl sm:text-2xl font-bold text-[var(--accent-orange)]">
                                             {m.steps_total ? (m.steps_total / 1000).toFixed(1) + 'k' : '--'}
                                         </div>
                                         <div className="text-xs text-[var(--text-muted)]">Passi totali</div>
                                         {period !== 'day' && m.steps_avg && <div className="text-xs text-[var(--text-secondary)] mt-1">{Math.round(m.steps_avg)}/giorno</div>}
-                                    </div>
-                                    <div className="glass-card p-4 text-center">
+                                    </InfoCard>
+                                    <InfoCard infoKey="calories">
                                         <div className="text-2xl mb-1">🔥</div>
                                         <div className="text-xl sm:text-2xl font-bold text-[var(--accent-red)]">
                                             {m.calories_total ? Math.round(m.calories_total).toLocaleString() : '--'}
                                         </div>
                                         <div className="text-xs text-[var(--text-muted)]">Calorie totali</div>
                                         {m.active_calories > 0 && <div className="text-xs text-[var(--text-secondary)] mt-1">{Math.round(m.active_calories)} attive</div>}
-                                    </div>
-                                    <div className="glass-card p-4 text-center">
+                                    </InfoCard>
+                                    <InfoCard infoKey="distance">
                                         <div className="text-2xl mb-1">📏</div>
                                         <div className="text-xl sm:text-2xl font-bold text-[var(--accent-blue)]">
                                             {m.distance_km || '--'}
                                         </div>
                                         <div className="text-xs text-[var(--text-muted)]">km percorsi</div>
                                         {m.floors > 0 && <div className="text-xs text-[var(--text-secondary)] mt-1">{m.floors} piani</div>}
-                                    </div>
-                                    <div className="glass-card p-4 text-center">
+                                    </InfoCard>
+                                    <InfoCard infoKey="intensity">
                                         <div className="text-2xl mb-1">⏱️</div>
                                         <div className="text-xl sm:text-2xl font-bold text-[var(--accent-purple)]">
                                             {(m.moderate_min || 0) + (m.vigorous_min || 0)}
                                         </div>
                                         <div className="text-xs text-[var(--text-muted)]">Min intensi</div>
                                         {m.vigorous_min > 0 && <div className="text-xs text-[var(--text-secondary)] mt-1">{m.vigorous_min} vigorosi</div>}
-                                    </div>
+                                    </InfoCard>
                                 </div>
                                 
                                 {/* Health Stats */}
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
-                                    <div className="glass-card p-4">
+                                    <InfoCard infoKey="sleep">
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className="text-xl">😴</span>
                                             <span className="text-sm font-medium">Sonno</span>
@@ -1541,8 +1578,8 @@
                                         <div className="text-2xl font-bold text-[var(--accent-purple)]">{m.sleep_hours?.toFixed(1) || '--'}h</div>
                                         <div className="text-xs text-[var(--text-muted)]">media/notte</div>
                                         {m.deep_sleep_min && <div className="text-xs text-[var(--text-secondary)] mt-2">Deep: {Math.round(m.deep_sleep_min)}min | REM: {Math.round(m.rem_sleep_min || 0)}min</div>}
-                                    </div>
-                                    <div className="glass-card p-4">
+                                    </InfoCard>
+                                    <InfoCard infoKey="heart">
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className="text-xl">❤️</span>
                                             <span className="text-sm font-medium">Cuore</span>
@@ -1550,39 +1587,39 @@
                                         <div className="text-2xl font-bold text-[var(--accent-red)]">{m.rhr || '--'} <span className="text-sm font-normal">bpm</span></div>
                                         <div className="text-xs text-[var(--text-muted)]">RHR medio</div>
                                         {m.hrv && <div className="text-xs text-[var(--text-secondary)] mt-2">HRV: {m.hrv}ms</div>}
-                                    </div>
-                                    <div className="glass-card p-4">
+                                    </InfoCard>
+                                    <InfoCard infoKey="stress">
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className="text-xl">😤</span>
                                             <span className="text-sm font-medium">Stress</span>
                                         </div>
                                         <div className="text-2xl font-bold" style={{ color: m.stress_avg > 50 ? 'var(--accent-orange)' : 'var(--accent-green)' }}>{m.stress_avg || '--'}</div>
                                         <div className="text-xs text-[var(--text-muted)]">livello medio</div>
-                                    </div>
-                                    <div className="glass-card p-4">
+                                    </InfoCard>
+                                    <InfoCard infoKey="recovery">
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className="text-xl">⚡</span>
                                             <span className="text-sm font-medium">Recovery</span>
                                         </div>
                                         <div className="text-2xl font-bold text-[var(--accent-green)]">{m.recovery || '--'}%</div>
                                         <div className="text-xs text-[var(--text-muted)]">prontezza</div>
-                                    </div>
-                                    <div className="glass-card p-4">
+                                    </InfoCard>
+                                    <InfoCard infoKey="strain">
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className="text-xl">🔥</span>
                                             <span className="text-sm font-medium">Strain</span>
                                         </div>
                                         <div className="text-2xl font-bold text-[var(--accent-orange)]">{m.strain?.toFixed(1) || '--'}</div>
                                         <div className="text-xs text-[var(--text-muted)]">medio /21</div>
-                                    </div>
-                                    <div className="glass-card p-4">
+                                    </InfoCard>
+                                    <InfoCard infoKey="bodyBattery">
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className="text-xl">🔋</span>
                                             <span className="text-sm font-medium">Body Battery</span>
                                         </div>
                                         <div className="text-2xl font-bold text-[var(--accent-blue)]">{m.body_battery_low || '--'}-{m.body_battery_high || '--'}</div>
                                         <div className="text-xs text-[var(--text-muted)]">range medio</div>
-                                    </div>
+                                    </InfoCard>
                                 </div>
                                 
                                 {/* Daily Chart (for week view) */}
@@ -1626,7 +1663,7 @@
                                 )}
                                 
                                 {/* Ask Coach Buttons */}
-                                <div className="glass-card p-4">
+                                <div className="glass-card p-4 mt-4">
                                     <h3 className="text-sm font-semibold mb-3 text-center">Chiedi al coach</h3>
                                     <div className="flex gap-3 justify-center">
                                         <button onClick={() => handleAskCoach('sensei')}
@@ -1654,8 +1691,110 @@
         // ==================== TREND VIEW ====================
         
         const TrendView = ({ trend, realAge }) => {
+            const [activeChart, setActiveChart] = useState('bioAge');
+            const [showInfo, setShowInfo] = useState(null);
             const canvasRef = useRef(null);
             const chartRef = useRef(null);
+            
+            const chartConfigs = {
+                bioAge: {
+                    title: 'Età Biologica',
+                    icon: '🧬',
+                    color: '#00f593',
+                    getData: (d) => d.biological_age,
+                    unit: 'anni',
+                    refLine: realAge,
+                    refLabel: 'Età Reale',
+                    info: 'Mostra come la tua età biologica cambia nel tempo. Sotto la linea tratteggiata = più giovane della tua età reale.'
+                },
+                recovery: {
+                    title: 'Recovery',
+                    icon: '⚡',
+                    color: '#00f593',
+                    getData: (d) => d.recovery,
+                    unit: '%',
+                    refLine: 66,
+                    refLabel: 'Soglia buona',
+                    info: 'Prontezza fisica al risveglio. >66% = pronto per allenamento intenso, <33% = riposo consigliato.'
+                },
+                strain: {
+                    title: 'Strain',
+                    icon: '🔥',
+                    color: '#ff9f43',
+                    getData: (d) => d.strain,
+                    unit: '/21',
+                    refLine: 10,
+                    refLabel: 'Carico moderato',
+                    info: 'Carico cardiovascolare giornaliero. 0-9 leggero, 10-14 moderato, 15-21 intenso.'
+                },
+                sleep: {
+                    title: 'Sonno',
+                    icon: '😴',
+                    color: '#a78bfa',
+                    getData: (d) => d.sleep_hours,
+                    unit: 'ore',
+                    refLine: 7.5,
+                    refLabel: 'Target 7.5h',
+                    info: 'Ore di sonno per notte. Target ideale 7-9 ore per adulti.'
+                },
+                hrv: {
+                    title: 'HRV',
+                    icon: '💓',
+                    color: '#ff6eb4',
+                    getData: (d) => d.hrv,
+                    unit: 'ms',
+                    refLine: null,
+                    info: 'Variabilità cardiaca notturna. Valori più alti = sistema nervoso più resiliente.'
+                },
+                rhr: {
+                    title: 'Frequenza a Riposo',
+                    icon: '❤️',
+                    color: '#ff6b6b',
+                    getData: (d) => d.rhr,
+                    unit: 'bpm',
+                    refLine: 60,
+                    refLabel: 'Target <60',
+                    info: 'Battiti a riposo. Valori più bassi indicano cuore più efficiente.'
+                },
+                stress: {
+                    title: 'Stress',
+                    icon: '😤',
+                    color: '#ff9f43',
+                    getData: (d) => d.stress,
+                    unit: '',
+                    refLine: 50,
+                    refLabel: 'Soglia alta',
+                    info: 'Livello medio di stress giornaliero. <25 rilassato, 25-50 normale, >50 alto.'
+                },
+                steps: {
+                    title: 'Passi',
+                    icon: '👟',
+                    color: '#4da6ff',
+                    getData: (d) => d.steps,
+                    unit: '',
+                    refLine: 10000,
+                    refLabel: 'Target 10k',
+                    info: 'Passi giornalieri. 10.000 passi = circa 7-8 km.'
+                },
+                bodyBattery: {
+                    title: 'Body Battery',
+                    icon: '🔋',
+                    color: '#22c55e',
+                    getData: (d) => d.body_battery_high,
+                    unit: '',
+                    refLine: 75,
+                    refLabel: 'Carico',
+                    info: 'Energia massima giornaliera. Si carica col sonno, si scarica con attività e stress.'
+                },
+                pace: {
+                    title: 'Pace of Aging',
+                    icon: '📈',
+                    color: '#00f593',
+                    info: 'Confronta i tuoi ultimi 15 giorni con i primi 15 del periodo. Negativo = stai migliorando (ringiovanendo). Positivo = invecchiamento accelerato. Zero = stabile.'
+                }
+            };
+            
+            const config = chartConfigs[activeChart];
             
             useEffect(() => {
                 if (!canvasRef.current || !trend?.data?.length) return;
@@ -1663,30 +1802,60 @@
                 
                 const ctx = canvasRef.current.getContext('2d');
                 const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-                gradient.addColorStop(0, 'rgba(0, 245, 147, 0.3)');
-                gradient.addColorStop(1, 'rgba(0, 245, 147, 0)');
+                gradient.addColorStop(0, config.color + '40');
+                gradient.addColorStop(1, config.color + '00');
+                
+                const datasets = [
+                    { 
+                        label: config.title, 
+                        data: trend.data.map(d => config.getData(d)), 
+                        borderColor: config.color, 
+                        backgroundColor: gradient, 
+                        fill: true, 
+                        tension: 0.4, 
+                        pointRadius: 0, 
+                        borderWidth: 3 
+                    }
+                ];
+                
+                if (config.refLine) {
+                    datasets.push({
+                        label: config.refLabel || 'Riferimento',
+                        data: trend.data.map(() => config.refLine),
+                        borderColor: '#5c5e6a',
+                        borderDash: [8, 4],
+                        pointRadius: 0,
+                        borderWidth: 2,
+                        fill: false
+                    });
+                }
                 
                 chartRef.current = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: trend.data.map(d => new Date(d.date).toLocaleDateString('it', { day: '2-digit', month: 'short' })),
-                        datasets: [
-                            { label: 'Età Biologica', data: trend.data.map(d => d.biological_age), borderColor: '#00f593', backgroundColor: gradient, fill: true, tension: 0.4, pointRadius: 0, borderWidth: 3 },
-                            { label: 'Età Reale', data: trend.data.map(() => realAge), borderColor: '#5c5e6a', borderDash: [8, 4], pointRadius: 0, borderWidth: 2 }
-                        ]
+                        datasets
                     },
                     options: {
-                        responsive: true, maintainAspectRatio: false,
+                        responsive: true, 
+                        maintainAspectRatio: false,
                         interaction: { intersect: false, mode: 'index' },
                         plugins: { legend: { labels: { color: '#8b8d98', font: { size: 12 } } } },
                         scales: {
-                            x: { grid: { color: '#1e2028' }, ticks: { color: '#5c5e6a', maxTicksLimit: 10 } },
-                            y: { grid: { color: '#1e2028' }, ticks: { color: '#5c5e6a' }, suggestedMin: realAge - 6, suggestedMax: realAge + 3 }
+                            x: { grid: { color: '#1e2028' }, ticks: { color: '#5c5e6a', maxTicksLimit: 8 } },
+                            y: { grid: { color: '#1e2028' }, ticks: { color: '#5c5e6a' } }
                         }
                     }
                 });
                 return () => chartRef.current?.destroy();
-            }, [trend, realAge]);
+            }, [trend, realAge, activeChart]);
+            
+            // Calculate stats for current metric
+            const validData = trend?.data?.filter(d => config.getData(d) != null) || [];
+            const values = validData.map(d => config.getData(d));
+            const avg = values.length ? (values.reduce((a,b) => a+b, 0) / values.length).toFixed(1) : '--';
+            const min = values.length ? Math.min(...values).toFixed(1) : '--';
+            const max = values.length ? Math.max(...values).toFixed(1) : '--';
             
             if (!trend?.data?.length) {
                 return (
@@ -1694,7 +1863,7 @@
                         <div className="text-center glass-card p-10">
                             <span className="text-5xl mb-4 block">📈</span>
                             <h3 className="text-xl font-semibold mb-2">Dati insufficienti</h3>
-                            <p className="text-[var(--text-muted)]">Servono almeno 30 giorni di dati</p>
+                            <p className="text-[var(--text-muted)]">Servono almeno 7 giorni di dati</p>
                         </div>
                     </div>
                 );
@@ -1704,39 +1873,106 @@
             
             return (
                 <div className="h-full overflow-y-auto bg-gradient-sensei">
-                    <div className="max-w-6xl mx-auto p-8">
-                        <div className="text-center mb-10 slide-up">
-                            <h1 className="text-4xl font-bold font-display mb-2">Trend Analysis</h1>
-                            <p className="text-[var(--text-muted)]">Evoluzione dell'età biologica nel tempo</p>
-                        </div>
-                        
-                        <div className="glass-card p-8 mb-8 slide-up">
-                            <div style={{ height: 350 }}><canvas ref={canvasRef} /></div>
-                        </div>
-                        
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div className="glass-card p-8 slide-up">
-                                <h3 className="text-sm text-[var(--text-muted)] uppercase tracking-wider mb-4">Pace of Aging</h3>
-                                <div className={`text-5xl font-bold font-display mb-4 ${pace <= 0 ? 'text-[var(--accent-green)] glow-text-green' : 'text-[var(--accent-orange)]'}`}>
-                                    {pace != null ? (pace <= 0 ? '' : '+') + pace.toFixed(1) : '--'}
-                                    <span className="text-xl ml-2">anni/anno</span>
+                    {/* Info Modal */}
+                    {showInfo && (
+                        <div className="modal-overlay" onClick={() => setShowInfo(null)}>
+                            <div className="modal-card" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-3xl">{chartConfigs[showInfo].icon}</span>
+                                        <h3 className="text-xl font-bold" style={{ color: chartConfigs[showInfo].color }}>{chartConfigs[showInfo].title}</h3>
+                                    </div>
+                                    <button onClick={() => setShowInfo(null)} className="text-2xl text-[var(--text-muted)]">&times;</button>
                                 </div>
-                                <p className="text-[var(--text-secondary)]">
+                                <p className="text-[var(--text-secondary)] leading-relaxed">{chartConfigs[showInfo].info}</p>
+                            </div>
+                        </div>
+                    )}
+                    
+                    <div className="max-w-6xl mx-auto p-4 sm:p-8">
+                        <div className="text-center mb-6 slide-up">
+                            <h1 className="text-2xl sm:text-4xl font-bold font-display mb-2">Trend Analysis</h1>
+                            <p className="text-sm sm:text-base text-[var(--text-muted)]">Evoluzione delle metriche nel tempo (90 giorni)</p>
+                        </div>
+                        
+                        {/* Metric Selector */}
+                        <div className="flex flex-wrap gap-2 mb-6 justify-center slide-up">
+                            {Object.entries(chartConfigs).map(([key, cfg]) => (
+                                <button 
+                                    key={key}
+                                    onClick={() => setActiveChart(key)}
+                                    className={`px-3 py-2 rounded-xl text-sm flex items-center gap-2 transition-all ${
+                                        activeChart === key 
+                                            ? 'bg-[var(--bg-card)] border-2' 
+                                            : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-card)] border-2 border-transparent'
+                                    }`}
+                                    style={{ borderColor: activeChart === key ? cfg.color : 'transparent' }}
+                                >
+                                    <span>{cfg.icon}</span>
+                                    <span className="hidden sm:inline">{cfg.title}</span>
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {/* Chart */}
+                        <div className="glass-card p-4 sm:p-8 mb-6 slide-up">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-semibold flex items-center gap-2">
+                                    <span>{config.icon}</span>
+                                    <span style={{ color: config.color }}>{config.title}</span>
+                                </h2>
+                                <button 
+                                    onClick={() => setShowInfo(activeChart)}
+                                    className="text-[var(--accent-blue)] text-sm hover:underline"
+                                >
+                                    ℹ️ Info
+                                </button>
+                            </div>
+                            <div style={{ height: 280 }}><canvas ref={canvasRef} /></div>
+                        </div>
+                        
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-3 gap-3 sm:gap-6 mb-6">
+                            <div className="glass-card p-4 sm:p-6 text-center slide-up">
+                                <div className="text-xs text-[var(--text-muted)] uppercase mb-2">Media</div>
+                                <div className="text-2xl sm:text-3xl font-bold" style={{ color: config.color }}>{avg}</div>
+                                <div className="text-xs text-[var(--text-muted)]">{config.unit}</div>
+                            </div>
+                            <div className="glass-card p-4 sm:p-6 text-center slide-up">
+                                <div className="text-xs text-[var(--text-muted)] uppercase mb-2">Min</div>
+                                <div className="text-2xl sm:text-3xl font-bold text-[var(--accent-blue)]">{min}</div>
+                                <div className="text-xs text-[var(--text-muted)]">{config.unit}</div>
+                            </div>
+                            <div className="glass-card p-4 sm:p-6 text-center slide-up">
+                                <div className="text-xs text-[var(--text-muted)] uppercase mb-2">Max</div>
+                                <div className="text-2xl sm:text-3xl font-bold text-[var(--accent-orange)]">{max}</div>
+                                <div className="text-xs text-[var(--text-muted)]">{config.unit}</div>
+                            </div>
+                        </div>
+                        
+                        {/* Pace of Aging (only show when bioAge selected) */}
+                        {activeChart === 'bioAge' && (
+                            <div className="glass-card p-4 sm:p-8 slide-up">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-sm text-[var(--text-muted)] uppercase tracking-wider">Pace of Aging</h3>
+                                    <button 
+                                        onClick={() => setShowInfo('pace')}
+                                        className="text-[var(--accent-blue)] text-xs"
+                                    >
+                                        ℹ️
+                                    </button>
+                                </div>
+                                <div className={`text-4xl sm:text-5xl font-bold font-display mb-4 ${pace <= 0 ? 'text-[var(--accent-green)] glow-text-green' : 'text-[var(--accent-orange)]'}`}>
+                                    {pace != null ? (pace <= 0 ? '' : '+') + pace.toFixed(1) : '--'}
+                                    <span className="text-lg sm:text-xl ml-2">anni/anno</span>
+                                </div>
+                                <p className="text-[var(--text-secondary)] text-sm sm:text-base">
                                     {pace < -0.5 ? '🎉 Eccellente! Stai ringiovanendo.' : 
                                      pace < 0 ? '✨ Ottimo! Invecchiamento rallentato.' :
                                      pace < 0.5 ? '👍 Nella norma.' : '⚠️ Attenzione! Invecchiamento accelerato.'}
                                 </p>
                             </div>
-                            
-                            <div className="glass-card p-8 slide-up">
-                                <h3 className="text-sm text-[var(--text-muted)] uppercase tracking-wider mb-4">Statistiche</h3>
-                                <div className="space-y-3">
-                                    <div className="flex justify-between"><span className="text-[var(--text-secondary)]">Giorni</span><span className="font-semibold">{trend.data.length}</span></div>
-                                    <div className="flex justify-between"><span className="text-[var(--text-secondary)]">Bio Age min</span><span className="font-semibold text-[var(--accent-green)]">{Math.min(...trend.data.filter(d => d.biological_age).map(d => d.biological_age)).toFixed(1)}</span></div>
-                                    <div className="flex justify-between"><span className="text-[var(--text-secondary)]">Bio Age max</span><span className="font-semibold text-[var(--accent-orange)]">{Math.max(...trend.data.filter(d => d.biological_age).map(d => d.biological_age)).toFixed(1)}</span></div>
-                                </div>
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             );
