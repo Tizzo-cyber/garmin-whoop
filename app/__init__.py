@@ -670,40 +670,40 @@ def create_app():
         avg_sleep = avg(sleep_hours)
         if avg_sleep:
             if 7 <= avg_sleep <= 8.5:
-                raw_impacts['sleep_duration'] = -0.3
+                raw_impacts['sleep_duration'] = -0.4  # Premio per sonno ottimale
                 impacts['sleep_duration'] = {'value': round(avg_sleep, 1), 'impact': 0, 'unit': 'h', 'status': '🟢'}
-            elif avg_sleep < 7:
-                raw = min(1, (7 - avg_sleep) / 3)
-                raw_impacts['sleep_duration'] = raw
-                impacts['sleep_duration'] = {'value': round(avg_sleep, 1), 'impact': 0, 'unit': 'h', 'status': '🟡' if raw < 0.5 else '🔴'}
-            else:
-                raw = min(0.5, (avg_sleep - 8.5) / 3)
+            elif avg_sleep >= 6 or avg_sleep <= 9.5:
+                raw = min(0.3, abs(avg_sleep - 7.5) * 0.2)
                 raw_impacts['sleep_duration'] = raw
                 impacts['sleep_duration'] = {'value': round(avg_sleep, 1), 'impact': 0, 'unit': 'h', 'status': '🟡'}
+            else:
+                raw = min(0.5, abs(avg_sleep - 7.5) * 0.25)
+                raw_impacts['sleep_duration'] = raw
+                impacts['sleep_duration'] = {'value': round(avg_sleep, 1), 'impact': 0, 'unit': 'h', 'status': '🔴'}
         
-        # 2. ZONE HR 1-3 (cardio moderato)
+        # 2. ZONE HR 1-3 (cardio moderato) - PREMI > penalità
         zone_low = sum([(a.hr_zone_1 or 0) + (a.hr_zone_2 or 0) + (a.hr_zone_3 or 0) for a in activities]) / 60
         weekly_low = zone_low / 26
         if weekly_low > 0 or len(activities) > 0:
             if weekly_low >= 150:
-                raw_impacts['zone_low'] = -0.8
+                raw_impacts['zone_low'] = -0.8  # Grande premio
                 impacts['zone_low'] = {'value': round(weekly_low), 'impact': 0, 'unit': 'min/sett', 'status': '🟢'}
             elif weekly_low >= 100:
-                raw_impacts['zone_low'] = -0.4
+                raw_impacts['zone_low'] = -0.5
                 impacts['zone_low'] = {'value': round(weekly_low), 'impact': 0, 'unit': 'min/sett', 'status': '🟢'}
             elif weekly_low >= 50:
-                raw_impacts['zone_low'] = 0
+                raw_impacts['zone_low'] = -0.2
                 impacts['zone_low'] = {'value': round(weekly_low), 'impact': 0, 'unit': 'min/sett', 'status': '🟡'}
             else:
-                raw_impacts['zone_low'] = 0.2  # Ridotto da 0.5
+                raw_impacts['zone_low'] = 0.25  # Penalità moderata
                 impacts['zone_low'] = {'value': round(weekly_low), 'impact': 0, 'unit': 'min/sett', 'status': '🔴'}
         
-        # 3. ZONE HR 4-5 (cardio intenso)
+        # 3. ZONE HR 4-5 (cardio intenso) - PREMI > penalità
         zone_high = sum([(a.hr_zone_4 or 0) + (a.hr_zone_5 or 0) for a in activities]) / 60
         weekly_high = zone_high / 26
         if weekly_high > 0 or len(activities) > 0:
             if weekly_high >= 75:
-                raw_impacts['zone_high'] = -0.8
+                raw_impacts['zone_high'] = -0.8  # Grande premio
                 impacts['zone_high'] = {'value': round(weekly_high), 'impact': 0, 'unit': 'min/sett', 'status': '🟢'}
             elif weekly_high >= 50:
                 raw_impacts['zone_high'] = -0.5
@@ -712,62 +712,89 @@ def create_app():
                 raw_impacts['zone_high'] = -0.2
                 impacts['zone_high'] = {'value': round(weekly_high), 'impact': 0, 'unit': 'min/sett', 'status': '🟡'}
             else:
-                raw_impacts['zone_high'] = 0.2  # Ridotto da 0.5
+                raw_impacts['zone_high'] = 0.25  # Penalità moderata
                 impacts['zone_high'] = {'value': round(weekly_high), 'impact': 0, 'unit': 'min/sett', 'status': '🔴'}
         
-        # 4. ATTIVITÀ FORZA
+        # 4. ATTIVITÀ FORZA - PREMI > penalità
         strength_activities = [a for a in activities if a.activity_type and 'strength' in a.activity_type.lower()]
         strength_weekly = len(strength_activities) / 26
         if len(activities) > 0:  # Solo se abbiamo attività
             if strength_weekly >= 2:
-                raw_impacts['strength'] = -0.6
+                raw_impacts['strength'] = -0.6  # Grande premio
                 impacts['strength'] = {'value': round(strength_weekly, 1), 'impact': 0, 'unit': 'x/sett', 'status': '🟢'}
             elif strength_weekly >= 1:
-                raw_impacts['strength'] = -0.2
+                raw_impacts['strength'] = -0.3
                 impacts['strength'] = {'value': round(strength_weekly, 1), 'impact': 0, 'unit': 'x/sett', 'status': '🟡'}
             else:
-                raw_impacts['strength'] = 0.15  # Ridotto da 0.5
+                raw_impacts['strength'] = 0.2  # Penalità moderata
                 impacts['strength'] = {'value': round(strength_weekly, 1), 'impact': 0, 'unit': 'x/sett', 'status': '🔴'}
         
-        # 5. PASSI GIORNALIERI
+        # 5. PASSI GIORNALIERI - PREMI > penalità
         steps = [m.steps for m in metrics if m.steps]
         avg_steps = avg(steps)
         if avg_steps:
             if avg_steps >= 12000:
-                raw_impacts['steps'] = -0.8
+                raw_impacts['steps'] = -0.7  # Grande premio
                 impacts['steps'] = {'value': round(avg_steps), 'impact': 0, 'unit': '/giorno', 'status': '🟢'}
             elif avg_steps >= 10000:
                 raw_impacts['steps'] = -0.5
                 impacts['steps'] = {'value': round(avg_steps), 'impact': 0, 'unit': '/giorno', 'status': '🟢'}
             elif avg_steps >= 8000:
-                raw_impacts['steps'] = -0.2
+                raw_impacts['steps'] = -0.3
                 impacts['steps'] = {'value': round(avg_steps), 'impact': 0, 'unit': '/giorno', 'status': '🟢'}
             elif avg_steps >= 6000:
-                raw_impacts['steps'] = 0
+                raw_impacts['steps'] = -0.1
                 impacts['steps'] = {'value': round(avg_steps), 'impact': 0, 'unit': '/giorno', 'status': '🟡'}
             elif avg_steps >= 4000:
-                raw_impacts['steps'] = 0.3
+                raw_impacts['steps'] = 0.15  # Leggera penalità
                 impacts['steps'] = {'value': round(avg_steps), 'impact': 0, 'unit': '/giorno', 'status': '🟡'}
             else:
-                raw_impacts['steps'] = 0.8
+                raw_impacts['steps'] = 0.35  # Sedentarietà penalizzata di più
                 impacts['steps'] = {'value': round(avg_steps), 'impact': 0, 'unit': '/giorno', 'status': '🔴'}
         
         # 6. RHR
         rhr_values = [m.resting_hr for m in metrics if m.resting_hr]
         avg_rhr = avg(rhr_values)
         if avg_rhr:
-            raw = (avg_rhr - 60) / 20
-            raw_impacts['rhr'] = max(-1, min(1, raw))
-            status = '🟢' if avg_rhr < 55 else '🟢' if avg_rhr < 65 else '🟡' if avg_rhr < 75 else '🔴'
+            if avg_rhr < 55:
+                raw_impacts['rhr'] = -0.5  # Eccellente
+                status = '🟢'
+            elif avg_rhr < 60:
+                raw_impacts['rhr'] = -0.3  # Ottimo
+                status = '🟢'
+            elif avg_rhr < 70:
+                raw_impacts['rhr'] = 0  # Normale
+                status = '🟡'
+            elif avg_rhr < 80:
+                raw_impacts['rhr'] = 0.25  # Alto
+                status = '🔴'
+            else:
+                raw_impacts['rhr'] = 0.4  # Molto alto
+                status = '🔴'
             impacts['rhr'] = {'value': round(avg_rhr), 'impact': 0, 'unit': 'bpm', 'status': status}
         
         # 7. VO2 MAX (se disponibile)
         vo2_values = [m.vo2_max for m in metrics if m.vo2_max]
         avg_vo2 = avg(vo2_values)
         if avg_vo2:
-            raw = (42 - avg_vo2) / 13
-            raw_impacts['vo2_max'] = max(-1, min(1, raw))
-            status = '🟢' if avg_vo2 > 50 else '🟢' if avg_vo2 > 42 else '🟡' if avg_vo2 > 35 else '🔴'
+            if avg_vo2 > 55:
+                raw_impacts['vo2_max'] = -0.7  # Elite
+                status = '🟢'
+            elif avg_vo2 > 50:
+                raw_impacts['vo2_max'] = -0.5  # Eccellente
+                status = '🟢'
+            elif avg_vo2 > 45:
+                raw_impacts['vo2_max'] = -0.3  # Buono
+                status = '🟢'
+            elif avg_vo2 > 40:
+                raw_impacts['vo2_max'] = 0  # Medio
+                status = '🟡'
+            elif avg_vo2 > 35:
+                raw_impacts['vo2_max'] = 0.2  # Sotto media
+                status = '🟡'
+            else:
+                raw_impacts['vo2_max'] = 0.4  # Basso
+                status = '🔴'
             impacts['vo2_max'] = {'value': round(avg_vo2, 1), 'impact': 0, 'unit': 'ml/kg/min', 'status': status}
         
         # ═══ CALCOLO NORMALIZZATO ═══
@@ -798,23 +825,25 @@ def create_app():
             recent_sleep = avg([m.sleep_seconds/3600 for m in recent_metrics if m.sleep_seconds])
             if recent_sleep:
                 if 7 <= recent_sleep <= 8.5:
-                    recent_raw['sleep'] = -0.3
-                elif recent_sleep < 7:
-                    recent_raw['sleep'] = min(1, (7 - recent_sleep) / 3)
+                    recent_raw['sleep'] = -0.4
                 else:
-                    recent_raw['sleep'] = min(0.5, (recent_sleep - 8.5) / 3)
+                    recent_raw['sleep'] = min(0.4, abs(recent_sleep - 7.5) * 0.2)
             
             recent_steps = avg([m.steps for m in recent_metrics if m.steps])
             if recent_steps:
                 if recent_steps >= 10000: recent_raw['steps'] = -0.5
-                elif recent_steps >= 8000: recent_raw['steps'] = -0.2
-                elif recent_steps >= 6000: recent_raw['steps'] = 0
-                elif recent_steps >= 4000: recent_raw['steps'] = 0.3
-                else: recent_raw['steps'] = 0.8
+                elif recent_steps >= 8000: recent_raw['steps'] = -0.3
+                elif recent_steps >= 6000: recent_raw['steps'] = -0.1
+                elif recent_steps >= 4000: recent_raw['steps'] = 0.15
+                else: recent_raw['steps'] = 0.35
             
             recent_rhr = avg([m.resting_hr for m in recent_metrics if m.resting_hr])
             if recent_rhr:
-                recent_raw['rhr'] = max(-1, min(1, (recent_rhr - 60) / 20))
+                if recent_rhr < 55: recent_raw['rhr'] = -0.5
+                elif recent_rhr < 60: recent_raw['rhr'] = -0.3
+                elif recent_rhr < 70: recent_raw['rhr'] = 0
+                elif recent_rhr < 80: recent_raw['rhr'] = 0.25
+                else: recent_raw['rhr'] = 0.4
             
             if len(recent_raw) >= 2:
                 recent_avg = sum(recent_raw.values()) / len(recent_raw)
@@ -822,11 +851,11 @@ def create_app():
                 
                 # Pace = differenza annualizzata
                 age_diff = recent_age - healthspan_age
-                pace = round(age_diff * 0.5, 2)  # Scala per visualizzazione
-                pace = max(-0.5, min(0.5, pace))
+                pace = round(age_diff * 0.8, 2)  # Scala per visualizzazione
+                pace = max(-1.0, min(1.0, pace))  # Range ±1
                 
-                pace_status = '🟢' if pace < -0.05 else '🟡' if pace <= 0.05 else '🔴'
-                pace_label = 'Ringiovanendo' if pace < -0.05 else 'Stabile' if pace <= 0.05 else 'Invecchiamento accelerato'
+                pace_status = '🟢' if pace < -0.1 else '🟡' if pace <= 0.1 else '🔴'
+                pace_label = 'Ringiovanendo' if pace < -0.1 else 'Stabile' if pace <= 0.1 else 'Invecchiamento accelerato'
         
         # Suggerimenti
         suggestions = []
