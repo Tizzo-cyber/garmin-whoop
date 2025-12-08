@@ -223,6 +223,29 @@ class GarminSyncService:
         except Exception as e:
             raw_data['fitness_age_error'] = str(e)
         
+        # VO2 Max
+        try:
+            max_metrics = client.get_max_metrics(day_str)
+            raw_data['max_metrics'] = max_metrics
+            
+            if max_metrics and isinstance(max_metrics, list) and len(max_metrics) > 0:
+                # Cerca VO2 Max nei risultati
+                for m in max_metrics:
+                    if m.get('generic', {}).get('vo2MaxPreciseValue'):
+                        metric.vo2_max = m['generic']['vo2MaxPreciseValue']
+                        break
+                    elif m.get('generic', {}).get('vo2MaxValue'):
+                        metric.vo2_max = m['generic']['vo2MaxValue']
+                        break
+                    elif m.get('cycling', {}).get('vo2MaxPreciseValue'):
+                        metric.vo2_max = m['cycling']['vo2MaxPreciseValue']
+                        break
+                    elif m.get('running', {}).get('vo2MaxPreciseValue'):
+                        metric.vo2_max = m['running']['vo2MaxPreciseValue']
+                        break
+        except Exception as e:
+            raw_data['max_metrics_error'] = str(e)
+        
         # Race Predictions
         try:
             race = client.get_race_predictions()
