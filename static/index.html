@@ -919,7 +919,8 @@
                 setCommenting(activity.id);
                 try {
                     const res = await fetch(`${API}/api/activity/${activity.id}/comment`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
-                    setComments(prev => ({ ...prev, [activity.id]: (await res.json()).comment }));
+                    const data = await res.json();
+                    setComments(prev => ({ ...prev, [activity.id]: data.comment }));
                 } catch {}
                 setCommenting(null);
             };
