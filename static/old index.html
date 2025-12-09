@@ -1,0 +1,2713 @@
+<!DOCTYPE html>
+<!-- Version 2.9.1 - Normalized biological age calculation - 2024-12-07 -->
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content, viewport-fit=cover">
+    <meta name="theme-color" content="#22c55e">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SENSEI">
+    <meta name="description" content="AI Coach per i tuoi dati Garmin - Healthspan, Recovery, Training">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <title>SENSEI & SAKURA — Performance Lab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0b0f;
+            --bg-secondary: #12141a;
+            --bg-card: #181a22;
+            --bg-card-hover: #1e2028;
+            --border: #2a2d38;
+            --text-primary: #ffffff;
+            --text-secondary: #8b8d98;
+            --text-muted: #5c5e6a;
+            --accent-green: #00f593;
+            --accent-green-dim: rgba(0, 245, 147, 0.15);
+            --accent-pink: #ff6eb4;
+            --accent-pink-dim: rgba(255, 110, 180, 0.15);
+            --accent-blue: #4da6ff;
+            --accent-orange: #ff9f43;
+            --accent-red: #ff6b6b;
+            --keyboard-height: 0px;
+            --accent-purple: #a855f7;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body, #root { 
+            height: 100%; 
+            height: 100dvh; /* Dynamic viewport height for mobile keyboard */ 
+            overflow: hidden; 
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        
+        /* Prevent iOS bounce */
+        body { overscroll-behavior: none; }
+        
+        .font-display { font-family: 'Space Grotesk', sans-serif; }
+        
+        .glass-card {
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(24,26,34,0.8) 100%);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .glass-card-hover:hover {
+            background: var(--bg-card-hover);
+            border-color: #3a3d48;
+            transform: translateY(-2px);
+            transition: all 0.3s ease;
+        }
+        
+        .glow-green { box-shadow: 0 0 40px rgba(0, 245, 147, 0.15); }
+        .glow-pink { box-shadow: 0 0 40px rgba(255, 110, 180, 0.15); }
+        .glow-text-green { text-shadow: 0 0 30px rgba(0, 245, 147, 0.5); }
+        
+        .bio-ring-container { position: relative; width: 220px; height: 220px; }
+        .bio-ring-bg {
+            position: absolute; inset: 0; border-radius: 50%;
+            background: conic-gradient(from 180deg, var(--border) 0deg, var(--border) 360deg);
+        }
+        .bio-ring-progress {
+            position: absolute; inset: 0; border-radius: 50%;
+            background: conic-gradient(from 180deg, var(--accent-green) 0deg, #00c978 calc(var(--progress) * 3.6deg), transparent calc(var(--progress) * 3.6deg));
+            filter: drop-shadow(0 0 10px rgba(0, 245, 147, 0.4));
+        }
+        .bio-ring-inner {
+            position: absolute; inset: 12px; border-radius: 50%;
+            background: var(--bg-primary);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        
+        .input-premium {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        .input-premium:focus {
+            border-color: var(--accent-green);
+            outline: none;
+            box-shadow: 0 0 0 3px var(--accent-green-dim);
+        }
+        .input-premium.pink:focus {
+            border-color: var(--accent-pink);
+            box-shadow: 0 0 0 3px var(--accent-pink-dim);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-green) 0%, #00c978 100%);
+            color: #000; font-weight: 600; transition: all 0.3s;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0, 245, 147, 0.3); }
+        .btn-primary:disabled { opacity: 0.5; transform: none; }
+        
+        .btn-pink {
+            background: linear-gradient(135deg, var(--accent-pink) 0%, #e055a0 100%);
+            color: #000; font-weight: 600;
+        }
+        .btn-pink:hover { box-shadow: 0 10px 30px rgba(255, 110, 180, 0.3); }
+        
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            transition: all 0.3s;
+        }
+        .btn-ghost:hover { border-color: var(--text-secondary); color: var(--text-primary); }
+        
+        .btn-danger {
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid var(--accent-red);
+            color: var(--accent-red);
+            transition: all 0.3s;
+        }
+        .btn-danger:hover { background: var(--accent-red); color: #000; }
+        
+        .chat-bubble {
+            max-width: 80%; padding: 16px 20px;
+            font-size: 15px; line-height: 1.6; border-radius: 20px;
+        }
+        .chat-ai {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px 20px 20px 20px;
+        }
+        .chat-ai.sensei { border-left: 3px solid var(--accent-green); }
+        .chat-ai.sakura { border-left: 3px solid var(--accent-pink); }
+        .chat-user {
+            background: linear-gradient(135deg, #2a2d38 0%, #1e2028 100%);
+            border-radius: 20px 20px 6px 20px;
+        }
+        
+        .typing-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            animation: typing-bounce 1.4s infinite;
+        }
+        .typing-dot:nth-child(2) { animation-delay: 0.15s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes typing-bounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-8px); opacity: 1; }
+        }
+        
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            padding: 12px 16px; border-radius: 16px; transition: all 0.3s;
+            color: var(--text-muted);
+        }
+        .nav-item:hover { color: var(--text-secondary); background: var(--bg-card); }
+        .nav-item.active { background: var(--bg-card); color: var(--text-primary); }
+        .nav-item.active.sensei { color: var(--accent-green); }
+        .nav-item.active.sakura { color: var(--accent-pink); }
+        
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        
+        .fade-in { animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .slide-up { animation: slideUp 0.5s ease; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+        }
+        .metric-card:hover { border-color: var(--accent-blue); transform: translateY(-2px); }
+        
+        .progress-bar { height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+        
+        .bg-gradient-sensei { background: radial-gradient(ellipse at top, rgba(0, 245, 147, 0.05) 0%, transparent 60%); }
+        .bg-gradient-sakura { background: radial-gradient(ellipse at top, rgba(255, 110, 180, 0.05) 0%, transparent 60%); }
+        
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; animation: fadeIn 0.2s ease;
+        }
+        .modal-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 28px;
+            max-width: 450px;
+            width: 90%;
+            animation: slideUp 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const API = '';
+        
+        // ==================== METRIC INFO DATABASE ====================
+        
+        const metricInfo = {
+            rhr: {
+                title: 'Frequenza Cardiaca a Riposo',
+                icon: '❤️',
+                color: 'var(--accent-red)',
+                description: 'La frequenza cardiaca a riposo indica l\'efficienza del tuo cuore. Un cuore allenato pompa più sangue per battito, necessitando di meno battiti al minuto.',
+                tip: 'Ogni 5 bpm in meno può indicare 1-2 anni di età biologica più giovane.',
+                ranges: [
+                    { label: 'Atleta', value: '40-50 bpm', good: true },
+                    { label: 'Eccellente', value: '51-60 bpm', good: true },
+                    { label: 'Buono', value: '61-70 bpm', good: false },
+                    { label: 'Nella media', value: '71-80 bpm', good: false },
+                    { label: 'Da migliorare', value: '80+ bpm', good: false }
+                ]
+            },
+            vo2: {
+                title: 'VO2 Max',
+                icon: '🫁',
+                color: 'var(--accent-green)',
+                description: 'Il VO2 Max misura la massima quantità di ossigeno che il tuo corpo può utilizzare durante l\'esercizio intenso. È il miglior indicatore di fitness cardiovascolare e longevità.',
+                tip: 'Ogni 5 punti in più può ridurre l\'età biologica di 2-3 anni.',
+                ranges: [
+                    { label: 'Eccellente', value: '50+ ml/kg', good: true },
+                    { label: 'Buono', value: '42-50 ml/kg', good: true },
+                    { label: 'Medio', value: '35-42 ml/kg', good: false },
+                    { label: 'Da migliorare', value: '<35 ml/kg', good: false }
+                ]
+            },
+            steps: {
+                title: 'Passi Giornalieri',
+                icon: '👟',
+                color: 'var(--accent-orange)',
+                description: 'I passi giornalieri misurano il tuo livello di attività quotidiana. Camminare regolarmente riduce il rischio cardiovascolare e migliora la longevità.',
+                tip: 'Passare da 5.000 a 10.000 passi può ridurre l\'età biologica di 1-2 anni.',
+                ranges: [
+                    { label: 'Molto attivo', value: '12.000+', good: true },
+                    { label: 'Attivo', value: '10.000-12.000', good: true },
+                    { label: 'Moderato', value: '7.500-10.000', good: false },
+                    { label: 'Basso', value: '5.000-7.500', good: false },
+                    { label: 'Sedentario', value: '<5.000', good: false }
+                ]
+            },
+            sleep: {
+                title: 'Durata del Sonno',
+                icon: '😴',
+                color: 'var(--accent-purple)',
+                description: 'Il sonno è fondamentale per il recupero fisico e mentale. Durante il sonno profondo il corpo ripara i tessuti, consolida la memoria e regola gli ormoni.',
+                tip: 'Dormire 7-8 ore invece di 5-6 può ridurre l\'età biologica di 1-3 anni.',
+                ranges: [
+                    { label: 'Ottimale', value: '7-9 ore', good: true },
+                    { label: 'Accettabile', value: '6-7 ore', good: false },
+                    { label: 'Insufficiente', value: '<6 ore', good: false },
+                    { label: 'Eccessivo', value: '>9 ore', good: false }
+                ]
+            },
+            recovery: {
+                title: 'Recovery Score',
+                icon: '⚡',
+                color: 'var(--accent-green)',
+                description: 'Il Recovery Score indica quanto il tuo corpo è pronto per lo sforzo fisico. Combina HRV, qualità del sonno, frequenza cardiaca a riposo e altri parametri.',
+                tip: 'Allenati intensamente quando il recovery è alto (70%+), fai recupero attivo quando è basso.',
+                ranges: [
+                    { label: 'Pronto per tutto', value: '80-100%', good: true },
+                    { label: 'Buono', value: '60-79%', good: true },
+                    { label: 'Moderato', value: '40-59%', good: false },
+                    { label: 'Riposo consigliato', value: '<40%', good: false }
+                ]
+            },
+            strain: {
+                title: 'Strain Score',
+                icon: '🔥',
+                color: 'var(--accent-orange)',
+                description: 'Lo Strain Score misura il carico cardiovascolare accumulato durante la giornata su una scala 0-21. Tiene conto di durata e intensità di ogni attività.',
+                tip: 'Bilancia strain e recovery: strain alto richiede recovery alto il giorno dopo.',
+                ranges: [
+                    { label: 'Riposo', value: '0-4', good: false },
+                    { label: 'Leggero', value: '5-9', good: true },
+                    { label: 'Moderato', value: '10-14', good: true },
+                    { label: 'Intenso', value: '15-18', good: false },
+                    { label: 'Massimo', value: '19-21', good: false }
+                ]
+            },
+            bioAge: {
+                title: 'Età Biologica',
+                icon: '🧬',
+                color: 'var(--accent-green)',
+                description: 'L\'età biologica stima l\'età del tuo corpo basandosi su parametri fisiologici reali. Riflette quanto bene stai invecchiando rispetto alla tua età anagrafica.',
+                tip: 'Puoi influenzare la tua età biologica con stile di vita, alimentazione, sonno e attività fisica.',
+                ranges: [
+                    { label: 'Eccellente', value: '5+ anni più giovane', good: true },
+                    { label: 'Ottimo', value: '2-5 anni più giovane', good: true },
+                    { label: 'Nella norma', value: '± 2 anni', good: false },
+                    { label: 'Attenzione', value: '2+ anni più vecchio', good: false }
+                ]
+            },
+            stress: {
+                title: 'Livello di Stress',
+                icon: '😤',
+                color: 'var(--accent-orange)',
+                description: 'Misurato tramite la variabilità cardiaca (HRV). Lo stress cronico accelera l\'invecchiamento cellulare e danneggia il sistema cardiovascolare.',
+                tip: 'Pratiche come meditazione, respirazione e attività fisica riducono lo stress.',
+                ranges: [
+                    { label: 'Rilassato', value: '0-25', good: true },
+                    { label: 'Basso', value: '26-50', good: true },
+                    { label: 'Moderato', value: '51-75', good: false },
+                    { label: 'Alto', value: '76-100', good: false }
+                ]
+            },
+            hrz: {
+                title: 'Zone di Frequenza Cardiaca',
+                icon: '💪',
+                color: 'var(--accent-blue)',
+                description: 'Il tempo nelle zone HR elevate (zone 4-5) indica l\'intensità dell\'allenamento. Essenziale per migliorare VO2 Max e fitness cardiovascolare.',
+                tip: '150+ minuti settimanali di attività moderata-intensa migliorano significativamente la longevità.',
+                ranges: [
+                    { label: 'Ottimo', value: '30+ min/giorno in zone 3-5', good: true },
+                    { label: 'Buono', value: '15-30 min/giorno', good: true },
+                    { label: 'Moderato', value: '5-15 min/giorno', good: false },
+                    { label: 'Basso', value: '<5 min/giorno', good: false }
+                ]
+            },
+            hrv: {
+                title: 'Variabilità Cardiaca (HRV)',
+                icon: '💓',
+                color: 'var(--accent-pink)',
+                description: 'L\'HRV misura la variazione tra i battiti cardiaci. Un HRV alto indica un sistema nervoso autonomo sano e una buona capacità di adattamento allo stress.',
+                tip: 'HRV più alto = corpo più resiliente. Migliora con sonno, meditazione e fitness.',
+                ranges: [
+                    { label: 'Eccellente', value: '60+ ms', good: true },
+                    { label: 'Buono', value: '40-60 ms', good: true },
+                    { label: 'Nella media', value: '20-40 ms', good: false },
+                    { label: 'Basso', value: '<20 ms', good: false }
+                ]
+            },
+            bodyBattery: {
+                title: 'Body Battery',
+                icon: '🔋',
+                color: 'var(--accent-green)',
+                description: 'Body Battery indica le tue riserve di energia durante la giornata. Si carica con riposo e sonno, si scarica con attività e stress.',
+                tip: 'Inizia la giornata con 80+ per massima produttività. Se scende sotto 20, hai bisogno di riposo.',
+                ranges: [
+                    { label: 'Carico', value: '75-100', good: true },
+                    { label: 'Buono', value: '50-74', good: true },
+                    { label: 'Medio', value: '25-49', good: false },
+                    { label: 'Scarico', value: '0-24', good: false }
+                ]
+            }
+        };
+        
+        // ==================== COMPONENTS ====================
+        
+        const Loading = () => (
+            <div className="h-full flex items-center justify-center">
+                <div className="w-12 h-12 border-4 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin" />
+            </div>
+        );
+        
+        // ==================== TOOLTIP MODAL ====================
+        
+        const MetricModal = ({ metricKey, value, onClose, token }) => {
+            const info = metricInfo[metricKey];
+            const [intradayData, setIntradayData] = React.useState(null);
+            const [loading, setLoading] = React.useState(false);
+            const chartRef = React.useRef(null);
+            const chartInstance = React.useRef(null);
+            
+            // Fetch intraday data for body battery
+            React.useEffect(() => {
+                if ((metricKey === 'bodyBattery' || metricKey === 'stress') && token) {
+                    setLoading(true);
+                    const endpoint = metricKey === 'bodyBattery' ? 'body-battery' : 'stress';
+                    fetch(`${API}/api/intraday/${endpoint}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        setIntradayData(data);
+                        setLoading(false);
+                    })
+                    .catch(() => setLoading(false));
+                }
+            }, [metricKey, token]);
+            
+            // Draw chart when data arrives
+            React.useEffect(() => {
+                if (intradayData?.data?.length > 0 && chartRef.current) {
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                    }
+                    
+                    const ctx = chartRef.current.getContext('2d');
+                    const color = metricKey === 'bodyBattery' ? '#22c55e' : '#ff9f43';
+                    
+                    chartInstance.current = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: intradayData.data.map(d => d.time),
+                            datasets: [{
+                                label: metricKey === 'bodyBattery' ? 'Body Battery' : 'Stress',
+                                data: intradayData.data.map(d => d.value),
+                                borderColor: color,
+                                backgroundColor: color + '20',
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: '#181a22',
+                                    titleColor: '#fff',
+                                    bodyColor: '#8b8d98',
+                                    borderColor: '#2a2d38',
+                                    borderWidth: 1
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    display: true,
+                                    grid: { color: '#2a2d3840' },
+                                    ticks: { 
+                                        color: '#5c5e6a', 
+                                        maxRotation: 0,
+                                        maxTicksLimit: 8
+                                    }
+                                },
+                                y: {
+                                    display: true,
+                                    min: 0,
+                                    max: 100,
+                                    grid: { color: '#2a2d3840' },
+                                    ticks: { color: '#5c5e6a' }
+                                }
+                            }
+                        }
+                    });
+                }
+                
+                return () => {
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                    }
+                };
+            }, [intradayData, metricKey]);
+            
+            if (!info) return null;
+            
+            const showChart = (metricKey === 'bodyBattery' || metricKey === 'stress');
+            
+            return (
+                <div className="modal-overlay" onClick={onClose}>
+                    <div className="modal-card" style={{ maxWidth: showChart ? '500px' : '400px' }} onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <span className="text-3xl">{info.icon}</span>
+                                <h3 className="text-xl font-bold" style={{ color: info.color }}>{info.title}</h3>
+                            </div>
+                            <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white text-2xl leading-none">&times;</button>
+                        </div>
+                        
+                        {value !== undefined && value !== null && (
+                            <div className="text-center py-4 mb-4 rounded-xl" style={{ background: 'var(--bg-secondary)' }}>
+                                <div className="text-4xl font-bold font-display" style={{ color: info.color }}>{value}</div>
+                                <div className="text-sm text-[var(--text-muted)]">Media 30 giorni</div>
+                            </div>
+                        )}
+                        
+                        {/* Intraday Chart */}
+                        {showChart && (
+                            <div className="mb-4 p-4 rounded-xl" style={{ background: 'var(--bg-secondary)' }}>
+                                <div className="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-3">📊 Andamento Oggi</div>
+                                {loading ? (
+                                    <div className="h-40 flex items-center justify-center">
+                                        <span className="text-[var(--text-muted)]">Caricamento...</span>
+                                    </div>
+                                ) : intradayData?.data?.length > 0 ? (
+                                    <div style={{ height: '160px' }}>
+                                        <canvas ref={chartRef}></canvas>
+                                    </div>
+                                ) : (
+                                    <div className="h-40 flex items-center justify-center">
+                                        <span className="text-[var(--text-muted)]">Nessun dato oggi</span>
+                                    </div>
+                                )}
+                                {intradayData && intradayData.min != null && intradayData.max != null && (
+                                    <div className="flex justify-between mt-2 text-xs">
+                                        <span className="text-[var(--accent-red)]">Min: {intradayData.min}</span>
+                                        <span className="text-[var(--accent-green)]">Max: {intradayData.max}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
+                        <p className="text-[var(--text-secondary)] leading-relaxed mb-4">{info.description}</p>
+                        
+                        <div className="flex items-start gap-2 p-4 rounded-xl mb-6" style={{ background: 'var(--accent-green-dim)' }}>
+                            <span>💡</span>
+                            <p className="text-sm" style={{ color: 'var(--accent-green)' }}>{info.tip}</p>
+                        </div>
+                        
+                        <div className="rounded-xl p-4" style={{ background: 'var(--bg-secondary)' }}>
+                            <div className="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-3">Valori di riferimento</div>
+                            {info.ranges.map((r, i) => (
+                                <div key={i} className="flex justify-between items-center py-2 border-b border-[var(--border)] last:border-0">
+                                    <span className="text-sm">{r.label}</span>
+                                    <span className="text-sm font-medium" style={{ color: r.good ? 'var(--accent-green)' : 'var(--accent-orange)' }}>{r.value}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== CONFIRM MODAL ====================
+        
+        const ConfirmModal = ({ title, message, onConfirm, onCancel }) => (
+            <div className="modal-overlay" onClick={onCancel}>
+                <div className="modal-card text-center" onClick={e => e.stopPropagation()}>
+                    <h3 className="text-xl font-bold mb-4">{title}</h3>
+                    <p className="text-[var(--text-secondary)] mb-8">{message}</p>
+                    <div className="flex gap-4 justify-center">
+                        <button onClick={onCancel} className="btn-ghost px-6 py-3 rounded-xl">Annulla</button>
+                        <button onClick={onConfirm} className="btn-danger px-6 py-3 rounded-xl">Conferma</button>
+                    </div>
+                </div>
+            </div>
+        );
+        
+        // ==================== BIO AGE RING ====================
+        
+        const BioAgeRing = ({ bioAge, realAge, onClick }) => {
+            const diff = realAge && bioAge ? realAge - bioAge : 0;
+            const progress = Math.max(0, Math.min(100, 50 + diff * 8));
+            
+            return (
+                <div className="bio-ring-container cursor-pointer hover:scale-105 transition-transform" onClick={onClick}>
+                    <div className="bio-ring-bg" />
+                    <div className="bio-ring-progress" style={{ '--progress': progress }} />
+                    <div className="bio-ring-inner">
+                        <span className="text-5xl font-bold font-display glow-text-green">{bioAge?.toFixed(1) || '--'}</span>
+                        <span className="text-sm text-[var(--text-muted)] uppercase tracking-widest mt-1">Bio Age</span>
+                        {diff !== 0 && (
+                            <span className={`text-lg font-semibold mt-2 ${diff > 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}`}>
+                                {diff > 0 ? `${diff.toFixed(1)} anni più giovane` : `${Math.abs(diff).toFixed(1)} anni più vecchio`}
+                            </span>
+                        )}
+                        <span className="text-xs text-[var(--accent-blue)] mt-2">ⓘ Clicca per info</span>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== METRIC CARD ====================
+        
+        const MetricCard = ({ metricKey, icon, label, value, unit, color, subtitle, onClick }) => (
+            <div className="metric-card fade-in" onClick={onClick}>
+                <div className="flex items-start justify-between mb-2 sm:mb-3">
+                    <span className="text-xl sm:text-2xl">{icon}</span>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                        <span className="text-[10px] sm:text-xs text-[var(--text-muted)] uppercase tracking-wider">{label}</span>
+                        <span className="text-[10px] sm:text-xs text-[var(--accent-blue)]">ⓘ</span>
+                    </div>
+                </div>
+                <div className="flex items-baseline gap-1">
+                    <span className="text-2xl sm:text-3xl font-bold font-display" style={{ color }}>{value ?? '--'}</span>
+                    {unit && <span className="text-xs sm:text-sm text-[var(--text-muted)]">{unit}</span>}
+                </div>
+                {subtitle && <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-1 sm:mt-2 hidden sm:block">{subtitle}</p>}
+            </div>
+        );
+        
+        // ==================== IMPACT ROW ====================
+        
+        const ImpactRow = ({ metricKey, icon, label, value, description, onClick }) => {
+            const isGood = value <= 0;
+            const width = Math.min(Math.abs(value || 0) / 2.5 * 100, 100);
+            
+            return (
+                <div className="py-4 border-b border-[var(--border)] last:border-0 cursor-pointer hover:bg-[var(--bg-secondary)] rounded-lg px-3 -mx-3 transition-colors" onClick={onClick}>
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                            <span className="text-xl">{icon}</span>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-medium">{label}</span>
+                                    <span className="text-xs text-[var(--accent-blue)]">ⓘ</span>
+                                </div>
+                                {description && <p className="text-xs text-[var(--text-muted)]">{description}</p>}
+                            </div>
+                        </div>
+                        <span className={`text-lg font-bold ${isGood ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}`}>
+                            {value != null ? (isGood ? '' : '+') + value.toFixed(1) : '--'} yr
+                        </span>
+                    </div>
+                    <div className="progress-bar">
+                        <div className="progress-fill" style={{ width: `${width}%`, background: isGood ? 'var(--accent-green)' : 'var(--accent-orange)' }} />
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== CHAT VIEW ====================
+        
+        const ChatView = ({ token, coach, initialMessage, onMessageSent }) => {
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [ready, setReady] = useState(false);
+            const [showReset, setShowReset] = useState(false);
+            const [playingAudio, setPlayingAudio] = useState(false);
+            const [isRecording, setIsRecording] = useState(false);
+            const [voiceInputPending, setVoiceInputPending] = useState(false);
+            const [pendingInitialMessage, setPendingInitialMessage] = useState(null);
+            const chatRef = useRef(null);
+            const inputRef = useRef(null);
+            const audioRef = useRef(null);
+            const recognitionRef = useRef(null);
+            const sendBtnRef = useRef(null);
+            
+            const isSakura = coach === 'sakura';
+            const accent = isSakura ? 'var(--accent-pink)' : 'var(--accent-green)';
+            const coachName = isSakura ? 'Sakura' : 'Sensei';
+            const coachEmoji = isSakura ? '🌸' : '🥋';
+            const coachTitle = isSakura ? 'Mental & Spiritual Coach' : 'Athletic Performance Coach';
+            const bgClass = isSakura ? 'bg-gradient-sakura' : 'bg-gradient-sensei';
+            
+            // Handle initial message from Stats view
+            useEffect(() => {
+                if (initialMessage && ready && !loading) {
+                    setPendingInitialMessage(initialMessage);
+                    if (onMessageSent) onMessageSent();
+                }
+            }, [initialMessage, ready]);
+            
+            const toggleRecording = () => {
+                if (isRecording) {
+                    // Stop recording
+                    if (recognitionRef.current) {
+                        recognitionRef.current.stop();
+                    }
+                    setIsRecording(false);
+                } else {
+                    // Start recording
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    if (!SpeechRecognition) {
+                        alert('Il tuo browser non supporta il riconoscimento vocale');
+                        return;
+                    }
+                    
+                    const recognition = new SpeechRecognition();
+                    recognition.lang = 'it-IT';
+                    recognition.continuous = false;
+                    recognition.interimResults = true;
+                    
+                    recognition.onresult = (event) => {
+                        const transcript = Array.from(event.results)
+                            .map(result => result[0].transcript)
+                            .join('');
+                        setInput(transcript);
+                    };
+                    
+                    recognition.onend = () => {
+                        setIsRecording(false);
+                        setVoiceInputPending(true);
+                    };
+                    
+                    recognition.onerror = (event) => {
+                        console.error('Speech recognition error:', event.error);
+                        setIsRecording(false);
+                    };
+                    
+                    recognitionRef.current = recognition;
+                    recognition.start();
+                    setIsRecording(true);
+                }
+            };
+            
+            const playAudio = async (text) => {
+                if (playingAudio) return;
+                setPlayingAudio(true);
+                
+                // Check for pause markers [PAUSA:XX]
+                const pausePattern = /\[PAUSA:(\d+)\]/g;
+                const hasPauses = pausePattern.test(text);
+                
+                if (hasPauses) {
+                    // Split text by pause markers and play with actual pauses
+                    const segments = text.split(/\[PAUSA:\d+\]/);
+                    const pauses = [...text.matchAll(/\[PAUSA:(\d+)\]/g)].map(m => parseInt(m[1]) * 1000);
+                    
+                    for (let i = 0; i < segments.length; i++) {
+                        const segment = segments[i].trim();
+                        if (segment) {
+                            try {
+                                const res = await fetch(`${API}/api/tts`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                    body: JSON.stringify({ text: segment, coach })
+                                });
+                                const data = await res.json();
+                                
+                                if (data.audio) {
+                                    await new Promise((resolve) => {
+                                        const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+                                        audioRef.current = audio;
+                                        audio.onended = resolve;
+                                        audio.onerror = resolve;
+                                        audio.play();
+                                    });
+                                }
+                            } catch (e) {
+                                console.error('TTS segment error:', e);
+                            }
+                        }
+                        
+                        // Wait for pause duration (if not last segment)
+                        if (i < pauses.length) {
+                            await new Promise(resolve => setTimeout(resolve, pauses[i]));
+                        }
+                    }
+                    setPlayingAudio(false);
+                } else {
+                    // Normal playback without pauses
+                    try {
+                        const res = await fetch(`${API}/api/tts`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ text, coach })
+                        });
+                        const data = await res.json();
+                        
+                        if (data.audio) {
+                            const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+                            audioRef.current = audio;
+                            audio.onended = () => setPlayingAudio(false);
+                            audio.onerror = () => setPlayingAudio(false);
+                            await audio.play();
+                        } else {
+                            setPlayingAudio(false);
+                        }
+                    } catch (e) {
+                        console.error('TTS error:', e);
+                        setPlayingAudio(false);
+                    }
+                }
+            };
+            
+            useEffect(() => {
+                setMessages([]);
+                setReady(false);
+                loadHistory();
+            }, [coach]);
+            
+            useEffect(() => {
+                if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+            }, [messages, loading]);
+            
+            // Auto-send when voice input ends
+            useEffect(() => {
+                if (voiceInputPending && input.trim()) {
+                    setVoiceInputPending(false);
+                    sendWithVoice();
+                } else if (voiceInputPending) {
+                    setVoiceInputPending(false);
+                }
+            }, [voiceInputPending, input]);
+            
+            const loadHistory = async () => {
+                try {
+                    const res = await fetch(`${API}/api/chat/history?coach=${coach}&limit=50`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (Array.isArray(data)) setMessages(data);
+                    }
+                } catch {}
+                setReady(true);
+            };
+            
+            const send = async (customMessage = null) => {
+                const text = customMessage || input.trim();
+                if (!text || loading) return;
+                
+                setInput('');
+                setMessages(prev => [...prev, { role: 'user', content: text }]);
+                setLoading(true);
+                
+                // Scroll to bottom after sending
+                setTimeout(() => {
+                    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+                }, 50);
+                
+                try {
+                    const res = await fetch(`${API}/api/chat`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ message: text, coach })
+                    });
+                    const data = await res.json();
+                    const responseText = data.response || data.error || 'Errore';
+                    setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
+                } catch {
+                    setMessages(prev => [...prev, { role: 'assistant', content: 'Errore di connessione' }]);
+                }
+                setLoading(false);
+                
+                // Scroll again after response
+                setTimeout(() => {
+                    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+                }, 100);
+            };
+            
+            // Send pending message from Stats view
+            useEffect(() => {
+                if (pendingInitialMessage && ready && !loading) {
+                    send(pendingInitialMessage);
+                    setPendingInitialMessage(null);
+                }
+            }, [pendingInitialMessage, ready, loading]);
+            
+            const sendWithVoice = async () => {
+                const text = input.trim();
+                if (!text || loading) return;
+                
+                setInput('');
+                setMessages(prev => [...prev, { role: 'user', content: text }]);
+                setLoading(true);
+                
+                try {
+                    const res = await fetch(`${API}/api/chat`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ message: text, coach })
+                    });
+                    const data = await res.json();
+                    const responseText = data.response || data.error || 'Errore';
+                    setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
+                    
+                    // Auto-play audio response
+                    if (responseText) {
+                        setTimeout(() => playAudio(responseText), 500);
+                    }
+                } catch {
+                    setMessages(prev => [...prev, { role: 'assistant', content: 'Errore di connessione' }]);
+                }
+                setLoading(false);
+            };
+            
+            const resetChat = async () => {
+                try {
+                    await fetch(`${API}/api/chat/reset?coach=${coach}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                } catch {}
+                setMessages([]);
+                setShowReset(false);
+            };
+            
+            const suggestions = isSakura 
+                ? ['Come mi sento oggi?', 'Sono stressato', 'Aiutami a rilassarmi', 'Ho bisogno di motivazione']
+                : ['Analizza i miei dati', 'Piano allenamento oggi', 'Come sta il mio recupero?', 'Consigli per migliorare'];
+            
+            if (!ready) return <Loading />;
+            
+            return (
+                <div className={`flex flex-col h-full min-h-0 ${bgClass}`}>
+                    {/* Reset Modal */}
+                    {showReset && (
+                        <ConfirmModal
+                            title={`Resettare la chat con ${coachName}?`}
+                            message="Tutti i messaggi verranno eliminati. Le memorie salvate rimarranno."
+                            onConfirm={resetChat}
+                            onCancel={() => setShowReset(false)}
+                        />
+                    )}
+                    
+                    {/* Header */}
+                        <div className="flex-shrink-0 flex justify-between items-center p-3 sm:p-4 border-b border-[var(--border)]">
+                            <div className="flex items-center gap-2 sm:gap-3">
+                                <span className="text-xl sm:text-2xl">{coachEmoji}</span>
+                                <div>
+                                    <h2 className="font-bold text-sm sm:text-base" style={{ color: accent }}>{coachName}</h2>
+                                    <p className="text-xs text-[var(--text-muted)] hidden sm:block">{coachTitle}</p>
+                                </div>
+                            </div>
+                            {messages.length > 0 && (
+                                <button onClick={() => setShowReset(true)} className="btn-ghost px-3 py-2 sm:px-4 rounded-xl text-xs sm:text-sm">
+                                    <span className="hidden sm:inline">🗑️ Reset</span>
+                                    <span className="sm:hidden">🗑️</span>
+                                </button>
+                            )}
+                        </div>
+                    
+                    {/* Messages */}
+                    <div ref={chatRef} className="flex-1 overflow-y-auto min-h-0">
+                        {messages.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center px-4 sm:px-6 text-center">
+                                <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full flex items-center justify-center text-3xl sm:text-5xl mb-4 sm:mb-6"
+                                    style={{ background: isSakura ? 'var(--accent-pink-dim)' : 'var(--accent-green-dim)',
+                                        boxShadow: isSakura ? '0 0 60px rgba(255,110,180,0.2)' : '0 0 60px rgba(0,245,147,0.2)' }}>
+                                    {coachEmoji}
+                                </div>
+                                <h2 className="text-2xl sm:text-3xl font-bold font-display mb-2" style={{ color: accent }}>{coachName}</h2>
+                                <p className="text-sm sm:text-base text-[var(--text-secondary)] max-w-md mb-6 sm:mb-8 px-2">
+                                    {isSakura 
+                                        ? 'Sono qui per guidarti nel tuo percorso di benessere mentale. Parliamo di come ti senti, dello stress, e troviamo insieme il tuo equilibrio interiore.'
+                                        : 'Analizzo i tuoi dati Garmin per ottimizzare allenamento e recupero. Chiedimi consigli su performance, nutrizione e preparazione atletica.'}
+                                </p>
+                                <div className="flex flex-wrap justify-center gap-2 sm:gap-3 max-w-lg">
+                                    {suggestions.map((s, i) => (
+                                        <button key={i} onClick={() => setInput(s)}
+                                            className="px-3 py-2 sm:px-5 sm:py-3 rounded-full text-xs sm:text-sm glass-card glass-card-hover">
+                                            {s}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-4 sm:p-6 space-y-3 sm:space-y-4 max-w-4xl mx-auto">
+                                {messages.map((m, i) => (
+                                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} fade-in`}>
+                                        <div className={`chat-bubble ${m.role === 'user' ? 'chat-user' : `chat-ai ${coach}`}`}>
+                                            {m.role === 'assistant' && (
+                                                <div className="flex items-center justify-between gap-3 mb-3 pb-3 border-b border-[var(--border)]">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-2xl">{coachEmoji}</span>
+                                                        <span className="font-semibold" style={{ color: accent }}>{coachName}</span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => playAudio(m.content)}
+                                                        disabled={playingAudio}
+                                                        className={`text-xl transition-opacity ${playingAudio ? 'animate-pulse opacity-100' : 'opacity-60 hover:opacity-100'}`}
+                                                        title="Ascolta"
+                                                    >
+                                                        {playingAudio ? '🔉' : '🔊'}
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {loading && (
+                                    <div className="flex justify-start fade-in">
+                                        <div className={`chat-bubble chat-ai ${coach}`}>
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <span className="text-2xl">{coachEmoji}</span>
+                                                <span className="font-semibold" style={{ color: accent }}>{coachName}</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <div className="typing-dot" style={{ background: accent }} />
+                                                <div className="typing-dot" style={{ background: accent }} />
+                                                <div className="typing-dot" style={{ background: accent }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Input */}
+                    <div className="flex-shrink-0 p-3 sm:p-4 border-t border-[var(--border)] bg-[var(--bg-primary)]" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+                        <div className="max-w-4xl mx-auto flex gap-2 sm:gap-3 overflow-hidden">
+                            <button 
+                                onClick={toggleRecording}
+                                className={`p-3 rounded-xl text-xl transition-all flex-shrink-0 ${
+                                    isRecording 
+                                        ? 'bg-[var(--accent-red)] animate-pulse' 
+                                        : 'bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)]'
+                                }`}
+                                title={isRecording ? 'Stop' : 'Parla'}
+                            >
+                                {isRecording ? '⏹️' : '🎤'}
+                            </button>
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={input}
+                                onChange={e => setInput(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                                placeholder={isRecording ? 'Ascoltando...' : `Messaggio...`}
+                                className={`input-premium flex-1 min-w-0 px-3 py-3 rounded-xl text-base ${isSakura ? 'pink' : ''}`}
+                                disabled={loading || isRecording}
+                            />
+                            <button ref={sendBtnRef} onClick={() => send()} disabled={loading || !input.trim()}
+                                className={`${isSakura ? 'btn-pink' : 'btn-primary'} px-3 sm:px-6 rounded-xl text-base disabled:opacity-40 flex-shrink-0`}>
+                                ➤
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== DATA VIEW ====================
+        
+        const DataView = ({ token, summary }) => {
+            const [activeMetric, setActiveMetric] = useState(null);
+            const [healthspan, setHealthspan] = useState(null);
+            const [hsLoading, setHsLoading] = useState(true);
+            const [showInfo, setShowInfo] = useState(false);
+            const avgs = summary?.averages || {};
+            const impacts = avgs.bio_impacts || {};
+            const realAge = summary?.real_age || 42;
+            
+            // Carica Healthspan (6 mesi)
+            useEffect(() => {
+                const fetchHS = async () => {
+                    try {
+                        const res = await fetch(`${API}/api/metrics/healthspan`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (res.ok) setHealthspan(await res.json());
+                    } catch (e) { console.error(e); }
+                    setHsLoading(false);
+                };
+                fetchHS();
+            }, [token]);
+            
+            const hs = healthspan;
+            const diff = hs?.difference || 0;
+            const isYounger = diff < 0;
+            const ringColor = isYounger ? 'var(--accent-green)' : diff > 2 ? 'var(--accent-red)' : 'var(--accent-orange)';
+            
+            // 8 metriche Healthspan con spiegazioni
+            const metricInfo = {
+                sleep_duration: { 
+                    label: 'Sonno', icon: '😴', 
+                    desc: 'Durata media del sonno',
+                    target: '7-8.5 ore/notte',
+                    science: 'Il sonno ottimale (7-8h) è associato a minor rischio cardiovascolare, migliore funzione cognitiva e longevità.'
+                },
+                sleep_consistency: { 
+                    label: 'Consistenza', icon: '🌙',
+                    desc: 'Variabilità orario sonno',
+                    target: '<30 min di variazione',
+                    science: 'Andare a dormire sempre alla stessa ora regola il ritmo circadiano e migliora la qualità del sonno.'
+                },
+                zone_low: { 
+                    label: 'Cardio Mod.', icon: '💚',
+                    desc: 'Tempo in zone HR 1-3',
+                    target: '150+ min/settimana',
+                    science: 'WHO raccomanda 150 min/sett di attività moderata per ridurre mortalità cardiovascolare del 30%.'
+                },
+                zone_high: { 
+                    label: 'Cardio Int.', icon: '❤️‍🔥',
+                    desc: 'Tempo in zone HR 4-5',
+                    target: '75+ min/settimana',
+                    science: 'L\'esercizio vigoroso migliora VO2 Max e ha effetti anti-aging a livello cellulare (telomeri).'
+                },
+                strength: { 
+                    label: 'Forza', icon: '💪',
+                    desc: 'Allenamenti di forza',
+                    target: '2+ sessioni/settimana',
+                    science: 'Il resistance training preserva massa muscolare, densità ossea e metabolismo con l\'età.'
+                },
+                steps: { 
+                    label: 'Passi', icon: '👟',
+                    desc: 'Passi giornalieri medi',
+                    target: '8000+ passi/giorno',
+                    science: '8000 passi/giorno riducono mortalità del 51% rispetto a 4000 passi (studio JAMA 2020).'
+                },
+                rhr: { 
+                    label: 'RHR', icon: '❤️',
+                    desc: 'Frequenza cardiaca a riposo',
+                    target: '<60 bpm',
+                    science: 'RHR basso indica cuore efficiente. Ogni 10 bpm sopra 60 aumenta rischio cardiovascolare.'
+                },
+                vo2_max: { 
+                    label: 'VO2 Max', icon: '🫁',
+                    desc: 'Capacità aerobica massima',
+                    target: '>42 ml/kg/min',
+                    science: 'VO2 Max è il miglior predittore di longevità. Alto VO2 = 5x meno rischio di morte prematura.'
+                },
+            };
+            
+            return (
+                <div className="h-full overflow-y-auto bg-gradient-sensei">
+                    {activeMetric && (
+                        <MetricModal
+                            metricKey={activeMetric.key}
+                            value={activeMetric.value}
+                            onClose={() => setActiveMetric(null)}
+                            token={token}
+                        />
+                    )}
+                    
+                    <div className="max-w-6xl mx-auto p-4 sm:p-8">
+                        <div className="text-center mb-6 sm:mb-8 slide-up">
+                            <h1 className="text-2xl sm:text-4xl font-bold font-display mb-2">Healthspan</h1>
+                            <p className="text-xs sm:text-base text-[var(--text-muted)]">
+                                {hs ? `Basato su ${hs.days_analyzed} giorni e ${hs.activities_analyzed} attività` : 'Calcolo età biologica...'}
+                            </p>
+                        </div>
+                        
+                        {/* Healthspan Age Section */}
+                        <div className="glass-card p-5 sm:p-8 mb-6 slide-up">
+                            {hsLoading ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="text-center">
+                                        <div className="text-3xl mb-2 animate-pulse">⏳</div>
+                                        <p className="text-sm text-[var(--text-muted)]">Analisi 6 mesi di dati...</p>
+                                    </div>
+                                </div>
+                            ) : hs ? (
+                                <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+                                    {/* Age Ring */}
+                                    <div className="flex items-center gap-6">
+                                        <div className="relative cursor-pointer" onClick={() => setActiveMetric({ key: 'bioAge', value: hs.healthspan_age })}>
+                                            <svg width="140" height="140" viewBox="0 0 140 140">
+                                                <circle cx="70" cy="70" r="60" fill="none" stroke="var(--bg-tertiary)" strokeWidth="10" />
+                                                <circle cx="70" cy="70" r="60" fill="none" stroke={ringColor} strokeWidth="10"
+                                                    strokeLinecap="round"
+                                                    strokeDasharray={`${Math.min(100, Math.abs(diff) * 10 + 50) * 3.77} 377`}
+                                                    transform="rotate(-90 70 70)"
+                                                    style={{ filter: `drop-shadow(0 0 8px ${ringColor})` }} />
+                                            </svg>
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                <span className="text-4xl font-bold font-display" style={{ color: ringColor }}>
+                                                    {hs.healthspan_age}
+                                                </span>
+                                                <span className="text-xs text-[var(--text-muted)]">Età Biologica</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-center lg:text-left">
+                                            <div className="text-sm text-[var(--text-muted)]">Età Anagrafica</div>
+                                            <div className="text-3xl font-bold">{hs.real_age}</div>
+                                            <div className={`text-xl font-semibold mt-2 ${isYounger ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}`}>
+                                                {isYounger ? '' : '+'}{diff} anni
+                                            </div>
+                                            <div className="text-sm text-[var(--text-muted)] mt-1">
+                                                {isYounger ? '🎉 Più giovane!' : diff > 3 ? '⚠️ Da migliorare' : '👍 Nella norma'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Pace of Aging */}
+                                    {hs?.pace_of_aging !== null && hs?.pace_of_aging !== undefined && (
+                                        <div className="glass-card px-6 py-4 text-center">
+                                            <div className="text-sm text-[var(--text-muted)]">Pace of Aging</div>
+                                            <div className={`text-2xl font-bold mt-1 ${hs.pace_of_aging < -0.05 ? 'text-[var(--accent-green)]' : hs.pace_of_aging > 0.05 ? 'text-[var(--accent-red)]' : ''}`}>
+                                                {hs.pace_status} {hs.pace_of_aging > 0 ? '+' : ''}{hs.pace_of_aging}
+                                            </div>
+                                            <div className="text-xs text-[var(--text-muted)] mt-1">
+                                                {hs.pace_label || (hs.pace_of_aging < -0.05 ? 'Ringiovanendo' : hs.pace_of_aging <= 0.05 ? 'Stabile' : 'Accelerato')}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-center py-6">
+                                    <div className="text-3xl mb-2">📊</div>
+                                    <p className="text-[var(--text-muted)]">Sincronizza più dati per calcolare Healthspan</p>
+                                    <p className="text-xs text-[var(--text-muted)] mt-2">Vai in Impostazioni → Sincronizza Anno Intero</p>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Suggestions */}
+                        {hs?.suggestions?.length > 0 && (
+                            <div className="glass-card p-4 sm:p-6 mb-6 slide-up border-l-4 border-[var(--accent-orange)]">
+                                <h3 className="text-lg font-semibold mb-3">💡 Consigli per migliorare</h3>
+                                <div className="space-y-2">
+                                    {hs.suggestions.map((s, i) => (
+                                        <div key={i} className="text-sm text-[var(--text-secondary)]">{s}</div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Metriche Grid */}
+                        {hs?.impacts && (
+                            <div className="glass-card p-4 sm:p-6 mb-6 slide-up">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-semibold">
+                                        Metriche Healthspan
+                                        <span className="text-sm font-normal text-[var(--text-muted)] ml-2">
+                                            ({Object.values(hs.impacts).filter(m => m && m.value !== undefined).length} attive)
+                                        </span>
+                                    </h3>
+                                    <button onClick={() => setShowInfo(!showInfo)} className="text-sm text-[var(--accent-green)] hover:underline">
+                                        {showInfo ? 'Nascondi info' : 'ℹ️ Come funziona?'}
+                                    </button>
+                                </div>
+                                
+                                {/* Info Panel */}
+                                {showInfo && (
+                                    <div className="mb-4 p-4 rounded-xl bg-[var(--bg-secondary)] text-sm">
+                                        <p className="mb-3 text-[var(--text-secondary)]">
+                                            <strong>Healthspan</strong> misura la tua età biologica. 
+                                            I pesi sono <strong>normalizzati</strong>: se mancano metriche (es. VO2 Max), 
+                                            le altre vengono ricalcolate per mantenere lo stesso range (-8 a +8 anni).
+                                        </p>
+                                        <div className="flex flex-wrap gap-3">
+                                            <span className="text-[var(--accent-green)]">🟢 Ottimale: ringiovanisce</span>
+                                            <span className="text-[var(--text-muted)]">🟡 Neutro: 0 impatto</span>
+                                            <span className="text-[var(--accent-orange)]">🔴 Da migliorare: invecchia</span>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    {Object.entries(metricInfo).map(([key, info]) => {
+                                        const m = hs.impacts[key];
+                                        if (!m) return null;
+                                        const impactColor = m.impact < 0 ? 'text-[var(--accent-green)]' : m.impact > 0 ? 'text-[var(--accent-orange)]' : 'text-[var(--text-secondary)]';
+                                        return (
+                                            <div key={key} 
+                                                className="p-3 rounded-xl bg-[var(--bg-secondary)] text-center cursor-pointer hover:bg-[var(--bg-card)] transition-colors"
+                                                onClick={() => setActiveMetric({ key: key, value: m.value, info: info })}>
+                                                <div className="text-2xl mb-1">{info.icon}</div>
+                                                <div className="text-xs text-[var(--text-muted)]">{info.label}</div>
+                                                <div className="font-semibold">{m.value}<span className="text-xs ml-1">{m.unit}</span></div>
+                                                <div className={`text-xs font-semibold ${impactColor}`}>
+                                                    {m.status} {m.impact > 0 ? '+' : ''}{m.impact}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                
+                                {/* Detailed explanations */}
+                                {showInfo && (
+                                    <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                                        <h4 className="font-semibold mb-3">Dettaglio metriche</h4>
+                                        <div className="space-y-3">
+                                            {Object.entries(metricInfo).map(([key, info]) => {
+                                                const m = hs.impacts[key];
+                                                if (!m) return null;
+                                                return (
+                                                    <div key={key} className="p-3 rounded-lg bg-[var(--bg-secondary)]">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span>{info.icon}</span>
+                                                            <span className="font-medium">{info.label}</span>
+                                                            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bg-card)]">{m.status}</span>
+                                                        </div>
+                                                        <div className="text-sm text-[var(--text-secondary)] mb-1">{info.desc}</div>
+                                                        <div className="text-xs text-[var(--text-muted)]">
+                                                            <strong>Target:</strong> {info.target}
+                                                        </div>
+                                                        <div className="text-xs text-[var(--text-muted)] mt-1">
+                                                            <strong>Perché:</strong> {info.science}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
+                        {/* Daily Metrics - from 30 day avg */}
+                        <div className="glass-card p-4 sm:p-6 mb-6 slide-up">
+                            <h3 className="text-lg font-semibold mb-4">Metriche Giornaliere <span className="text-sm font-normal text-[var(--text-muted)]">(media 30gg)</span></h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                                <MetricCard metricKey="recovery" icon="⚡" label="Recovery" 
+                                    value={avgs.recovery?.toFixed(0)} unit="%"
+                                    color="var(--accent-green)" subtitle="Prontezza"
+                                    onClick={() => setActiveMetric({ key: 'recovery', value: avgs.recovery?.toFixed(0) + '%' })} />
+                                <MetricCard metricKey="strain" icon="🔥" label="Strain" 
+                                    value={avgs.strain?.toFixed(1)} unit="/21"
+                                    color="var(--accent-orange)" subtitle="Carico"
+                                    onClick={() => setActiveMetric({ key: 'strain', value: avgs.strain?.toFixed(1) })} />
+                                <MetricCard metricKey="sleep" icon="😴" label="Sonno" 
+                                    value={avgs.sleep_hours?.toFixed(1)} unit="h"
+                                    color="var(--accent-purple)" subtitle="Durata"
+                                    onClick={() => setActiveMetric({ key: 'sleep', value: avgs.sleep_hours?.toFixed(1) + 'h' })} />
+                                <MetricCard metricKey="stress" icon="😤" label="Stress" 
+                                    value={avgs.stress_avg?.toFixed(0)} unit=""
+                                    color="var(--accent-red)" subtitle="Medio"
+                                    onClick={() => setActiveMetric({ key: 'stress', value: avgs.stress_avg?.toFixed(0) })} />
+                                <MetricCard metricKey="hrv" icon="💓" label="HRV" 
+                                    value={avgs.hrv?.toFixed(0)} unit="ms"
+                                    color="var(--accent-green)" subtitle="Variabilità"
+                                    onClick={() => setActiveMetric({ key: 'hrv', value: avgs.hrv?.toFixed(0) + 'ms' })} />
+                                <MetricCard metricKey="bodyBattery" icon="🔋" label="Battery" 
+                                    value={avgs.body_battery_high?.toFixed(0)} unit="%"
+                                    color="var(--accent-orange)" subtitle="Body Battery"
+                                    onClick={() => setActiveMetric({ key: 'bodyBattery', value: avgs.body_battery_high?.toFixed(0) })} />
+                            </div>
+                        </div>
+                        
+                        {/* Pace of Aging Explanation */}
+                        {hs && hs.pace_of_aging !== null && hs.pace_of_aging !== undefined && (
+                            <div className="glass-card p-4 sm:p-6 slide-up">
+                                <h3 className="text-lg font-semibold mb-3">📈 Pace of Aging</h3>
+                                <p className="text-sm text-[var(--text-secondary)] mb-4">
+                                    Confronta i tuoi ultimi 30 giorni con la media dei 6 mesi. 
+                                    Negativo = stai migliorando, Positivo = stai peggiorando.
+                                </p>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-xs">-0.5</span>
+                                    <div className="flex-1 h-3 bg-[var(--bg-secondary)] rounded-full overflow-hidden relative">
+                                        {/* Center marker */}
+                                        <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-[var(--text-muted)]" />
+                                        {/* Progress bar */}
+                                        <div className="absolute top-0 bottom-0 rounded-full transition-all"
+                                            style={{ 
+                                                left: hs.pace_of_aging < 0 ? `${50 + (hs.pace_of_aging * 100)}%` : '50%',
+                                                width: `${Math.abs(hs.pace_of_aging) * 100}%`,
+                                                background: hs.pace_of_aging < -0.05 ? 'var(--accent-green)' : hs.pace_of_aging > 0.05 ? 'var(--accent-red)' : 'var(--accent-orange)'
+                                            }} />
+                                    </div>
+                                    <span className="text-xs">+0.5</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-[var(--text-muted)] mt-2">
+                                    <span>🟢 Ringiovanendo</span>
+                                    <span>🟡 Stabile</span>
+                                    <span>🔴 Invecchiando</span>
+                                </div>
+                                <div className="text-center mt-3">
+                                    <span className={`text-xl font-bold ${hs.pace_of_aging < -0.05 ? 'text-[var(--accent-green)]' : hs.pace_of_aging > 0.05 ? 'text-[var(--accent-red)]' : 'text-[var(--accent-orange)]'}`}>
+                                        {hs.pace_of_aging > 0 ? '+' : ''}{hs.pace_of_aging}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== STATS VIEW (Connect-style) ====================
+        
+        const StatsView = ({ token, onAskCoach }) => {
+            const [period, setPeriod] = useState('week'); // day, week, month, year
+            const [offset, setOffset] = useState(0);
+            const [data, setData] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [showInfo, setShowInfo] = useState(null);
+            
+            const statsInfo = {
+                steps: { icon: '👟', title: 'Passi', desc: 'I passi misurano il tuo movimento quotidiano. Target: 10.000/giorno per benefici cardiovascolari. Ogni 2.000 passi in più riducono il rischio di morte prematura del 8-11%.' },
+                calories: { icon: '🔥', title: 'Calorie', desc: 'Calorie totali bruciate = metabolismo basale + attività. Le calorie attive sono quelle bruciate con movimento intenzionale (esercizio, camminare, ecc.).' },
+                distance: { icon: '📏', title: 'Distanza', desc: 'Km percorsi a piedi o in attività. Include passeggiate, corsa, escursioni. Non include ciclismo o nuoto nella maggior parte dei casi.' },
+                intensity: { icon: '⏱️', title: 'Minuti Intensi', desc: 'Minuti in zone cardiache moderate (50-70% HR max) e vigorose (70-85% HR max). OMS raccomanda 150-300 min/settimana moderati o 75-150 vigorosi.' },
+                sleep: { icon: '😴', title: 'Sonno', desc: 'Ore di sonno notturno. Deep sleep = recupero fisico (memoria muscolare). REM = recupero mentale (memoria, sogni). Target: 7-9 ore, con 1.5-2h deep e 1.5-2h REM.' },
+                heart: { icon: '❤️', title: 'Cuore', desc: 'RHR = Frequenza a riposo, misura efficienza cardiaca. Atleti: 40-50 bpm. HRV = Variabilità cardiaca, indica resilienza del sistema nervoso. Più alto = meglio.' },
+                stress: { icon: '😤', title: 'Stress', desc: 'Calcolato dalla variabilità cardiaca durante il giorno. 0-25 rilassato, 26-50 normale, 51-75 moderato, 76-100 alto. Lo stress cronico accelera l\'invecchiamento.' },
+                recovery: { icon: '⚡', title: 'Recovery', desc: 'Prontezza fisica al risveglio basata su HRV, sonno, RHR. >66% = pronto per allenamento intenso. 33-66% = allenamento moderato. <33% = riposo o recupero attivo.' },
+                strain: { icon: '🔥', title: 'Strain', desc: 'Carico cardiovascolare accumulato (0-21). 0-9 leggero, 10-14 moderato, 15-17 intenso, 18-21 massimo. Bilancia strain e recovery per risultati ottimali.' },
+                bodyBattery: { icon: '🔋', title: 'Body Battery', desc: 'Energia disponibile (0-100). Si carica con riposo e sonno, si scarica con attività e stress. Mattina ideale: 80-100. Se < 25 hai bisogno di recupero.' }
+            };
+            
+            const fetchData = async () => {
+                setLoading(true);
+                try {
+                    const res = await fetch(`${API}/api/metrics/period?type=${period}&offset=${offset}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        const json = await res.json();
+                        setData(json);
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+                setLoading(false);
+            };
+            
+            useEffect(() => { fetchData(); }, [period, offset]);
+            
+            const getActivityIcon = (type) => {
+                const icons = { 'running': '🏃', 'cycling': '🚴', 'swimming': '🏊', 'walking': '🚶', 'hiking': '🥾', 'strength_training': '💪', 'yoga': '🧘' };
+                return icons[type] || '⚡';
+            };
+            
+            const getPeriodLabel = () => {
+                if (!data?.period) return '';
+                const p = data.period;
+                if (period === 'day') {
+                    if (offset === 0) return 'oggi';
+                    if (offset === -1) return 'ieri';
+                    return p.label;
+                }
+                if (period === 'week') {
+                    if (offset === 0) return 'questa settimana';
+                    if (offset === -1) return 'la settimana scorsa';
+                    return `la settimana del ${p.label}`;
+                }
+                if (period === 'month') {
+                    if (offset === 0) return 'questo mese';
+                    if (offset === -1) return 'il mese scorso';
+                    return p.label;
+                }
+                return p.label;
+            };
+            
+            const handleAskCoach = (coach) => {
+                if (!data) return;
+                const m = data.metrics;
+                const periodLabel = getPeriodLabel();
+                const hour = data.current_hour;
+                const time = data.current_time;
+                
+                // Intro con ora
+                let timeContext = '';
+                if (period === 'day' && offset === 0) {
+                    if (hour < 12) timeContext = `Sono le ${time}, mattina. `;
+                    else if (hour < 17) timeContext = `Sono le ${time}, pomeriggio. `;
+                    else timeContext = `Sono le ${time}, sera. `;
+                }
+                
+                // Costruisci messaggio con i dati del periodo
+                let msg = `${timeContext}Analizza i miei dati di ${periodLabel}:\n\n`;
+                msg += `📊 **PERIODO ATTUALE**\n`;
+                msg += `• Passi: ${m.steps_total?.toLocaleString() || 'N/D'}`;
+                if (m.steps_avg && period !== 'day') msg += ` (${Math.round(m.steps_avg)}/giorno)`;
+                msg += `\n• Calorie: ${m.calories_total?.toLocaleString() || 'N/D'}`;
+                msg += `\n• Distanza: ${m.distance_km || 0} km`;
+                msg += `\n• Sonno: ${m.sleep_hours?.toFixed(1) || 'N/D'}h media`;
+                if (m.deep_sleep_min) msg += ` (Deep: ${Math.round(m.deep_sleep_min)}min)`;
+                msg += `\n• RHR: ${m.rhr || 'N/D'} bpm`;
+                msg += `\n• Stress: ${m.stress_avg || 'N/D'} medio`;
+                msg += `\n• Recovery: ${m.recovery || 'N/D'}%`;
+                msg += `\n• Strain: ${m.strain?.toFixed(1) || 'N/D'}/21`;
+                msg += `\n• Body Battery: ${m.body_battery_low || 'N/D'}-${m.body_battery_high || 'N/D'}`;
+                if (m.activity_count > 0) {
+                    msg += `\n• Attività: ${m.activity_count} (${m.activity_duration_min}min totali)`;
+                }
+                
+                // Aggiungi confronto con periodi precedenti
+                if (data.previous?.length > 0) {
+                    msg += `\n\n📈 **CONFRONTO PERIODI PRECEDENTI**`;
+                    data.previous.forEach((prev, i) => {
+                        const pm = prev.metrics;
+                        const label = period === 'day' 
+                            ? (i === 0 ? 'Ieri' : i === 1 ? "L'altro ieri" : prev.label)
+                            : period === 'week'
+                            ? (i === 0 ? 'Settimana scorsa' : i === 1 ? '2 settimane fa' : prev.label)
+                            : prev.label;
+                        
+                        msg += `\n\n${label}:`;
+                        msg += ` Passi ${pm.steps_total?.toLocaleString() || 'N/D'}`;
+                        msg += ` | Sonno ${pm.sleep_hours?.toFixed(1) || 'N/D'}h`;
+                        msg += ` | Stress ${pm.stress_avg || 'N/D'}`;
+                        msg += ` | Recovery ${pm.recovery || 'N/D'}%`;
+                        if (pm.activity_count > 0) msg += ` | ${pm.activity_count} attività`;
+                    });
+                }
+                
+                msg += `\n\n`;
+                if (period === 'day' && offset === 0 && hour < 18) {
+                    msg += `Come sto andando? Cosa mi consigli per il resto della giornata?`;
+                } else {
+                    msg += `Cosa ne pensi? Come posso migliorare rispetto ai periodi precedenti?`;
+                }
+                
+                onAskCoach(coach, msg);
+            };
+            
+            const m = data?.metrics || {};
+            const p = data?.period || {};
+            
+            const InfoCard = ({ infoKey, children }) => (
+                <div className="glass-card p-4 relative cursor-pointer hover:border-[var(--accent-blue)] transition-all" onClick={() => setShowInfo(infoKey)}>
+                    <button className="absolute top-2 right-2 text-xs text-[var(--accent-blue)] opacity-60 hover:opacity-100">ℹ️</button>
+                    {children}
+                </div>
+            );
+            
+            return (
+                <div className="h-full overflow-y-auto bg-gradient-sensei">
+                    {/* Info Modal */}
+                    {showInfo && statsInfo[showInfo] && (
+                        <div className="modal-overlay" onClick={() => setShowInfo(null)}>
+                            <div className="modal-card" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-3xl">{statsInfo[showInfo].icon}</span>
+                                        <h3 className="text-xl font-bold text-[var(--accent-green)]">{statsInfo[showInfo].title}</h3>
+                                    </div>
+                                    <button onClick={() => setShowInfo(null)} className="text-2xl text-[var(--text-muted)]">&times;</button>
+                                </div>
+                                <p className="text-[var(--text-secondary)] leading-relaxed">{statsInfo[showInfo].desc}</p>
+                            </div>
+                        </div>
+                    )}
+                    
+                    <div className="max-w-4xl mx-auto p-4 sm:p-6">
+                        
+                        {/* Period Selector */}
+                        <div className="glass-card p-3 sm:p-4 mb-4 sm:mb-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <button onClick={() => setOffset(o => o - 1)} className="p-2 hover:bg-[var(--bg-card)] rounded-lg">
+                                    <span className="text-xl">◀</span>
+                                </button>
+                                <div className="text-center">
+                                    <div className="text-lg sm:text-xl font-bold">{p.label || '...'}</div>
+                                    <div className="text-xs text-[var(--text-muted)]">{p.days_with_data || 0} giorni con dati</div>
+                                </div>
+                                <button onClick={() => setOffset(o => Math.min(o + 1, 0))} disabled={offset >= 0} className="p-2 hover:bg-[var(--bg-card)] rounded-lg disabled:opacity-30">
+                                    <span className="text-xl">▶</span>
+                                </button>
+                            </div>
+                            <div className="flex justify-center gap-2">
+                                {['day', 'week', 'month', 'year'].map(t => (
+                                    <button key={t} onClick={() => { setPeriod(t); setOffset(0); }}
+                                        className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${period === t ? 'bg-[var(--accent-green)] text-black' : 'bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)]'}`}>
+                                        {t === 'day' ? 'Giorno' : t === 'week' ? 'Settimana' : t === 'month' ? 'Mese' : 'Anno'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        
+                        {loading ? <Loading /> : (
+                            <>
+                                {/* Main Stats */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+                                    <InfoCard infoKey="steps">
+                                        <div className="text-2xl mb-1">👟</div>
+                                        <div className="text-xl sm:text-2xl font-bold text-[var(--accent-orange)]">
+                                            {m.steps_total ? (m.steps_total / 1000).toFixed(1) + 'k' : '--'}
+                                        </div>
+                                        <div className="text-xs text-[var(--text-muted)]">Passi totali</div>
+                                        {period !== 'day' && m.steps_avg && <div className="text-xs text-[var(--text-secondary)] mt-1">{Math.round(m.steps_avg)}/giorno</div>}
+                                    </InfoCard>
+                                    <InfoCard infoKey="calories">
+                                        <div className="text-2xl mb-1">🔥</div>
+                                        <div className="text-xl sm:text-2xl font-bold text-[var(--accent-red)]">
+                                            {m.calories_total ? Math.round(m.calories_total).toLocaleString() : '--'}
+                                        </div>
+                                        <div className="text-xs text-[var(--text-muted)]">Calorie totali</div>
+                                        {m.active_calories > 0 && <div className="text-xs text-[var(--text-secondary)] mt-1">{Math.round(m.active_calories)} attive</div>}
+                                    </InfoCard>
+                                    <InfoCard infoKey="distance">
+                                        <div className="text-2xl mb-1">📏</div>
+                                        <div className="text-xl sm:text-2xl font-bold text-[var(--accent-blue)]">
+                                            {m.distance_km || '--'}
+                                        </div>
+                                        <div className="text-xs text-[var(--text-muted)]">km percorsi</div>
+                                        {m.floors > 0 && <div className="text-xs text-[var(--text-secondary)] mt-1">{m.floors} piani</div>}
+                                    </InfoCard>
+                                    <InfoCard infoKey="intensity">
+                                        <div className="text-2xl mb-1">⏱️</div>
+                                        <div className="text-xl sm:text-2xl font-bold text-[var(--accent-purple)]">
+                                            {(m.moderate_min || 0) + (m.vigorous_min || 0)}
+                                        </div>
+                                        <div className="text-xs text-[var(--text-muted)]">Min intensi</div>
+                                        {m.vigorous_min > 0 && <div className="text-xs text-[var(--text-secondary)] mt-1">{m.vigorous_min} vigorosi</div>}
+                                    </InfoCard>
+                                </div>
+                                
+                                {/* Health Stats */}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
+                                    <InfoCard infoKey="sleep">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xl">😴</span>
+                                            <span className="text-sm font-medium">Sonno</span>
+                                        </div>
+                                        <div className="text-2xl font-bold text-[var(--accent-purple)]">{m.sleep_hours?.toFixed(1) || '--'}h</div>
+                                        <div className="text-xs text-[var(--text-muted)]">media/notte</div>
+                                        {m.deep_sleep_min && <div className="text-xs text-[var(--text-secondary)] mt-2">Deep: {Math.round(m.deep_sleep_min)}min | REM: {Math.round(m.rem_sleep_min || 0)}min</div>}
+                                    </InfoCard>
+                                    <InfoCard infoKey="heart">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xl">❤️</span>
+                                            <span className="text-sm font-medium">Cuore</span>
+                                        </div>
+                                        <div className="text-2xl font-bold text-[var(--accent-red)]">{m.rhr || '--'} <span className="text-sm font-normal">bpm</span></div>
+                                        <div className="text-xs text-[var(--text-muted)]">RHR medio</div>
+                                        {m.hrv && <div className="text-xs text-[var(--text-secondary)] mt-2">HRV: {m.hrv}ms</div>}
+                                    </InfoCard>
+                                    <InfoCard infoKey="stress">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xl">😤</span>
+                                            <span className="text-sm font-medium">Stress</span>
+                                        </div>
+                                        <div className="text-2xl font-bold" style={{ color: m.stress_avg > 50 ? 'var(--accent-orange)' : 'var(--accent-green)' }}>{m.stress_avg || '--'}</div>
+                                        <div className="text-xs text-[var(--text-muted)]">livello medio</div>
+                                    </InfoCard>
+                                    <InfoCard infoKey="recovery">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xl">⚡</span>
+                                            <span className="text-sm font-medium">Recovery</span>
+                                        </div>
+                                        <div className="text-2xl font-bold text-[var(--accent-green)]">{m.recovery || '--'}%</div>
+                                        <div className="text-xs text-[var(--text-muted)]">prontezza</div>
+                                    </InfoCard>
+                                    <InfoCard infoKey="strain">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xl">🔥</span>
+                                            <span className="text-sm font-medium">Strain</span>
+                                        </div>
+                                        <div className="text-2xl font-bold text-[var(--accent-orange)]">{m.strain?.toFixed(1) || '--'}</div>
+                                        <div className="text-xs text-[var(--text-muted)]">medio /21</div>
+                                    </InfoCard>
+                                    <InfoCard infoKey="bodyBattery">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xl">🔋</span>
+                                            <span className="text-sm font-medium">Body Battery</span>
+                                        </div>
+                                        <div className="text-2xl font-bold text-[var(--accent-blue)]">{m.body_battery_low || '--'}-{m.body_battery_high || '--'}</div>
+                                        <div className="text-xs text-[var(--text-muted)]">range medio</div>
+                                    </InfoCard>
+                                </div>
+                                
+                                {/* Daily Chart (for week view) */}
+                                {period === 'week' && data?.daily?.length > 0 && (
+                                    <div className="glass-card p-4 mb-4 sm:mb-6">
+                                        <h3 className="text-sm font-semibold mb-3">Passi giornalieri</h3>
+                                        <div className="flex items-end justify-between gap-1 h-24">
+                                            {data.daily.map((d, i) => (
+                                                <div key={i} className="flex-1 flex flex-col items-center">
+                                                    <div className="w-full bg-[var(--accent-green)] rounded-t opacity-80"
+                                                        style={{ height: `${Math.min((d.steps || 0) / 150, 100)}%` }}></div>
+                                                    <div className="text-[10px] text-[var(--text-muted)] mt-1">{d.day}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Activities */}
+                                {data?.activities?.length > 0 && (
+                                    <div className="glass-card p-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h3 className="text-sm font-semibold">Attività ({data.activity_count})</h3>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {data.activities.map((a, i) => (
+                                                <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-[var(--bg-secondary)]">
+                                                    <span className="text-xl">{getActivityIcon(a.type)}</span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-medium truncate">{a.name}</div>
+                                                        <div className="text-xs text-[var(--text-muted)]">{a.date}</div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-sm font-medium">{a.duration_min}min</div>
+                                                        {a.distance_km > 0 && <div className="text-xs text-[var(--text-muted)]">{a.distance_km}km</div>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Ask Coach Buttons */}
+                                <div className="glass-card p-4 mt-4">
+                                    <h3 className="text-sm font-semibold mb-3 text-center">Chiedi al coach</h3>
+                                    <div className="flex gap-3 justify-center">
+                                        <button onClick={() => handleAskCoach('sensei')}
+                                            className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[var(--accent-green-dim)] border border-[var(--accent-green)] hover:bg-[var(--accent-green)] hover:text-black transition-all">
+                                            <span className="text-xl">🥋</span>
+                                            <span className="text-sm font-medium">Sensei</span>
+                                        </button>
+                                        <button onClick={() => handleAskCoach('sakura')}
+                                            className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[var(--accent-pink-dim)] border border-[var(--accent-pink)] hover:bg-[var(--accent-pink)] hover:text-black transition-all">
+                                            <span className="text-xl">🌸</span>
+                                            <span className="text-sm font-medium">Sakura</span>
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-[var(--text-muted)] text-center mt-2">
+                                        Invia i dati di {getPeriodLabel() || 'questo periodo'} al coach
+                                    </p>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== TREND VIEW ====================
+        
+        const TrendView = ({ trend, realAge }) => {
+            const [activeChart, setActiveChart] = useState('bioAge');
+            const [showInfo, setShowInfo] = useState(null);
+            const canvasRef = useRef(null);
+            const chartRef = useRef(null);
+            
+            const chartConfigs = {
+                bioAge: {
+                    title: 'Età Biologica',
+                    icon: '🧬',
+                    color: '#00f593',
+                    getData: (d) => d.biological_age,
+                    unit: 'anni',
+                    refLine: realAge,
+                    refLabel: 'Età Reale',
+                    info: 'Mostra come la tua età biologica cambia nel tempo. Sotto la linea tratteggiata = più giovane della tua età reale.'
+                },
+                recovery: {
+                    title: 'Recovery',
+                    icon: '⚡',
+                    color: '#00f593',
+                    getData: (d) => d.recovery,
+                    unit: '%',
+                    refLine: 66,
+                    refLabel: 'Soglia buona',
+                    info: 'Prontezza fisica al risveglio. >66% = pronto per allenamento intenso, <33% = riposo consigliato.'
+                },
+                strain: {
+                    title: 'Strain',
+                    icon: '🔥',
+                    color: '#ff9f43',
+                    getData: (d) => d.strain,
+                    unit: '/21',
+                    refLine: 10,
+                    refLabel: 'Carico moderato',
+                    info: 'Carico cardiovascolare giornaliero. 0-9 leggero, 10-14 moderato, 15-21 intenso.'
+                },
+                sleep: {
+                    title: 'Sonno',
+                    icon: '😴',
+                    color: '#a78bfa',
+                    getData: (d) => d.sleep_hours,
+                    unit: 'ore',
+                    refLine: 7.5,
+                    refLabel: 'Target 7.5h',
+                    info: 'Ore di sonno per notte. Target ideale 7-9 ore per adulti.'
+                },
+                hrv: {
+                    title: 'HRV',
+                    icon: '💓',
+                    color: '#ff6eb4',
+                    getData: (d) => d.hrv,
+                    unit: 'ms',
+                    refLine: null,
+                    info: 'Variabilità cardiaca notturna. Valori più alti = sistema nervoso più resiliente.'
+                },
+                rhr: {
+                    title: 'Frequenza a Riposo',
+                    icon: '❤️',
+                    color: '#ff6b6b',
+                    getData: (d) => d.rhr,
+                    unit: 'bpm',
+                    refLine: 60,
+                    refLabel: 'Target <60',
+                    info: 'Battiti a riposo. Valori più bassi indicano cuore più efficiente.'
+                },
+                stress: {
+                    title: 'Stress',
+                    icon: '😤',
+                    color: '#ff9f43',
+                    getData: (d) => d.stress,
+                    unit: '',
+                    refLine: 50,
+                    refLabel: 'Soglia alta',
+                    info: 'Livello medio di stress giornaliero. <25 rilassato, 25-50 normale, >50 alto.'
+                },
+                steps: {
+                    title: 'Passi',
+                    icon: '👟',
+                    color: '#4da6ff',
+                    getData: (d) => d.steps,
+                    unit: '',
+                    refLine: 10000,
+                    refLabel: 'Target 10k',
+                    info: 'Passi giornalieri. 10.000 passi = circa 7-8 km.'
+                },
+                bodyBattery: {
+                    title: 'Body Battery',
+                    icon: '🔋',
+                    color: '#22c55e',
+                    getData: (d) => d.body_battery_high,
+                    unit: '',
+                    refLine: 75,
+                    refLabel: 'Carico',
+                    info: 'Energia massima giornaliera. Si carica col sonno, si scarica con attività e stress.'
+                },
+                pace: {
+                    title: 'Pace of Aging',
+                    icon: '📈',
+                    color: '#00f593',
+                    info: 'Confronta i tuoi ultimi 15 giorni con i primi 15 del periodo. Negativo = stai migliorando (ringiovanendo). Positivo = invecchiamento accelerato. Zero = stabile.'
+                }
+            };
+            
+            const config = chartConfigs[activeChart];
+            
+            useEffect(() => {
+                if (!canvasRef.current || !trend?.data?.length) return;
+                if (chartRef.current) chartRef.current.destroy();
+                
+                const ctx = canvasRef.current.getContext('2d');
+                const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+                gradient.addColorStop(0, config.color + '40');
+                gradient.addColorStop(1, config.color + '00');
+                
+                const datasets = [
+                    { 
+                        label: config.title, 
+                        data: trend.data.map(d => config.getData(d)), 
+                        borderColor: config.color, 
+                        backgroundColor: gradient, 
+                        fill: true, 
+                        tension: 0.4, 
+                        pointRadius: 0, 
+                        borderWidth: 3 
+                    }
+                ];
+                
+                if (config.refLine) {
+                    datasets.push({
+                        label: config.refLabel || 'Riferimento',
+                        data: trend.data.map(() => config.refLine),
+                        borderColor: '#5c5e6a',
+                        borderDash: [8, 4],
+                        pointRadius: 0,
+                        borderWidth: 2,
+                        fill: false
+                    });
+                }
+                
+                chartRef.current = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: trend.data.map(d => new Date(d.date).toLocaleDateString('it', { day: '2-digit', month: 'short' })),
+                        datasets
+                    },
+                    options: {
+                        responsive: true, 
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: { legend: { labels: { color: '#8b8d98', font: { size: 12 } } } },
+                        scales: {
+                            x: { grid: { color: '#1e2028' }, ticks: { color: '#5c5e6a', maxTicksLimit: 8 } },
+                            y: { grid: { color: '#1e2028' }, ticks: { color: '#5c5e6a' } }
+                        }
+                    }
+                });
+                return () => chartRef.current?.destroy();
+            }, [trend, realAge, activeChart]);
+            
+            // Calculate stats for current metric
+            const validData = trend?.data?.filter(d => config.getData(d) != null) || [];
+            const values = validData.map(d => config.getData(d));
+            const avg = values.length ? (values.reduce((a,b) => a+b, 0) / values.length).toFixed(1) : '--';
+            const min = values.length ? Math.min(...values).toFixed(1) : '--';
+            const max = values.length ? Math.max(...values).toFixed(1) : '--';
+            
+            if (!trend?.data?.length) {
+                return (
+                    <div className="h-full flex items-center justify-center">
+                        <div className="text-center glass-card p-10">
+                            <span className="text-5xl mb-4 block">📈</span>
+                            <h3 className="text-xl font-semibold mb-2">Dati insufficienti</h3>
+                            <p className="text-[var(--text-muted)]">Servono almeno 7 giorni di dati</p>
+                        </div>
+                    </div>
+                );
+            }
+            
+            const pace = trend.pace_of_aging;
+            
+            return (
+                <div className="h-full overflow-y-auto bg-gradient-sensei">
+                    {/* Info Modal */}
+                    {showInfo && (
+                        <div className="modal-overlay" onClick={() => setShowInfo(null)}>
+                            <div className="modal-card" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-3xl">{chartConfigs[showInfo].icon}</span>
+                                        <h3 className="text-xl font-bold" style={{ color: chartConfigs[showInfo].color }}>{chartConfigs[showInfo].title}</h3>
+                                    </div>
+                                    <button onClick={() => setShowInfo(null)} className="text-2xl text-[var(--text-muted)]">&times;</button>
+                                </div>
+                                <p className="text-[var(--text-secondary)] leading-relaxed">{chartConfigs[showInfo].info}</p>
+                            </div>
+                        </div>
+                    )}
+                    
+                    <div className="max-w-6xl mx-auto p-4 sm:p-8">
+                        <div className="text-center mb-6 slide-up">
+                            <h1 className="text-2xl sm:text-4xl font-bold font-display mb-2">Trend Analysis</h1>
+                            <p className="text-sm sm:text-base text-[var(--text-muted)]">Evoluzione delle metriche nel tempo (90 giorni)</p>
+                        </div>
+                        
+                        {/* Metric Selector */}
+                        <div className="flex flex-wrap gap-2 mb-6 justify-center slide-up">
+                            {Object.entries(chartConfigs).map(([key, cfg]) => (
+                                <button 
+                                    key={key}
+                                    onClick={() => setActiveChart(key)}
+                                    className={`px-3 py-2 rounded-xl text-sm flex items-center gap-2 transition-all ${
+                                        activeChart === key 
+                                            ? 'bg-[var(--bg-card)] border-2' 
+                                            : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-card)] border-2 border-transparent'
+                                    }`}
+                                    style={{ borderColor: activeChart === key ? cfg.color : 'transparent' }}
+                                >
+                                    <span>{cfg.icon}</span>
+                                    <span className="hidden sm:inline">{cfg.title}</span>
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {/* Chart */}
+                        <div className="glass-card p-4 sm:p-8 mb-6 slide-up">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-semibold flex items-center gap-2">
+                                    <span>{config.icon}</span>
+                                    <span style={{ color: config.color }}>{config.title}</span>
+                                </h2>
+                                <button 
+                                    onClick={() => setShowInfo(activeChart)}
+                                    className="text-[var(--accent-blue)] text-sm hover:underline"
+                                >
+                                    ℹ️ Info
+                                </button>
+                            </div>
+                            <div style={{ height: 280 }}><canvas ref={canvasRef} /></div>
+                        </div>
+                        
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-3 gap-3 sm:gap-6 mb-6">
+                            <div className="glass-card p-4 sm:p-6 text-center slide-up">
+                                <div className="text-xs text-[var(--text-muted)] uppercase mb-2">Media</div>
+                                <div className="text-2xl sm:text-3xl font-bold" style={{ color: config.color }}>{avg}</div>
+                                <div className="text-xs text-[var(--text-muted)]">{config.unit}</div>
+                            </div>
+                            <div className="glass-card p-4 sm:p-6 text-center slide-up">
+                                <div className="text-xs text-[var(--text-muted)] uppercase mb-2">Min</div>
+                                <div className="text-2xl sm:text-3xl font-bold text-[var(--accent-blue)]">{min}</div>
+                                <div className="text-xs text-[var(--text-muted)]">{config.unit}</div>
+                            </div>
+                            <div className="glass-card p-4 sm:p-6 text-center slide-up">
+                                <div className="text-xs text-[var(--text-muted)] uppercase mb-2">Max</div>
+                                <div className="text-2xl sm:text-3xl font-bold text-[var(--accent-orange)]">{max}</div>
+                                <div className="text-xs text-[var(--text-muted)]">{config.unit}</div>
+                            </div>
+                        </div>
+                        
+                        {/* Pace of Aging (only show when bioAge selected) */}
+                        {activeChart === 'bioAge' && (
+                            <div className="glass-card p-4 sm:p-8 slide-up">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-sm text-[var(--text-muted)] uppercase tracking-wider">Pace of Aging</h3>
+                                    <button 
+                                        onClick={() => setShowInfo('pace')}
+                                        className="text-[var(--accent-blue)] text-xs"
+                                    >
+                                        ℹ️
+                                    </button>
+                                </div>
+                                <div className={`text-4xl sm:text-5xl font-bold font-display mb-4 ${pace <= 0 ? 'text-[var(--accent-green)] glow-text-green' : 'text-[var(--accent-orange)]'}`}>
+                                    {pace != null ? (pace <= 0 ? '' : '+') + pace.toFixed(1) : '--'}
+                                    <span className="text-lg sm:text-xl ml-2">anni/anno</span>
+                                </div>
+                                <p className="text-[var(--text-secondary)] text-sm sm:text-base">
+                                    {pace < -0.5 ? '🎉 Eccellente! Stai ringiovanendo.' : 
+                                     pace < 0 ? '✨ Ottimo! Invecchiamento rallentato.' :
+                                     pace < 0.5 ? '👍 Nella norma.' : '⚠️ Attenzione! Invecchiamento accelerato.'}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== ACTIVITY VIEW ====================
+        
+        const ActivityView = ({ token, activities, onRefresh }) => {
+            const [commenting, setCommenting] = useState(null);
+            const [comments, setComments] = useState({});
+            
+            const getActivityIcon = (type) => {
+                const icons = {
+                    'running': '🏃',
+                    'treadmill_running': '🏃',
+                    'trail_running': '🏃',
+                    'cycling': '🚴',
+                    'indoor_cycling': '🚴',
+                    'virtual_ride': '🚴',
+                    'swimming': '🏊',
+                    'pool_swimming': '🏊',
+                    'open_water_swimming': '🌊',
+                    'walking': '🚶',
+                    'hiking': '🥾',
+                    'strength_training': '💪',
+                    'weightlifting': '🏋️',
+                    'yoga': '🧘',
+                    'pilates': '🧘',
+                    'skiing': '⛷️',
+                    'snowboarding': '🏂',
+                    'golf': '⛳',
+                    'tennis': '🎾',
+                    'rowing': '🚣',
+                    'indoor_rowing': '🚣',
+                    'elliptical': '🏃',
+                    'stair_stepper': '🪜',
+                    'climbing': '🧗',
+                    'surfing': '🏄',
+                    'fitness_equipment': '🏋️',
+                    'cardio': '❤️',
+                    'breathwork': '🌬️',
+                    'meditation': '🧘',
+                    'other': '⚡'
+                };
+                return icons[type] || icons['other'];
+            };
+            
+            const formatDuration = (seconds) => {
+                if (!seconds) return '--';
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                return h > 0 ? `${h}h ${m}m` : `${m}m`;
+            };
+            
+            const formatDistance = (meters) => {
+                if (!meters) return '--';
+                return (meters / 1000).toFixed(2) + ' km';
+            };
+            
+            const getAIComment = async (activity) => {
+                setCommenting(activity.id);
+                try {
+                    const res = await fetch(`${API}/api/activity/${activity.id}/comment`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    setComments(prev => ({ ...prev, [activity.id]: data.comment }));
+                } catch (e) {
+                    setComments(prev => ({ ...prev, [activity.id]: 'Errore nel generare il commento' }));
+                }
+                setCommenting(null);
+            };
+            
+            return (
+                <div className="h-full overflow-y-auto">
+                    <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-10">
+                        <div className="text-center mb-6 sm:mb-10 slide-up">
+                            <h1 className="text-2xl sm:text-4xl font-bold font-display mb-2">Attività</h1>
+                            <p className="text-xs sm:text-base text-[var(--text-muted)]">Ultimi 30 giorni</p>
+                        </div>
+                        
+                        {activities.length === 0 ? (
+                            <div className="glass-card p-6 sm:p-10 text-center">
+                                <span className="text-4xl sm:text-6xl mb-4 block">🏃</span>
+                                <p className="text-[var(--text-muted)]">Nessuna attività</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3 sm:space-y-4">
+                                {activities.map((a, i) => (
+                                    <div key={a.id || i} className="glass-card p-4 sm:p-6 slide-up">
+                                        <div className="flex items-start gap-3 sm:gap-4">
+                                            <div className="text-2xl sm:text-4xl">{getActivityIcon(a.activity_type)}</div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between mb-2 gap-2">
+                                                    <h3 className="font-semibold text-sm sm:text-lg truncate">{a.activity_name || a.activity_type || 'Attività'}</h3>
+                                                    <span className="text-xs sm:text-sm text-[var(--text-muted)] flex-shrink-0">
+                                                        {a.start_time ? new Date(a.start_time).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) : '--'}
+                                                    </span>
+                                                </div>
+                                                
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-3 sm:mb-4">
+                                                    <div>
+                                                        <span className="text-[10px] sm:text-xs text-[var(--text-muted)]">Durata</span>
+                                                        <div className="font-semibold text-sm sm:text-base">{formatDuration(a.duration_seconds)}</div>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] sm:text-xs text-[var(--text-muted)]">Distanza</span>
+                                                        <div className="font-semibold text-sm sm:text-base">{formatDistance(a.distance_meters)}</div>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] sm:text-xs text-[var(--text-muted)]">Calorie</span>
+                                                        <div className="font-semibold text-sm sm:text-base">{a.calories || '--'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] sm:text-xs text-[var(--text-muted)]">HR</span>
+                                                        <div className="font-semibold text-sm sm:text-base">{a.avg_hr || '--'} bpm</div>
+                                                    </div>
+                                                </div>
+                                                
+                                                {a.strain_score && (
+                                                    <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                                                        <span className="text-[10px] sm:text-xs text-[var(--text-muted)]">Strain:</span>
+                                                        <div className="flex-1 h-1.5 sm:h-2 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
+                                                            <div 
+                                                                className="h-full bg-gradient-to-r from-[var(--accent-green)] to-[var(--accent-orange)]"
+                                                                style={{ width: `${(a.strain_score / 21) * 100}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-xs sm:text-sm font-semibold">{a.strain_score}/21</span>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* AI Comment Section */}
+                                                {comments[a.id] ? (
+                                                    <div className="mt-3 sm:mt-4 p-3 sm:p-4 rounded-xl bg-[var(--bg-secondary)] border-l-4 border-[var(--accent-green)]">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <span className="text-base sm:text-lg">🥋</span>
+                                                            <span className="text-xs sm:text-sm font-semibold text-[var(--accent-green)]">Sensei</span>
+                                                        </div>
+                                                        <p className="text-xs sm:text-sm text-[var(--text-secondary)]">{comments[a.id]}</p>
+                                                    </div>
+                                                ) : (
+                                                    <button 
+                                                        onClick={() => getAIComment(a)}
+                                                        disabled={commenting === a.id}
+                                                        className="mt-2 text-xs sm:text-sm text-[var(--accent-green)] hover:underline flex items-center gap-2"
+                                                    >
+                                                        {commenting === a.id ? (
+                                                            <>🔄 Analisi...</>
+                                                        ) : (
+                                                            <>💬 Chiedi a Sensei</>
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== PROFILE VIEW ====================
+        
+        const ProfileView = ({ token, user, onUpdate, onLogout }) => {
+            const [form, setForm] = useState({ name: user?.name || '', birth_year: user?.birth_year || '' });
+            const [saving, setSaving] = useState(false);
+            const [saved, setSaved] = useState(false);
+            const [recalculating, setRecalculating] = useState(false);
+            const [recalcResult, setRecalcResult] = useState(null);
+            const [debugData, setDebugData] = useState(null);
+            const [syncingYear, setSyncingYear] = useState(false);
+            const [syncProgress, setSyncProgress] = useState(null);
+            
+            const syncYear = async () => {
+                if (!confirm('Questo scaricherà tutti i dati da inizio anno in blocchi. Può richiedere qualche minuto. Continuare?')) return;
+                setSyncingYear(true);
+                
+                const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+                const totalDays = Math.ceil((new Date() - startOfYear) / (1000 * 60 * 60 * 24));
+                const chunkSize = 45;
+                const chunks = Math.ceil(totalDays / chunkSize);
+                
+                try {
+                    for (let i = 0; i < chunks; i++) {
+                        const daysBack = Math.min((i + 1) * chunkSize, totalDays);
+                        const startDay = i * chunkSize;
+                        setSyncProgress(`Blocco ${i + 1}/${chunks}: giorni ${startDay + 1}-${daysBack}...`);
+                        
+                        await fetch(`${API}/api/sync`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ days_back: chunkSize, offset_days: startDay })
+                        });
+                        
+                        // Pausa tra blocchi
+                        if (i < chunks - 1) await new Promise(r => setTimeout(r, 2000));
+                    }
+                    setSyncProgress(`✅ Completato! ${totalDays} giorni sincronizzati`);
+                    setTimeout(() => setSyncProgress(null), 5000);
+                } catch (e) {
+                    setSyncProgress('❌ Errore: ' + e.message);
+                }
+                setSyncingYear(false);
+            };
+            
+            const save = async () => {
+                setSaving(true);
+                try {
+                    const res = await fetch(`${API}/api/profile`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ name: form.name, birth_year: form.birth_year ? parseInt(form.birth_year) : null })
+                    });
+                    if (res.ok) {
+                        setSaved(true);
+                        setTimeout(() => setSaved(false), 2000);
+                        const updated = { ...user, name: form.name, birth_year: parseInt(form.birth_year) };
+                        localStorage.setItem('user', JSON.stringify(updated));
+                        onUpdate(updated);
+                    }
+                } catch {}
+                setSaving(false);
+            };
+            
+            const recalculate = async () => {
+                setRecalculating(true);
+                setRecalcResult(null);
+                try {
+                    const res = await fetch(`${API}/api/recalculate`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    setRecalcResult(data.message || 'Fatto!');
+                    setTimeout(() => setRecalcResult(null), 5000);
+                } catch (e) {
+                    setRecalcResult('Errore: ' + e.message);
+                }
+                setRecalculating(false);
+            };
+            
+            const loadDebug = async () => {
+                try {
+                    const res = await fetch(`${API}/api/debug/bio`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    setDebugData(data);
+                } catch (e) {
+                    setDebugData([{ error: e.message }]);
+                }
+            };
+            
+            const age = form.birth_year ? new Date().getFullYear() - parseInt(form.birth_year) : null;
+            
+            return (
+                <div className="h-full overflow-y-auto">
+                    <div className="max-w-2xl mx-auto p-4 sm:p-8">
+                        <div className="text-center mb-6 sm:mb-10 slide-up">
+                            <h1 className="text-2xl sm:text-4xl font-bold font-display mb-2">Profilo</h1>
+                            <p className="text-xs sm:text-base text-[var(--text-muted)]">Gestisci il tuo account</p>
+                        </div>
+                        
+                        <div className="glass-card p-5 sm:p-8 mb-4 sm:mb-6 slide-up">
+                            <h3 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6">Informazioni Personali</h3>
+                            <div className="space-y-4 sm:space-y-5">
+                                <div>
+                                    <label className="text-xs sm:text-sm text-[var(--text-muted)] block mb-2">Nome</label>
+                                    <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})}
+                                        className="input-premium w-full px-4 py-3 sm:px-5 sm:py-4 rounded-xl text-base" placeholder="Il tuo nome" />
+                                </div>
+                                <div>
+                                    <label className="text-xs sm:text-sm text-[var(--text-muted)] block mb-2">Anno di nascita</label>
+                                    <input type="number" value={form.birth_year} onChange={e => setForm({...form, birth_year: e.target.value})}
+                                        className="input-premium w-full px-4 py-3 sm:px-5 sm:py-4 rounded-xl text-base" placeholder="1976" />
+                                    {age && <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-2">Età: {age} anni</p>}
+                                </div>
+                                <button onClick={save} disabled={saving} className="btn-primary w-full py-4 rounded-xl text-lg">
+                                    {saving ? 'Salvataggio...' : saved ? '✓ Salvato!' : 'Salva Modifiche'}
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="glass-card p-8 mb-6 slide-up">
+                            <h3 className="text-lg font-semibold mb-6">Account</h3>
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center py-3 border-b border-[var(--border)]">
+                                    <span className="text-[var(--text-muted)]">Email</span>
+                                    <span>{user?.email}</span>
+                                </div>
+                                <div className="flex justify-between items-center py-3">
+                                    <span className="text-[var(--text-muted)]">Garmin</span>
+                                    <span className={user?.garmin_connected ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}>
+                                        {user?.garmin_connected ? '✓ Connesso' : '✗ Non connesso'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="glass-card p-8 mb-6 slide-up">
+                            <h3 className="text-lg font-semibold mb-4">Sincronizzazione Dati</h3>
+                            <p className="text-sm text-[var(--text-muted)] mb-4">
+                                Scarica tutti i dati Garmin da inizio anno per avere uno storico completo.
+                            </p>
+                            <button onClick={syncYear} disabled={syncingYear} 
+                                className="btn-primary w-full py-4 rounded-xl text-lg">
+                                {syncingYear ? '🔄 Sincronizzazione...' : '📅 Sincronizza Anno Intero'}
+                            </button>
+                            {syncProgress && (
+                                <p className="text-center text-[var(--text-secondary)] mt-4">{syncProgress}</p>
+                            )}
+                        </div>
+                        
+                        <div className="glass-card p-8 mb-6 slide-up">
+                            <h3 className="text-lg font-semibold mb-4">Ricalcola Età Biologica</h3>
+                            <p className="text-sm text-[var(--text-muted)] mb-4">
+                                Ricalcola l'età biologica per tutti i dati storici usando la formula aggiornata.
+                            </p>
+                            <button onClick={recalculate} disabled={recalculating} 
+                                className="btn-primary w-full py-4 rounded-xl text-lg mb-4">
+                                {recalculating ? '🔄 Ricalcolo in corso...' : '🧬 Ricalcola Tutto'}
+                            </button>
+                            {recalcResult && (
+                                <p className="text-center text-[var(--accent-green)] mb-4">{recalcResult}</p>
+                            )}
+                            
+                            <button onClick={loadDebug} className="btn-ghost w-full py-3 rounded-xl text-sm">
+                                🔍 Debug: Mostra ultimi 5 giorni
+                            </button>
+                            
+                            {debugData && (
+                                <div className="mt-4 p-4 rounded-xl text-xs font-mono overflow-x-auto" style={{ background: 'var(--bg-secondary)' }}>
+                                    {debugData.map((d, i) => (
+                                        <div key={i} className="mb-3 pb-3 border-b border-[var(--border)] last:border-0">
+                                            <div className="text-[var(--accent-green)] font-bold">{d.date}</div>
+                                            <div>Sonno: {d.sleep_hours}h → impatto: <span className={d.bio_age_sleep_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_sleep_impact}</span></div>
+                                            <div>RHR: {d.resting_hr} → impatto: <span className={d.bio_age_rhr_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_rhr_impact}</span></div>
+                                            <div>Passi: {d.steps} → impatto: <span className={d.bio_age_steps_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_steps_impact}</span></div>
+                                            <div>Stress: {d.stress_avg} → impatto: <span className={d.bio_age_stress_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_stress_impact}</span></div>
+                                            <div>HRZ: impatto: <span className={d.bio_age_hrz_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_hrz_impact}</span></div>
+                                            <div className="mt-1 font-bold">Bio Age: {d.biological_age}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        
+                        <button onClick={onLogout} className="btn-ghost w-full py-4 rounded-xl">Logout</button>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== AUTH PAGES ====================
+        
+        const LandingPage = ({ onNavigate }) => (
+            <div className="h-full flex flex-col items-center justify-center p-8">
+                <div className="flex gap-6 mb-8">
+                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl glow-green" style={{ background: 'var(--accent-green-dim)' }}>🥋</div>
+                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl glow-pink" style={{ background: 'var(--accent-pink-dim)' }}>🌸</div>
+                </div>
+                <h1 className="text-5xl font-bold font-display mb-3">SENSEI & SAKURA</h1>
+                <p className="text-xl text-[var(--text-secondary)] mb-2">Performance Lab</p>
+                <p className="text-[var(--text-muted)] mb-10 max-w-md text-center">Il tuo centro medico sportivo digitale. Corpo e mente in perfetto equilibrio.</p>
+                <div className="flex gap-4">
+                    <button onClick={() => onNavigate('login')} className="btn-primary px-10 py-4 rounded-xl text-lg">Accedi</button>
+                    <button onClick={() => onNavigate('register')} className="btn-ghost px-10 py-4 rounded-xl text-lg">Registrati</button>
+                </div>
+            </div>
+        );
+        
+        const LoginPage = ({ onNavigate, onLogin }) => {
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+            
+            const submit = async (e) => {
+                e.preventDefault();
+                setLoading(true); setError('');
+                try {
+                    const res = await fetch(`${API}/api/login`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    const data = await res.json();
+                    if (data.token) {
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                        onLogin(data);
+                    } else setError(data.error || 'Login fallito');
+                } catch { setError('Errore di connessione'); }
+                setLoading(false);
+            };
+            
+            return (
+                <div className="h-full flex items-center justify-center p-8">
+                    <form onSubmit={submit} className="w-full max-w-md">
+                        <div className="text-center mb-10">
+                            <h1 className="text-4xl font-bold font-display mb-2">Bentornato</h1>
+                            <p className="text-[var(--text-muted)]">Accedi al tuo Performance Lab</p>
+                        </div>
+                        {error && <div className="glass-card border-[var(--accent-red)] p-4 mb-6 text-[var(--accent-red)] text-sm">{error}</div>}
+                        <div className="space-y-4 mb-6">
+                            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Email" required />
+                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Password" required />
+                        </div>
+                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 rounded-xl text-lg mb-6">{loading ? 'Accesso...' : 'Accedi'}</button>
+                        <p className="text-center text-[var(--text-muted)]">Non hai un account? <button type="button" onClick={() => onNavigate('register')} className="text-[var(--accent-green)]">Registrati</button></p>
+                    </form>
+                </div>
+            );
+        };
+        
+        const RegisterPage = ({ onNavigate }) => {
+            const [form, setForm] = useState({ email: '', password: '', birth_year: '', name: '' });
+            const [error, setError] = useState('');
+            const [success, setSuccess] = useState(false);
+            const [loading, setLoading] = useState(false);
+            
+            const submit = async (e) => {
+                e.preventDefault();
+                if (!form.birth_year) { setError('Anno di nascita richiesto'); return; }
+                setLoading(true); setError('');
+                try {
+                    const res = await fetch(`${API}/api/register`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...form, birth_year: parseInt(form.birth_year) })
+                    });
+                    const data = await res.json();
+                    if (data.user_id) setSuccess(true);
+                    else setError(data.error || 'Errore');
+                } catch { setError('Errore di connessione'); }
+                setLoading(false);
+            };
+            
+            if (success) return (
+                <div className="h-full flex items-center justify-center p-8">
+                    <div className="text-center glass-card p-12">
+                        <div className="text-6xl mb-6">🎉</div>
+                        <h2 className="text-3xl font-bold font-display text-[var(--accent-green)] mb-4">Account Creato!</h2>
+                        <button onClick={() => onNavigate('login')} className="btn-primary px-10 py-4 rounded-xl text-lg">Accedi Ora</button>
+                    </div>
+                </div>
+            );
+            
+            return (
+                <div className="h-full flex items-center justify-center p-8">
+                    <form onSubmit={submit} className="w-full max-w-md">
+                        <div className="text-center mb-10">
+                            <h1 className="text-4xl font-bold font-display mb-2">Registrazione</h1>
+                            <p className="text-[var(--text-muted)]">Crea il tuo account Performance Lab</p>
+                        </div>
+                        {error && <div className="glass-card border-[var(--accent-red)] p-4 mb-6 text-[var(--accent-red)] text-sm">{error}</div>}
+                        <div className="space-y-4 mb-6">
+                            <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Nome" />
+                            <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Email" required />
+                            <input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Password (min 6)" required minLength="6" />
+                            <input type="number" value={form.birth_year} onChange={e => setForm({...form, birth_year: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Anno di nascita *" required />
+                        </div>
+                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 rounded-xl text-lg mb-6">{loading ? 'Registrazione...' : 'Crea Account'}</button>
+                        <p className="text-center text-[var(--text-muted)]">Hai già un account? <button type="button" onClick={() => onNavigate('login')} className="text-[var(--accent-green)]">Accedi</button></p>
+                    </form>
+                </div>
+            );
+        };
+        
+        const SetupPage = ({ token, onComplete }) => {
+            const [garmin, setGarmin] = useState({ email: '', password: '' });
+            const [error, setError] = useState('');
+            const [step, setStep] = useState(1);
+            const [loading, setLoading] = useState(false);
+            
+            const connect = async (e) => {
+                e.preventDefault();
+                setLoading(true); setError('');
+                try {
+                    const res = await fetch(`${API}/api/garmin/connect`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ garmin_email: garmin.email, garmin_password: garmin.password })
+                    });
+                    const data = await res.json();
+                    if (data.message?.includes('collegato')) {
+                        setStep(2);
+                        await fetch(`${API}/api/sync`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ days_back: 90 })
+                        });
+                        setStep(3);
+                        setTimeout(onComplete, 2000);
+                    } else setError(data.error || 'Errore');
+                } catch { setError('Errore di connessione'); }
+                setLoading(false);
+            };
+            
+            if (step >= 2) return (
+                <div className="h-full flex items-center justify-center">
+                    <div className="text-center glass-card p-12">
+                        {step === 2 ? (
+                            <>
+                                <div className="w-16 h-16 border-4 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin mx-auto mb-6" />
+                                <h3 className="text-2xl font-bold mb-2">Sincronizzazione</h3>
+                                <p className="text-[var(--text-muted)]">Importazione dati degli ultimi 90 giorni...</p>
+                            </>
+                        ) : (
+                            <>
+                                <div className="text-6xl mb-6">✓</div>
+                                <h3 className="text-2xl font-bold text-[var(--accent-green)] mb-2">Tutto Pronto!</h3>
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+            
+            return (
+                <div className="h-full flex items-center justify-center p-8">
+                    <form onSubmit={connect} className="w-full max-w-md">
+                        <div className="text-center mb-10">
+                            <div className="text-5xl mb-4">⌚</div>
+                            <h1 className="text-4xl font-bold font-display mb-2">Connetti Garmin</h1>
+                            <p className="text-[var(--text-muted)]">Sincronizza i tuoi dati</p>
+                        </div>
+                        {error && <div className="glass-card border-[var(--accent-red)] p-4 mb-6 text-[var(--accent-red)] text-sm">{error}</div>}
+                        <div className="glass-card p-4 mb-6 text-sm text-[var(--text-muted)]">🔒 Le tue credenziali sono criptate</div>
+                        <div className="space-y-4 mb-6">
+                            <input type="email" value={garmin.email} onChange={e => setGarmin({...garmin, email: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Email Garmin" required />
+                            <input type="password" value={garmin.password} onChange={e => setGarmin({...garmin, password: e.target.value})} className="input-premium w-full px-5 py-4 rounded-xl" placeholder="Password Garmin" required />
+                        </div>
+                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 rounded-xl text-lg">{loading ? 'Connessione...' : 'Connetti'}</button>
+                    </form>
+                </div>
+            );
+        };
+        
+        // ==================== DASHBOARD ====================
+        
+        const Dashboard = ({ token, user, onLogout, onUserUpdate }) => {
+            const [tab, setTab] = useState('data');
+            const [summary, setSummary] = useState(null);
+            const [trend, setTrend] = useState(null);
+            const [activities, setActivities] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [syncing, setSyncing] = useState(false);
+            const [initialMessage, setInitialMessage] = useState(null);
+            
+            useEffect(() => { fetchData(); }, []);
+            
+            const fetchData = async () => {
+                try {
+                    const headers = { 'Authorization': `Bearer ${token}` };
+                    const [s, t, a] = await Promise.all([
+                        fetch(`${API}/api/metrics/summary?days=30`, { headers }).then(r => r.ok ? r.json() : {}),
+                        fetch(`${API}/api/metrics/trend?days=90`, { headers }).then(r => r.ok ? r.json() : {}),
+                        fetch(`${API}/api/activities?days=30`, { headers }).then(r => r.ok ? r.json() : [])
+                    ]);
+                    setSummary(s); setTrend(t); setActivities(a);
+                } catch {}
+                setLoading(false);
+            };
+            
+            const sync = async () => {
+                setSyncing(true);
+                try {
+                    await fetch(`${API}/api/sync`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ days_back: 45 })
+                    });
+                    await fetchData();
+                } catch {}
+                setSyncing(false);
+            };
+            
+            const handleAskCoach = (coach, message) => {
+                setInitialMessage(message);
+                setTab(coach);
+            };
+            
+            if (loading) return <Loading />;
+            
+            return (
+                <div className="h-full flex">
+                    {/* Sidebar */}
+                    <nav className="w-16 sm:w-20 lg:w-72 border-r border-[var(--border)] bg-[var(--bg-secondary)] flex flex-col flex-shrink-0">
+                        <div className="p-2 sm:p-4 lg:p-6 border-b border-[var(--border)]">
+                            <h1 className="hidden lg:block text-xl font-bold font-display">Performance Lab</h1>
+                            <span className="lg:hidden text-xl sm:text-2xl block text-center">⚡</span>
+                        </div>
+                        
+                        <div className="flex-1 p-2 sm:p-3 space-y-1 sm:space-y-2 overflow-y-auto">
+                            {/* Dashboard */}
+                            <button onClick={() => setTab('data')}
+                                className={`nav-item w-full ${tab === 'data' ? 'active' : ''}`}>
+                                <span className="text-lg sm:text-xl lg:text-2xl">📊</span>
+                                <span className="hidden lg:block text-sm">Dashboard</span>
+                            </button>
+                            
+                            {/* Coaches Section */}
+                            <div className="pt-2 sm:pt-4 pb-1 sm:pb-2">
+                                <span className="hidden lg:block text-xs text-[var(--text-muted)] uppercase tracking-wider px-3">I tuoi coach</span>
+                            </div>
+                            
+                            {/* Sensei */}
+                            <button onClick={() => setTab('sensei')}
+                                className={`w-full rounded-xl p-2 sm:p-3 transition-all ${tab === 'sensei' ? 'bg-[var(--accent-green-dim)] border border-[var(--accent-green)]' : 'hover:bg-[var(--bg-card)]'}`}>
+                                <div className="flex flex-col lg:flex-row items-center gap-2 sm:gap-3">
+                                    <img src="/images/sensei.png" alt="Sensei" className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full object-cover border-2 border-[var(--accent-green)]" />
+                                    <div className="hidden lg:block text-left">
+                                        <div className="font-semibold text-[var(--accent-green)]">Dr. Sensei</div>
+                                        <div className="text-xs text-[var(--text-muted)]">Sport & Performance</div>
+                                    </div>
+                                </div>
+                            </button>
+                            
+                            {/* Sakura */}
+                            <button onClick={() => setTab('sakura')}
+                                className={`w-full rounded-xl p-2 sm:p-3 transition-all ${tab === 'sakura' ? 'bg-[var(--accent-pink-dim)] border border-[var(--accent-pink)]' : 'hover:bg-[var(--bg-card)]'}`}>
+                                <div className="flex flex-col lg:flex-row items-center gap-2 sm:gap-3">
+                                    <img src="/images/sakura.png" alt="Sakura" className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full object-cover border-2 border-[var(--accent-pink)]" />
+                                    <div className="hidden lg:block text-left">
+                                        <div className="font-semibold text-[var(--accent-pink)]">Dr. Sakura</div>
+                                        <div className="text-xs text-[var(--text-muted)]">Mente & Benessere</div>
+                                    </div>
+                                </div>
+                            </button>
+                            
+                            {/* Other nav items */}
+                            <div className="pt-2 sm:pt-4 pb-1 sm:pb-2">
+                                <span className="hidden lg:block text-xs text-[var(--text-muted)] uppercase tracking-wider px-3">Analisi</span>
+                            </div>
+                            
+                            <button onClick={() => setTab('stats')}
+                                className={`nav-item w-full ${tab === 'stats' ? 'active' : ''}`}>
+                                <span className="text-lg sm:text-xl lg:text-2xl">📅</span>
+                                <span className="hidden lg:block text-sm">Statistiche</span>
+                            </button>
+                            
+                            <button onClick={() => setTab('trend')}
+                                className={`nav-item w-full ${tab === 'trend' ? 'active' : ''}`}>
+                                <span className="text-lg sm:text-xl lg:text-2xl">📈</span>
+                                <span className="hidden lg:block text-sm">Trend</span>
+                            </button>
+                            
+                            <button onClick={() => setTab('activities')}
+                                className={`nav-item w-full ${tab === 'activities' ? 'active' : ''}`}>
+                                <span className="text-lg sm:text-xl lg:text-2xl">🏃</span>
+                                <span className="hidden lg:block text-sm">Attività</span>
+                            </button>
+                            
+                            <button onClick={() => setTab('profile')}
+                                className={`nav-item w-full ${tab === 'profile' ? 'active' : ''}`}>
+                                <span className="text-lg sm:text-xl lg:text-2xl">⚙️</span>
+                                <span className="hidden lg:block text-sm">Impostazioni</span>
+                            </button>
+                        </div>
+                        
+                        <div className="p-2 sm:p-3 border-t border-[var(--border)]">
+                            <button onClick={sync} disabled={syncing} className="nav-item w-full">
+                                <span className={`text-lg sm:text-xl ${syncing ? 'animate-spin' : ''}`}>🔄</span>
+                                <span className="hidden lg:block text-sm">{syncing ? 'Sync...' : 'Sincronizza'}</span>
+                            </button>
+                        </div>
+                    </nav>
+                    
+                    {/* Content */}
+                    <main className="flex-1 overflow-hidden min-h-0">
+                        {tab === 'data' && <DataView token={token} summary={summary} />}
+                        {tab === 'stats' && <StatsView token={token} onAskCoach={handleAskCoach} />}
+                        {tab === 'sensei' && <ChatView token={token} coach="sensei" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
+                        {tab === 'sakura' && <ChatView token={token} coach="sakura" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
+                        {tab === 'trend' && <TrendView trend={trend} realAge={summary?.real_age || 42} />}
+                        {tab === 'activities' && <ActivityView token={token} activities={activities} onRefresh={fetchData} />}
+                        {tab === 'profile' && <ProfileView token={token} user={user} onUpdate={onUserUpdate} onLogout={onLogout} />}
+                    </main>
+                </div>
+            );
+        };
+        
+        // ==================== APP ====================
+        
+        const App = () => {
+            const [page, setPage] = useState('landing');
+            const [token, setToken] = useState(localStorage.getItem('token'));
+            const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
+            
+            useEffect(() => {
+                if (token && user) setPage(user.garmin_connected ? 'dashboard' : 'setup');
+            }, []);
+            
+            const handleLogin = (data) => { setToken(data.token); setUser(data.user); setPage(data.user.garmin_connected ? 'dashboard' : 'setup'); };
+            const handleLogout = () => { localStorage.clear(); setToken(null); setUser(null); setPage('landing'); };
+            const handleSetupComplete = () => { const u = { ...user, garmin_connected: true }; setUser(u); localStorage.setItem('user', JSON.stringify(u)); setPage('dashboard'); };
+            
+            return (
+                <div className="h-full">
+                    {page === 'landing' && <LandingPage onNavigate={setPage} />}
+                    {page === 'login' && <LoginPage onNavigate={setPage} onLogin={handleLogin} />}
+                    {page === 'register' && <RegisterPage onNavigate={setPage} />}
+                    {page === 'setup' && <SetupPage token={token} onComplete={handleSetupComplete} />}
+                    {page === 'dashboard' && <Dashboard token={token} user={user} onLogout={handleLogout} onUserUpdate={setUser} />}
+                </div>
+            );
+        };
+        
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('SW registered:', reg.scope))
+                    .catch(err => console.log('SW registration failed:', err));
+            });
+        }
+        
+        // iOS keyboard resize fix
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                document.documentElement.style.setProperty('--keyboard-height', 
+                    `${window.innerHeight - window.visualViewport.height}px`);
+            });
+        }
+    </script>
+</body>
+</html>
