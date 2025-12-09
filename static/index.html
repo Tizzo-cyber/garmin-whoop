@@ -740,26 +740,77 @@
         
         // ==================== TREND VIEW ====================
         
-        const TrendView = ({ trend, realAge }) => {
+        const TrendView = ({ token, realAge }) => {
+            const [period, setPeriod] = useState('90d');
             const [activeChart, setActiveChart] = useState('bioAge');
             const [showInfo, setShowInfo] = useState(null);
+            const [data, setData] = useState(null);
+            const [loading, setLoading] = useState(true);
             const chartRef = useRef(null);
             const canvasRef = useRef(null);
             
-            const configs = {
-                bioAge: { title: 'Età Biologica', icon: '🧬', color: '#00f593', getData: d => d.bio_age, refLine: realAge, info: 'Trend della tua età biologica calcolata. Sotto la linea = più giovane.' },
-                sleep: { title: 'Sonno', icon: '😴', color: '#a855f7', getData: d => d.sleep_hours, refLine: 7.5, unit: 'h', info: 'Ore di sonno per notte. Target: 7-8h.' },
-                hrv: { title: 'HRV', icon: '💓', color: '#ff6eb4', getData: d => d.hrv, unit: 'ms', info: 'Variabilità cardiaca notturna. Più alto = meglio.' },
-                rhr: { title: 'RHR', icon: '❤️', color: '#ff5757', getData: d => d.rhr, refLine: 60, unit: 'bpm', info: 'Battiti a riposo. Più basso = cuore efficiente.' },
-                steps: { title: 'Passi', icon: '👟', color: '#4da6ff', getData: d => d.steps, refLine: 10000, info: 'Passi giornalieri. Target: 10.000.' },
-                stress: { title: 'Stress', icon: '😤', color: '#ff9f43', getData: d => d.stress, refLine: 50, info: 'Livello stress. <25 rilassato, >50 alto.' },
-                bodyBattery: { title: 'Battery', icon: '🔋', color: '#22d3ee', getData: d => d.body_battery_high, refLine: 75, info: 'Energia massima giornaliera.' }
+            const periods = {
+                'today': { label: 'Oggi', days: 1, intraday: true },
+                '7d': { label: '7 Giorni', days: 7 },
+                '30d': { label: '30 Giorni', days: 30 },
+                '90d': { label: '3 Mesi', days: 90 },
+                '180d': { label: '6 Mesi', days: 180 },
+                '365d': { label: 'Anno', days: 365 }
             };
             
-            const config = configs[activeChart];
+            const configs = {
+                bioAge: { title: 'Età Biologica', icon: '🧬', color: '#00f593', getData: d => d.bio_age, refLine: realAge, info: 'Trend della tua età biologica. Sotto la linea = più giovane.' },
+                sleep: { title: 'Sonno', icon: '😴', color: '#a855f7', getData: d => d.sleep_hours, refLine: 7.5, unit: 'h', info: 'Ore di sonno per notte. Target: 7-8h.' },
+                hrv: { title: 'HRV', icon: '💓', color: '#ff6eb4', getData: d => d.hrv, unit: 'ms', info: 'Variabilità cardiaca. Più alto = meglio.' },
+                rhr: { title: 'RHR', icon: '❤️', color: '#ff5757', getData: d => d.rhr, refLine: 60, unit: 'bpm', info: 'Battiti a riposo. Più basso = meglio.' },
+                steps: { title: 'Passi', icon: '👟', color: '#4da6ff', getData: d => d.steps, refLine: 10000, info: 'Passi giornalieri. Target: 10.000.' },
+                stress: { title: 'Stress', icon: '😤', color: '#ff9f43', getData: d => d.stress, refLine: 50, info: 'Livello stress. <25 rilassato, >50 alto.' },
+                bodyBattery: { title: 'Battery', icon: '🔋', color: '#22d3ee', getData: d => d.body_battery_high || d.value, refLine: 75, info: 'Energia. Si carica col sonno.' }
+            };
             
+            // Metriche disponibili per intraday
+            const intradayMetrics = ['stress', 'bodyBattery', 'rhr'];
+            
+            const config = configs[activeChart];
+            const isIntraday = periods[period]?.intraday;
+            
+            // Fetch data when period changes
             useEffect(() => {
-                if (!canvasRef.current || !trend?.data?.length) return;
+                const fetchData = async () => {
+                    setLoading(true);
+                    try {
+                        if (isIntraday) {
+                            // Fetch intraday data
+                            const endpoint = activeChart === 'bodyBattery' ? 'body-battery' : activeChart === 'stress' ? 'stress' : 'heart-rate';
+                            const res = await fetch(`${API}/api/intraday/${endpoint}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                            if (res.ok) {
+                                const json = await res.json();
+                                setData({ intraday: true, data: json.data || [], date: json.date });
+                            }
+                        } else {
+                            // Fetch trend data
+                            const res = await fetch(`${API}/api/metrics/trend?days=${periods[period].days}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                            if (res.ok) {
+                                const json = await res.json();
+                                setData({ intraday: false, ...json });
+                            }
+                        }
+                    } catch (e) { console.error(e); }
+                    setLoading(false);
+                };
+                fetchData();
+            }, [period, activeChart, token]);
+            
+            // Switch to valid metric when changing to intraday
+            useEffect(() => {
+                if (isIntraday && !intradayMetrics.includes(activeChart)) {
+                    setActiveChart('bodyBattery');
+                }
+            }, [period]);
+            
+            // Draw chart
+            useEffect(() => {
+                if (!canvasRef.current || !data?.data?.length) return;
                 if (chartRef.current) chartRef.current.destroy();
                 
                 const ctx = canvasRef.current.getContext('2d');
@@ -767,26 +818,60 @@
                 gradient.addColorStop(0, config.color + '30');
                 gradient.addColorStop(1, config.color + '00');
                 
-                const datasets = [{ label: config.title, data: trend.data.map(d => config.getData(d)), borderColor: config.color, backgroundColor: gradient, fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 }];
-                if (config.refLine) datasets.push({ label: 'Ref', data: trend.data.map(() => config.refLine), borderColor: 'rgba(255,255,255,0.15)', borderDash: [5, 3], pointRadius: 0, borderWidth: 1, fill: false });
+                let labels, values;
+                if (data.intraday) {
+                    labels = data.data.map(d => d.time);
+                    values = data.data.map(d => d.value);
+                } else {
+                    labels = data.data.map(d => {
+                        const date = new Date(d.date);
+                        if (periods[period].days <= 7) return date.toLocaleDateString('it', { weekday: 'short' });
+                        if (periods[period].days <= 30) return date.toLocaleDateString('it', { day: '2-digit' });
+                        if (periods[period].days <= 90) return date.toLocaleDateString('it', { day: '2-digit', month: 'short' });
+                        return date.toLocaleDateString('it', { month: 'short' });
+                    });
+                    values = data.data.map(d => config.getData(d));
+                }
+                
+                const datasets = [{ label: config.title, data: values, borderColor: config.color, backgroundColor: gradient, fill: true, tension: 0.4, pointRadius: data.intraday ? 0 : (periods[period].days <= 7 ? 4 : 0), borderWidth: 2 }];
+                if (config.refLine && !data.intraday) {
+                    datasets.push({ label: 'Ref', data: values.map(() => config.refLine), borderColor: 'rgba(255,255,255,0.15)', borderDash: [5, 3], pointRadius: 0, borderWidth: 1, fill: false });
+                }
                 
                 chartRef.current = new Chart(ctx, {
                     type: 'line',
-                    data: { labels: trend.data.map(d => new Date(d.date).toLocaleDateString('it', { day: '2-digit', month: 'short' })), datasets },
-                    options: { responsive: true, maintainAspectRatio: false, interaction: { intersect: false, mode: 'index' }, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(255,255,255,0.3)', maxTicksLimit: 5, font: { size: 9 } } }, y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 } } } } }
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#181a22', titleColor: '#fff', bodyColor: '#8b8d98', borderColor: '#2a2d38', borderWidth: 1 } },
+                        scales: {
+                            x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(255,255,255,0.3)', maxTicksLimit: data.intraday ? 8 : (periods[period].days <= 30 ? 7 : 6), font: { size: 9 } } },
+                            y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 } } }
+                        }
+                    }
                 });
                 return () => chartRef.current?.destroy();
-            }, [trend, activeChart, realAge]);
+            }, [data, activeChart, config, period]);
             
-            const validData = trend?.data?.filter(d => config.getData(d) != null) || [];
-            const values = validData.map(d => config.getData(d));
-            const avg = values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1) : '--';
-            const min = values.length ? Math.min(...values).toFixed(1) : '--';
-            const max = values.length ? Math.max(...values).toFixed(1) : '--';
-            
-            if (!trend?.data?.length) {
-                return <div className="h-full flex items-center justify-center"><div className="text-center glass p-8"><span className="text-4xl block mb-3">📈</span><h3 className="font-bold mb-1">Dati insufficienti</h3><p className="text-[var(--text-muted)] text-sm">Servono almeno 7 giorni</p></div></div>;
-            }
+            // Calculate stats
+            const getStats = () => {
+                if (!data?.data?.length) return { avg: '--', min: '--', max: '--' };
+                let values;
+                if (data.intraday) {
+                    values = data.data.map(d => d.value).filter(v => v != null);
+                } else {
+                    values = data.data.map(d => config.getData(d)).filter(v => v != null);
+                }
+                if (!values.length) return { avg: '--', min: '--', max: '--' };
+                return {
+                    avg: (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1),
+                    min: Math.min(...values).toFixed(1),
+                    max: Math.max(...values).toFixed(1)
+                };
+            };
+            const stats = getStats();
             
             return (
                 <div className="h-full overflow-y-auto bg-gradient-sensei" style={{ paddingBottom: 'calc(76px + var(--safe-bottom))' }}>
@@ -803,46 +888,82 @@
                     <div className="max-w-4xl mx-auto p-4">
                         <h1 className="text-xl font-bold font-display mb-4 text-center slide-up">Trend</h1>
                         
-                        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide slide-up">
-                            {Object.entries(configs).map(([key, cfg]) => (
-                                <button key={key} onClick={() => setActiveChart(key)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full whitespace-nowrap transition-all text-sm ${activeChart === key ? 'text-black font-bold' : 'glass text-[var(--text-muted)]'}`}
-                                    style={activeChart === key ? { background: cfg.color } : {}}>
-                                    <span>{cfg.icon}</span><span className="text-xs">{cfg.title}</span>
+                        {/* Period Selector */}
+                        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3 scrollbar-hide slide-up">
+                            {Object.entries(periods).map(([key, p]) => (
+                                <button key={key} onClick={() => setPeriod(key)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${period === key ? 'bg-[var(--accent-green)] text-black' : 'glass hover:bg-[var(--bg-elevated)]'}`}>
+                                    {p.label}
                                 </button>
                             ))}
                         </div>
                         
-                        <div className="glass-elevated p-4 mb-4 slide-up">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="font-semibold text-sm" style={{ color: config.color }}>{config.icon} {config.title}</h3>
-                                <button onClick={() => setShowInfo(activeChart)} className="text-xs text-[var(--accent-blue)]">ℹ️</button>
-                            </div>
-                            <div className="h-48"><canvas ref={canvasRef}></canvas></div>
+                        {/* Metric Selector */}
+                        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide slide-up">
+                            {Object.entries(configs).map(([key, cfg]) => {
+                                // Hide non-intraday metrics when in intraday mode
+                                if (isIntraday && !intradayMetrics.includes(key)) return null;
+                                return (
+                                    <button key={key} onClick={() => setActiveChart(key)}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full whitespace-nowrap transition-all text-sm ${activeChart === key ? 'text-black font-bold' : 'glass text-[var(--text-muted)]'}`}
+                                        style={activeChart === key ? { background: cfg.color } : {}}>
+                                        <span>{cfg.icon}</span><span className="text-xs">{cfg.title}</span>
+                                    </button>
+                                );
+                            })}
                         </div>
                         
+                        {/* Chart */}
+                        <div className="glass-elevated p-4 mb-4 slide-up">
+                            <div className="flex items-center justify-between mb-3">
+                                <div>
+                                    <h3 className="font-semibold text-sm" style={{ color: config.color }}>{config.icon} {config.title}</h3>
+                                    <p className="text-[10px] text-[var(--text-muted)]">{periods[period].label}{data?.date ? ` • ${data.date}` : ''}</p>
+                                </div>
+                                <button onClick={() => setShowInfo(activeChart)} className="text-xs text-[var(--accent-blue)]">ℹ️</button>
+                            </div>
+                            {loading ? (
+                                <div className="h-48 flex items-center justify-center">
+                                    <div className="w-8 h-8 border-2 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin"></div>
+                                </div>
+                            ) : !data?.data?.length ? (
+                                <div className="h-48 flex items-center justify-center text-[var(--text-muted)] text-sm">Nessun dato disponibile</div>
+                            ) : (
+                                <div className="h-48"><canvas ref={canvasRef}></canvas></div>
+                            )}
+                        </div>
+                        
+                        {/* Stats */}
                         <div className="grid grid-cols-3 gap-2 mb-4 slide-up">
                             <div className="glass p-3 text-center">
                                 <div className="text-[10px] text-[var(--text-muted)]">Min</div>
-                                <div className="text-lg font-bold" style={{ color: config.color }}>{min}</div>
+                                <div className="text-lg font-bold" style={{ color: config.color }}>{stats.min}</div>
                             </div>
                             <div className="glass p-3 text-center">
                                 <div className="text-[10px] text-[var(--text-muted)]">Media</div>
-                                <div className="text-lg font-bold">{avg}</div>
+                                <div className="text-lg font-bold">{stats.avg}</div>
                             </div>
                             <div className="glass p-3 text-center">
                                 <div className="text-[10px] text-[var(--text-muted)]">Max</div>
-                                <div className="text-lg font-bold text-[var(--accent-orange)]">{max}</div>
+                                <div className="text-lg font-bold text-[var(--accent-orange)]">{stats.max}</div>
                             </div>
                         </div>
                         
-                        {activeChart === 'bioAge' && trend.pace_of_aging !== null && (
+                        {/* Pace of Aging (only for bioAge and non-intraday) */}
+                        {activeChart === 'bioAge' && !isIntraday && data?.pace_of_aging !== null && data?.pace_of_aging !== undefined && (
                             <div className="glass-elevated p-5 text-center slide-up">
                                 <div className="text-xs text-[var(--text-muted)] mb-1">Pace of Aging</div>
-                                <div className={`text-3xl font-bold font-display ${trend.pace_of_aging <= 0 ? 'text-[var(--accent-green)] glow-text-green' : 'text-[var(--accent-orange)]'}`}>
-                                    {trend.pace_of_aging <= 0 ? '' : '+'}{trend.pace_of_aging?.toFixed(1)}<span className="text-sm ml-1">anni/anno</span>
+                                <div className={`text-3xl font-bold font-display ${data.pace_of_aging <= 0 ? 'text-[var(--accent-green)] glow-text-green' : 'text-[var(--accent-orange)]'}`}>
+                                    {data.pace_of_aging <= 0 ? '' : '+'}{data.pace_of_aging?.toFixed(1)}<span className="text-sm ml-1">anni/anno</span>
                                 </div>
-                                <p className="text-xs text-[var(--text-muted)] mt-2">{trend.pace_of_aging < -0.5 ? '🎉 Ringiovanimento!' : trend.pace_of_aging < 0 ? '✨ Rallentato' : '👍 Normale'}</p>
+                                <p className="text-xs text-[var(--text-muted)] mt-2">{data.pace_of_aging < -0.5 ? '🎉 Ringiovanimento!' : data.pace_of_aging < 0 ? '✨ Rallentato' : '👍 Normale'}</p>
+                            </div>
+                        )}
+                        
+                        {/* Intraday hint */}
+                        {isIntraday && (
+                            <div className="glass p-3 text-center text-xs text-[var(--text-muted)] slide-up">
+                                📊 Vista intraday: dati di oggi ora per ora
                             </div>
                         )}
                     </div>
@@ -1276,7 +1397,7 @@
                         {tab === 'stats' && <StatsView token={token} onAskCoach={handleAskCoach} />}
                         {tab === 'sensei' && <ChatView token={token} coach="sensei" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
                         {tab === 'sakura' && <ChatView token={token} coach="sakura" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
-                        {tab === 'trend' && <TrendView trend={trend} realAge={summary?.real_age || 42} />}
+                        {tab === 'trend' && <TrendView token={token} realAge={summary?.real_age || 42} />}
                         {tab === 'activities' && <ActivityView token={token} activities={activities} onRefresh={fetchData} />}
                         {tab === 'profile' && <ProfileView token={token} user={user} onUpdate={onUserUpdate} onLogout={onLogout} />}
                     </main>
