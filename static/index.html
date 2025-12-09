@@ -1346,57 +1346,24 @@
             const [page, setPage] = useState('loading');
             const [token, setToken] = useState(null);
             const [user, setUser] = useState(null);
-            const [error, setError] = useState(null);
             
-            // Robust startup
+            // Simple startup - just check localStorage
             useEffect(() => {
-                const init = async () => {
-                    try {
-                        const storedToken = localStorage.getItem('token');
-                        const storedUser = localStorage.getItem('user');
-                        
-                        if (!storedToken || !storedUser) {
-                            setPage('landing');
-                            return;
-                        }
-                        
-                        // Verify token is valid
-                        const res = await fetch(`${API}/api/profile`, {
-                            headers: { 'Authorization': `Bearer ${storedToken}` }
-                        });
-                        
-                        if (res.ok) {
-                            const userData = await res.json();
-                            setToken(storedToken);
-                            setUser(userData);
-                            setPage(userData.garmin_connected ? 'dashboard' : 'setup');
-                        } else {
-                            // Token invalid, clear and go to login
-                            localStorage.removeItem('token');
-                            localStorage.removeItem('user');
-                            setPage('landing');
-                        }
-                    } catch (e) {
-                        console.error('Init error:', e);
-                        // Network error - try using stored data
-                        const storedToken = localStorage.getItem('token');
-                        const storedUser = localStorage.getItem('user');
-                        if (storedToken && storedUser) {
-                            try {
-                                setToken(storedToken);
-                                setUser(JSON.parse(storedUser));
-                                setPage('dashboard');
-                            } catch {
-                                setPage('landing');
-                            }
-                        } else {
-                            setPage('landing');
-                        }
-                    }
-                };
+                const storedToken = localStorage.getItem('token');
+                const storedUser = localStorage.getItem('user');
                 
-                // Small delay to prevent flash
-                setTimeout(init, 100);
+                if (storedToken && storedUser) {
+                    try {
+                        const userData = JSON.parse(storedUser);
+                        setToken(storedToken);
+                        setUser(userData);
+                        setPage(userData.garmin_connected ? 'dashboard' : 'setup');
+                    } catch {
+                        setPage('landing');
+                    }
+                } else {
+                    setPage('landing');
+                }
             }, []);
             
             const handleLogin = (data) => {
