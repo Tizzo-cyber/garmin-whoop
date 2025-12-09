@@ -393,7 +393,7 @@
                                                             <div className="text-lg font-bold">{impact.value}</div>
                                                             <div className="text-[10px] text-[var(--text-muted)]">{meta.label}</div>
                                                             <div className="progress-track mt-2">
-                                                                <div className="progress-fill" style={{ width: `${impact.score * 10}%`, background: impact.score >= 7 ? 'var(--accent-green)' : impact.score >= 5 ? 'var(--accent-orange)' : 'var(--accent-red)' }} />
+                                                                <div className="progress-fill" style={{ width: `${impact.score * 10}%`, background: impact.impact <= 0 ? 'var(--accent-green)' : 'var(--accent-orange)' }} />
                                                             </div>
                                                         </div>
                                                     );
