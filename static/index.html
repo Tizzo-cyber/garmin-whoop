@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<!-- SENSEI v3.1 - Complete Premium Edition - Mobile-First - 2024-12-09 -->
+<!-- SENSEI v3.2 - Robust Startup & Sync - 2024-12-09 -->
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0a0a0f">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SENSEI">
     <link rel="manifest" href="/manifest.json">
@@ -16,75 +17,57 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-base: #050508;
-            --bg-primary: #0a0a0f;
-            --bg-secondary: #0f1015;
-            --bg-card: rgba(18, 18, 24, 0.7);
-            --bg-card-solid: #121218;
-            --bg-elevated: rgba(28, 28, 38, 0.6);
-            --border: rgba(255, 255, 255, 0.06);
-            --border-light: rgba(255, 255, 255, 0.1);
-            --text-primary: #ffffff;
-            --text-secondary: rgba(255, 255, 255, 0.7);
-            --text-muted: rgba(255, 255, 255, 0.4);
-            --accent-green: #00f593;
-            --accent-green-dim: rgba(0, 245, 147, 0.12);
-            --accent-pink: #ff6eb4;
-            --accent-pink-dim: rgba(255, 110, 180, 0.12);
-            --accent-blue: #4da6ff;
-            --accent-purple: #a855f7;
-            --accent-orange: #ff9f43;
-            --accent-red: #ff5757;
-            --accent-cyan: #22d3ee;
-            --safe-bottom: env(safe-area-inset-bottom, 0px);
-            --nav-height: 72px;
+            --bg-base: #050508; --bg-primary: #0a0a0f; --bg-secondary: #0f1015; --bg-card: rgba(18,18,24,0.7); --bg-card-solid: #121218; --bg-elevated: rgba(28,28,38,0.6);
+            --border: rgba(255,255,255,0.06); --border-light: rgba(255,255,255,0.1);
+            --text-primary: #fff; --text-secondary: rgba(255,255,255,0.7); --text-muted: rgba(255,255,255,0.4);
+            --accent-green: #00f593; --accent-green-dim: rgba(0,245,147,0.12); --accent-pink: #ff6eb4; --accent-pink-dim: rgba(255,110,180,0.12);
+            --accent-blue: #4da6ff; --accent-purple: #a855f7; --accent-orange: #ff9f43; --accent-red: #ff5757; --accent-cyan: #22d3ee;
+            --safe-bottom: env(safe-area-inset-bottom, 0px); --nav-height: 72px;
         }
-        
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         html, body, #root { height: 100%; height: 100dvh; overflow: hidden; font-family: 'Inter', -apple-system, sans-serif; background: var(--bg-base); color: var(--text-primary); -webkit-font-smoothing: antialiased; }
-        body { overscroll-behavior: none; background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 245, 147, 0.08) 0%, transparent 50%), var(--bg-base); }
+        body { overscroll-behavior: none; background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0,245,147,0.08) 0%, transparent 50%), var(--bg-base); }
         .font-display { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
         
         .glass { background: var(--bg-card); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 20px; }
         .glass-solid { background: var(--bg-card-solid); border: 1px solid var(--border); border-radius: 20px; }
         .glass-elevated { background: var(--bg-elevated); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px); border: 1px solid var(--border-light); border-radius: 24px; box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
         
-        .glow-green { box-shadow: 0 0 60px rgba(0, 245, 147, 0.15); }
-        .glow-pink { box-shadow: 0 0 60px rgba(255, 110, 180, 0.15); }
-        .glow-text-green { text-shadow: 0 0 40px rgba(0, 245, 147, 0.6); }
-        .gradient-text { background: linear-gradient(135deg, var(--accent-green) 0%, var(--accent-cyan) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .glow-green { box-shadow: 0 0 60px rgba(0,245,147,0.15); }
+        .glow-pink { box-shadow: 0 0 60px rgba(255,110,180,0.15); }
+        .glow-text-green { text-shadow: 0 0 40px rgba(0,245,147,0.6); }
+        .gradient-text { background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
         
-        .btn-primary { background: linear-gradient(135deg, var(--accent-green) 0%, #00c978 100%); color: #000; font-weight: 700; border-radius: 16px; transition: all 0.3s; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0, 245, 147, 0.35); }
+        .btn-primary { background: linear-gradient(135deg, var(--accent-green), #00c978); color: #000; font-weight: 700; border-radius: 16px; transition: all 0.3s; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,245,147,0.35); }
         .btn-primary:active { transform: scale(0.98); }
         .btn-primary:disabled { opacity: 0.5; transform: none; }
-        .btn-pink { background: linear-gradient(135deg, var(--accent-pink) 0%, #e055a0 100%); color: #000; font-weight: 700; border-radius: 16px; transition: all 0.3s; }
-        .btn-pink:hover { box-shadow: 0 12px 40px rgba(255, 110, 180, 0.35); }
+        .btn-pink { background: linear-gradient(135deg, var(--accent-pink), #e055a0); color: #000; font-weight: 700; border-radius: 16px; }
         .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); border-radius: 14px; transition: all 0.2s; }
-        .btn-ghost:hover { border-color: var(--border-light); color: var(--text-primary); background: rgba(255,255,255,0.03); }
-        .btn-danger { background: rgba(255,87,87,0.1); border: 1px solid var(--accent-red); color: var(--accent-red); border-radius: 14px; transition: all 0.2s; }
+        .btn-ghost:hover { border-color: var(--border-light); background: rgba(255,255,255,0.03); }
+        .btn-danger { background: rgba(255,87,87,0.1); border: 1px solid var(--accent-red); color: var(--accent-red); border-radius: 14px; }
         .btn-danger:hover { background: var(--accent-red); color: #000; }
         
-        .input-modern { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); color: var(--text-primary); font-size: 16px; border-radius: 14px; transition: all 0.3s; }
+        .input-modern { background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--text-primary); font-size: 16px; border-radius: 14px; transition: all 0.3s; }
         .input-modern::placeholder { color: var(--text-muted); }
-        .input-modern:focus { border-color: var(--accent-green); outline: none; background: rgba(0, 245, 147, 0.04); box-shadow: 0 0 0 4px rgba(0, 245, 147, 0.1); }
-        .input-modern.pink:focus { border-color: var(--accent-pink); background: rgba(255, 110, 180, 0.04); box-shadow: 0 0 0 4px rgba(255, 110, 180, 0.1); }
+        .input-modern:focus { border-color: var(--accent-green); outline: none; background: rgba(0,245,147,0.04); box-shadow: 0 0 0 4px rgba(0,245,147,0.1); }
+        .input-modern.pink:focus { border-color: var(--accent-pink); background: rgba(255,110,180,0.04); box-shadow: 0 0 0 4px rgba(255,110,180,0.1); }
         
         .chat-bubble { max-width: 85%; padding: 16px 20px; font-size: 15px; line-height: 1.7; border-radius: 20px; }
         .chat-ai { background: var(--bg-card-solid); border: 1px solid var(--border); border-radius: 6px 20px 20px 20px; }
-        .chat-ai.sensei { border-left: 3px solid var(--accent-green); background: linear-gradient(135deg, rgba(0, 245, 147, 0.04) 0%, var(--bg-card-solid) 100%); }
-        .chat-ai.sakura { border-left: 3px solid var(--accent-pink); background: linear-gradient(135deg, rgba(255, 110, 180, 0.04) 0%, var(--bg-card-solid) 100%); }
-        .chat-user { background: linear-gradient(135deg, rgba(77, 166, 255, 0.15) 0%, rgba(77, 166, 255, 0.05) 100%); border: 1px solid rgba(77, 166, 255, 0.2); border-radius: 20px 20px 6px 20px; }
+        .chat-ai.sensei { border-left: 3px solid var(--accent-green); background: linear-gradient(135deg, rgba(0,245,147,0.04), var(--bg-card-solid)); }
+        .chat-ai.sakura { border-left: 3px solid var(--accent-pink); background: linear-gradient(135deg, rgba(255,110,180,0.04), var(--bg-card-solid)); }
+        .chat-user { background: linear-gradient(135deg, rgba(77,166,255,0.15), rgba(77,166,255,0.05)); border: 1px solid rgba(77,166,255,0.2); border-radius: 20px 20px 6px 20px; }
         
         .typing-dot { width: 8px; height: 8px; border-radius: 50%; animation: pulse 1.4s infinite ease-in-out; }
         .typing-dot:nth-child(2) { animation-delay: 0.15s; }
         .typing-dot:nth-child(3) { animation-delay: 0.3s; }
         @keyframes pulse { 0%, 60%, 100% { transform: scale(0.8); opacity: 0.4; } 30% { transform: scale(1.2); opacity: 1; } }
         
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: calc(var(--nav-height) + var(--safe-bottom)); padding-bottom: var(--safe-bottom); background: rgba(10, 10, 15, 0.9); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--border); z-index: 100; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: calc(var(--nav-height) + var(--safe-bottom)); padding-bottom: var(--safe-bottom); background: rgba(10,10,15,0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--border); z-index: 100; }
         .nav-item-mobile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 8px; border-radius: 12px; transition: all 0.2s; color: var(--text-muted); flex: 1; min-width: 0; }
         .nav-item-mobile.active { color: var(--accent-green); }
         .nav-item-mobile.active.sakura { color: var(--accent-pink); }
@@ -93,7 +76,7 @@
         
         .sidebar { background: var(--bg-secondary); border-right: 1px solid var(--border); }
         .nav-item-desktop { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; transition: all 0.2s; color: var(--text-muted); cursor: pointer; }
-        .nav-item-desktop:hover { background: rgba(255, 255, 255, 0.03); color: var(--text-secondary); }
+        .nav-item-desktop:hover { background: rgba(255,255,255,0.03); color: var(--text-secondary); }
         .nav-item-desktop.active { background: var(--accent-green-dim); color: var(--accent-green); }
         .nav-item-desktop.active.sakura { background: var(--accent-pink-dim); color: var(--accent-pink); }
         
@@ -101,12 +84,12 @@
         .metric-card:hover { border-color: var(--border-light); transform: translateY(-2px); }
         .metric-card:active { transform: scale(0.98); }
         
-        .progress-track { height: 5px; background: rgba(255, 255, 255, 0.06); border-radius: 3px; overflow: hidden; }
-        .progress-fill { height: 100%; border-radius: 3px; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+        .progress-track { height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 3px; transition: width 0.8s cubic-bezier(0.4,0,0.2,1); }
         
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
         
         .fade-in { animation: fadeIn 0.4s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
@@ -115,12 +98,12 @@
         .scale-in { animation: scaleIn 0.3s ease; }
         @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 16px; animation: fadeIn 0.2s ease; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 16px; }
         .modal-card { background: var(--bg-card-solid); border: 1px solid var(--border); border-radius: 24px; padding: 24px; max-width: 420px; width: 100%; max-height: 85vh; overflow-y: auto; animation: scaleIn 0.3s ease; }
         
-        .bg-gradient-hero { background: radial-gradient(ellipse 100% 80% at 50% -20%, rgba(0, 245, 147, 0.12) 0%, transparent 50%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(255, 110, 180, 0.06) 0%, transparent 50%), var(--bg-base); }
-        .bg-gradient-sensei { background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0, 245, 147, 0.06) 0%, transparent 50%); }
-        .bg-gradient-sakura { background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255, 110, 180, 0.06) 0%, transparent 50%); }
+        .bg-gradient-hero { background: radial-gradient(ellipse 100% 80% at 50% -20%, rgba(0,245,147,0.12) 0%, transparent 50%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(255,110,180,0.06) 0%, transparent 50%), var(--bg-base); }
+        .bg-gradient-sensei { background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0,245,147,0.06) 0%, transparent 50%); }
+        .bg-gradient-sakura { background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255,110,180,0.06) 0%, transparent 50%); }
         
         .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         @media (min-width: 640px) { .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; } }
@@ -131,48 +114,96 @@
         
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Pull to refresh */
+        .ptr-container { position: relative; overflow-y: auto; overflow-x: hidden; }
+        .ptr-indicator { position: absolute; top: -50px; left: 50%; transform: translateX(-50%); transition: all 0.3s; opacity: 0; }
+        .ptr-indicator.visible { opacity: 1; }
+        .ptr-indicator.refreshing { top: 10px; }
+        .ptr-spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent-green); border-radius: 50%; }
+        .ptr-spinner.spin { animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* View header */
+        .view-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); background: rgba(10,10,15,0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 10; }
+        .view-title { font-size: 18px; font-weight: 700; }
+        .refresh-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--bg-card); border: 1px solid var(--border); font-size: 16px; cursor: pointer; transition: all 0.2s; }
+        .refresh-btn:hover { background: var(--bg-elevated); border-color: var(--border-light); }
+        .refresh-btn:active { transform: scale(0.95); }
+        .refresh-btn.spinning { animation: spin 0.8s linear infinite; }
+        
+        /* Sync status */
+        .sync-status { font-size: 10px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+        .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-green); }
+        .sync-dot.stale { background: var(--accent-orange); }
     </style>
 </head>
 <body>
     <div id="root"></div>
     
     <script type="text/babel">
-        const { useState, useEffect, useRef, useCallback } = React;
+        const { useState, useEffect, useRef, useCallback, createContext, useContext } = React;
         const API = '';
         
-        // ==================== SHARED DATA ====================
+        // ==================== GLOBAL CONTEXT ====================
         
-        const metricInfo = {
-            rhr: { title: 'Frequenza a Riposo', icon: '❤️', color: 'var(--accent-red)', desc: 'La frequenza cardiaca a riposo indica l\'efficienza del tuo cuore.', tip: 'Ogni 5 bpm in meno = 1-2 anni di età biologica più giovane.', ranges: [{ label: 'Atleta', value: '40-50 bpm', good: true }, { label: 'Eccellente', value: '51-60 bpm', good: true }, { label: 'Buono', value: '61-70 bpm', good: false }, { label: 'Da migliorare', value: '70+ bpm', good: false }] },
-            vo2: { title: 'VO2 Max', icon: '🫁', color: 'var(--accent-green)', desc: 'Il miglior indicatore di fitness cardiovascolare e longevità.', tip: 'Ogni 5 punti in più = 2-3 anni di età biologica più giovane.', ranges: [{ label: 'Eccellente', value: '50+ ml/kg', good: true }, { label: 'Buono', value: '42-50 ml/kg', good: true }, { label: 'Medio', value: '35-42 ml/kg', good: false }] },
-            steps: { title: 'Passi Giornalieri', icon: '👟', color: 'var(--accent-orange)', desc: 'Camminare regolarmente riduce il rischio cardiovascolare.', tip: '8000+ passi/giorno riducono mortalità del 51%.', ranges: [{ label: 'Molto attivo', value: '12.000+', good: true }, { label: 'Attivo', value: '10.000+', good: true }, { label: 'Moderato', value: '7.500+', good: false }] },
-            sleep: { title: 'Sonno', icon: '😴', color: 'var(--accent-purple)', desc: 'Il sonno è fondamentale per il recupero fisico e mentale.', tip: '7-8 ore = 1-3 anni di età biologica più giovane.', ranges: [{ label: 'Ottimale', value: '7-9 ore', good: true }, { label: 'Accettabile', value: '6-7 ore', good: false }] },
-            recovery: { title: 'Recovery', icon: '⚡', color: 'var(--accent-green)', desc: 'Quanto il tuo corpo è pronto per lo sforzo.', tip: '70%+ = allenamento intenso. <40% = riposo.', ranges: [{ label: 'Pronto', value: '80-100%', good: true }, { label: 'Buono', value: '60-79%', good: true }] },
-            strain: { title: 'Strain', icon: '🔥', color: 'var(--accent-orange)', desc: 'Carico cardiovascolare accumulato (0-21).', tip: '0-9 leggero, 10-14 moderato, 15+ intenso.', ranges: [{ label: 'Leggero', value: '0-9', good: true }, { label: 'Moderato', value: '10-14', good: true }] },
-            hrv: { title: 'HRV', icon: '💓', color: 'var(--accent-pink)', desc: 'Variabilità cardiaca. HRV alto = sistema nervoso sano.', tip: 'Migliora con sonno, meditazione e fitness.', ranges: [{ label: 'Eccellente', value: '60+ ms', good: true }, { label: 'Buono', value: '40-60 ms', good: true }] },
-            bodyBattery: { title: 'Body Battery', icon: '🔋', color: 'var(--accent-cyan)', desc: 'Le tue riserve di energia durante la giornata.', tip: 'Mattina ideale: 80+. Sotto 25 = riposo.', ranges: [{ label: 'Carico', value: '75-100', good: true }, { label: 'Buono', value: '50-74', good: true }] },
-            stress: { title: 'Stress', icon: '😤', color: 'var(--accent-orange)', desc: 'Misurato tramite HRV. Lo stress cronico accelera l\'invecchiamento.', tip: 'Meditazione e respirazione aiutano.', ranges: [{ label: 'Rilassato', value: '0-25', good: true }, { label: 'Basso', value: '26-50', good: true }] },
-            bioAge: { title: 'Età Biologica', icon: '🧬', color: 'var(--accent-green)', desc: 'Stima l\'età del tuo corpo basandosi su parametri reali.', tip: 'Influenzala con stile di vita e attività fisica.', ranges: [{ label: 'Eccellente', value: '5+ anni più giovane', good: true }, { label: 'Ottimo', value: '2-5 anni più giovane', good: true }] },
-            calories: { title: 'Calorie', icon: '🔥', color: 'var(--accent-red)', desc: 'Calorie totali bruciate durante il periodo.', tip: 'Include metabolismo basale + attività.', ranges: [] },
-            distance: { title: 'Distanza', icon: '📏', color: 'var(--accent-blue)', desc: 'Chilometri totali percorsi.', tip: 'Include passi, corsa, ciclismo.', ranges: [] },
-            intensity: { title: 'Minuti Intensi', icon: '⏱️', color: 'var(--accent-purple)', desc: 'Tempo in attività moderata e vigorosa.', tip: 'WHO raccomanda 150+ min/settimana.', ranges: [] },
-            heart: { title: 'Cuore', icon: '❤️', color: 'var(--accent-red)', desc: 'Metriche cardiovascolari: RHR e HRV.', tip: 'RHR basso + HRV alto = cuore efficiente.', ranges: [] }
+        const AppContext = createContext(null);
+        
+        const useApp = () => useContext(AppContext);
+        
+        // ==================== PULL TO REFRESH HOOK ====================
+        
+        const usePullToRefresh = (onRefresh, containerRef) => {
+            const [pullDistance, setPullDistance] = useState(0);
+            const [isRefreshing, setIsRefreshing] = useState(false);
+            const startY = useRef(0);
+            const pulling = useRef(false);
+            
+            useEffect(() => {
+                const container = containerRef.current;
+                if (!container) return;
+                
+                const handleTouchStart = (e) => {
+                    if (container.scrollTop === 0) {
+                        startY.current = e.touches[0].clientY;
+                        pulling.current = true;
+                    }
+                };
+                
+                const handleTouchMove = (e) => {
+                    if (!pulling.current) return;
+                    const deltaY = e.touches[0].clientY - startY.current;
+                    if (deltaY > 0 && container.scrollTop === 0) {
+                        e.preventDefault();
+                        setPullDistance(Math.min(deltaY * 0.5, 80));
+                    }
+                };
+                
+                const handleTouchEnd = async () => {
+                    if (pullDistance > 60 && !isRefreshing) {
+                        setIsRefreshing(true);
+                        try { await onRefresh(); } catch {}
+                        setIsRefreshing(false);
+                    }
+                    setPullDistance(0);
+                    pulling.current = false;
+                };
+                
+                container.addEventListener('touchstart', handleTouchStart, { passive: true });
+                container.addEventListener('touchmove', handleTouchMove, { passive: false });
+                container.addEventListener('touchend', handleTouchEnd, { passive: true });
+                
+                return () => {
+                    container.removeEventListener('touchstart', handleTouchStart);
+                    container.removeEventListener('touchmove', handleTouchMove);
+                    container.removeEventListener('touchend', handleTouchEnd);
+                };
+            }, [onRefresh, pullDistance, isRefreshing]);
+            
+            return { pullDistance, isRefreshing };
         };
         
-        const statsInfo = {
-            steps: { icon: '👟', title: 'Passi', desc: 'Passi totali del periodo. 10.000/giorno è l\'obiettivo standard per mantenersi attivi.' },
-            calories: { icon: '🔥', title: 'Calorie', desc: 'Calorie totali bruciate. Include metabolismo basale + attività fisica.' },
-            distance: { icon: '📏', title: 'Distanza', desc: 'Km totali percorsi da tutte le attività tracciate.' },
-            intensity: { icon: '⏱️', title: 'Minuti Intensi', desc: 'Tempo in zone HR moderate (3) e vigorose (4-5). WHO raccomanda 150 min/settimana.' },
-            sleep: { icon: '😴', title: 'Sonno', desc: 'Durata media del sonno. 7-8 ore sono ottimali per recupero e longevità.' },
-            heart: { icon: '❤️', title: 'Cuore', desc: 'RHR = efficienza cardiaca (più basso = meglio). HRV = resilienza allo stress (più alto = meglio).' },
-            stress: { icon: '😤', title: 'Stress', desc: 'Livello medio di stress (0-100). <25 rilassato, 25-50 normale, >50 alto.' },
-            recovery: { icon: '⚡', title: 'Recovery', desc: 'Prontezza per lo sforzo (0-100%). 70%+ = vai forte, <40% = riposo consigliato.' },
-            strain: { icon: '🔥', title: 'Strain', desc: 'Carico cardiovascolare (0-21). 0-9 leggero, 10-14 moderato, 15+ intenso.' },
-            bodyBattery: { icon: '🔋', title: 'Body Battery', desc: 'Energia (0-100). Si carica col sonno, si scarica con attività e stress.' }
-        };
-        
-        // ==================== UTILITY COMPONENTS ====================
+        // ==================== SHARED COMPONENTS ====================
         
         const Loading = ({ text = "Caricamento..." }) => (
             <div className="h-full flex items-center justify-center">
@@ -192,70 +223,394 @@
             </div>
         );
         
-        const InfoModal = ({ info, value, onClose, token }) => {
-            const [intradayData, setIntradayData] = useState(null);
-            const chartRef = useRef(null);
-            const chartInstance = useRef(null);
+        const ViewHeader = ({ title, onRefresh, isRefreshing, lastSync, children }) => (
+            <div className="view-header">
+                <div>
+                    <h1 className="view-title gradient-text">{title}</h1>
+                    {lastSync && (
+                        <div className="sync-status">
+                            <span className={`sync-dot ${Date.now() - lastSync > 3600000 ? 'stale' : ''}`}></span>
+                            Sync: {new Date(lastSync).toLocaleTimeString('it', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                    )}
+                </div>
+                <div className="flex items-center gap-2">
+                    {children}
+                    {onRefresh && (
+                        <button onClick={onRefresh} disabled={isRefreshing} className={`refresh-btn ${isRefreshing ? 'spinning' : ''}`}>🔄</button>
+                    )}
+                </div>
+            </div>
+        );
+        
+        const PullIndicator = ({ distance, isRefreshing }) => (
+            <div className={`ptr-indicator ${distance > 10 || isRefreshing ? 'visible' : ''} ${isRefreshing ? 'refreshing' : ''}`} style={{ transform: `translateX(-50%) translateY(${Math.min(distance, 60)}px)` }}>
+                <div className={`ptr-spinner ${isRefreshing ? 'spin' : ''}`}></div>
+            </div>
+        );
+        
+        // ==================== INFO DATA ====================
+        
+        const metricInfo = {
+            rhr: { title: 'Frequenza a Riposo', icon: '❤️', color: 'var(--accent-red)', desc: 'Efficienza del cuore. Più basso = meglio.', ranges: [{ label: 'Atleta', value: '40-50 bpm', good: true }, { label: 'Buono', value: '51-65 bpm', good: true }] },
+            vo2: { title: 'VO2 Max', icon: '🫁', color: 'var(--accent-green)', desc: 'Capacità aerobica. Ogni 5 punti in più = 2-3 anni più giovane.', ranges: [{ label: 'Eccellente', value: '50+', good: true }] },
+            steps: { title: 'Passi', icon: '👟', color: 'var(--accent-orange)', desc: '8000+ passi/giorno riducono mortalità del 51%.', ranges: [] },
+            sleep: { title: 'Sonno', icon: '😴', color: 'var(--accent-purple)', desc: '7-8 ore = recupero ottimale.', ranges: [] },
+            recovery: { title: 'Recovery', icon: '⚡', color: 'var(--accent-green)', desc: '70%+ = allenamento intenso OK.', ranges: [] },
+            strain: { title: 'Strain', icon: '🔥', color: 'var(--accent-orange)', desc: 'Carico cardiovascolare (0-21).', ranges: [] },
+            hrv: { title: 'HRV', icon: '💓', color: 'var(--accent-pink)', desc: 'Variabilità cardiaca. Alto = sistema nervoso sano.', ranges: [] },
+            bodyBattery: { title: 'Body Battery', icon: '🔋', color: 'var(--accent-cyan)', desc: 'Riserve di energia. Mattina ideale: 80+.', ranges: [] },
+            stress: { title: 'Stress', icon: '😤', color: 'var(--accent-orange)', desc: '<25 rilassato, >50 alto.', ranges: [] },
+            bioAge: { title: 'Età Biologica', icon: '🧬', color: 'var(--accent-green)', desc: 'Età reale del tuo corpo.', ranges: [] }
+        };
+        
+        const statsInfo = {
+            steps: { icon: '👟', title: 'Passi', desc: 'Passi totali. Target: 10.000/giorno.' },
+            calories: { icon: '🔥', title: 'Calorie', desc: 'Calorie totali bruciate.' },
+            distance: { icon: '📏', title: 'Distanza', desc: 'Km percorsi.' },
+            intensity: { icon: '⏱️', title: 'Min Intensi', desc: 'Minuti in zone HR elevate. WHO: 150 min/sett.' },
+            sleep: { icon: '😴', title: 'Sonno', desc: 'Durata media. Ottimale: 7-8h.' },
+            heart: { icon: '❤️', title: 'Cuore', desc: 'RHR basso + HRV alto = cuore efficiente.' },
+            stress: { icon: '😤', title: 'Stress', desc: 'Livello medio stress (0-100).' },
+            recovery: { icon: '⚡', title: 'Recovery', desc: 'Prontezza per sforzo (0-100%).' },
+            strain: { icon: '🔥', title: 'Strain', desc: 'Carico cardiovascolare (0-21).' },
+            bodyBattery: { icon: '🔋', title: 'Battery', desc: 'Energia (0-100).' }
+        };
+        
+        // ==================== DATA VIEW ====================
+        
+        const DataView = ({ onAskCoach }) => {
+            const { token, lastSync, refresh, isRefreshing } = useApp();
+            const [healthspan, setHealthspan] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [showInfo, setShowInfo] = useState(false);
+            const [activeMetric, setActiveMetric] = useState(null);
+            const containerRef = useRef(null);
             
-            useEffect(() => {
-                if ((info.title === 'Body Battery' || info.title === 'Stress') && token) {
-                    const endpoint = info.title === 'Body Battery' ? 'body-battery' : 'stress';
-                    fetch(`${API}/api/intraday/${endpoint}`, { headers: { 'Authorization': `Bearer ${token}` } })
-                        .then(r => r.json()).then(setIntradayData).catch(() => {});
-                }
-            }, [info, token]);
+            const loadData = useCallback(async () => {
+                try {
+                    const res = await fetch(`${API}/api/metrics/healthspan`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (res.ok) setHealthspan(await res.json());
+                } catch {}
+                setLoading(false);
+            }, [token]);
             
-            useEffect(() => {
-                if (intradayData?.data?.length > 0 && chartRef.current) {
-                    if (chartInstance.current) chartInstance.current.destroy();
-                    const ctx = chartRef.current.getContext('2d');
-                    chartInstance.current = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: intradayData.data.map(d => d.time),
-                            datasets: [{ data: intradayData.data.map(d => d.value), borderColor: info.color, backgroundColor: info.color + '15', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 }]
-                        },
-                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.3)', maxTicksLimit: 6, font: { size: 10 } } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 10 } } } } }
-                    });
-                }
-                return () => chartInstance.current?.destroy();
-            }, [intradayData, info]);
+            useEffect(() => { loadData(); }, [loadData, lastSync]);
+            
+            const handleRefresh = async () => { await refresh(); await loadData(); };
+            const { pullDistance, isRefreshing: isPulling } = usePullToRefresh(handleRefresh, containerRef);
+            
+            const hs = healthspan;
+            const diff = hs?.difference || 0;
+            const isYounger = diff < 0;
+            const ringColor = isYounger ? 'var(--accent-green)' : diff > 2 ? 'var(--accent-red)' : 'var(--accent-orange)';
+            const progress = Math.min(100, Math.abs(diff) * 10 + 50);
+            
+            const hsMetrics = {
+                sleep_duration: { label: 'Sonno', icon: '😴', target: '7-8.5h' },
+                sleep_consistency: { label: 'Consistenza', icon: '🌙', target: '<30min var.' },
+                zone_low: { label: 'Cardio Mod.', icon: '💚', target: '150+ min/sett' },
+                zone_high: { label: 'Cardio Int.', icon: '❤️‍🔥', target: '75+ min/sett' },
+                strength: { label: 'Forza', icon: '💪', target: '2+ sess/sett' },
+                steps: { label: 'Passi', icon: '👟', target: '8000+/giorno' },
+                rhr: { label: 'RHR', icon: '❤️', target: '<60 bpm' },
+                vo2_max: { label: 'VO2 Max', icon: '🫁', target: '>42 ml/kg' }
+            };
             
             return (
-                <Modal onClose={onClose}>
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                            <span className="text-2xl">{info.icon}</span>
-                            <h3 className="text-lg font-bold" style={{ color: info.color }}>{info.title}</h3>
-                        </div>
-                        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] text-xl">×</button>
-                    </div>
-                    {value !== undefined && (
-                        <div className="text-center mb-5 p-5 rounded-xl" style={{ background: `${info.color}10` }}>
-                            <div className="text-3xl font-bold font-display" style={{ color: info.color }}>{value}</div>
-                            <div className="text-xs text-[var(--text-muted)] mt-1">Valore attuale</div>
-                        </div>
-                    )}
-                    {intradayData?.data?.length > 0 && <div className="h-36 mb-5"><canvas ref={chartRef}></canvas></div>}
-                    <p className="text-[var(--text-secondary)] text-sm leading-relaxed mb-3">{info.desc}</p>
-                    {info.tip && <div className="p-3 rounded-xl bg-[var(--bg-elevated)] mb-4"><p className="text-sm text-[var(--accent-green)]">💡 {info.tip}</p></div>}
-                    {info.ranges?.length > 0 && (
-                        <div className="space-y-2">
-                            {info.ranges.map((r, i) => (
-                                <div key={i} className="flex justify-between items-center py-2 px-3 rounded-lg" style={{ background: r.good ? 'rgba(0, 245, 147, 0.08)' : 'rgba(255, 255, 255, 0.03)' }}>
-                                    <span className={r.good ? 'text-[var(--accent-green)]' : 'text-[var(--text-muted)]'}>{r.label}</span>
-                                    <span className="text-xs text-[var(--text-secondary)]">{r.value}</span>
+                <div className="h-full flex flex-col">
+                    <ViewHeader title="Healthspan" onRefresh={handleRefresh} isRefreshing={isRefreshing || isPulling} lastSync={lastSync} />
+                    <div ref={containerRef} className="flex-1 overflow-y-auto ptr-container bg-gradient-sensei" style={{ paddingBottom: 'calc(80px + var(--safe-bottom))' }}>
+                        <PullIndicator distance={pullDistance} isRefreshing={isPulling} />
+                        
+                        {activeMetric && (
+                            <Modal onClose={() => setActiveMetric(null)}>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <span className="text-2xl">{activeMetric.icon}</span>
+                                    <h3 className="text-lg font-bold" style={{ color: activeMetric.color || 'var(--accent-green)' }}>{activeMetric.title}</h3>
                                 </div>
-                            ))}
+                                <p className="text-[var(--text-secondary)] text-sm">{activeMetric.desc}</p>
+                            </Modal>
+                        )}
+                        
+                        <div className="max-w-4xl mx-auto p-4">
+                            {loading ? <Loading text="Analisi dati..." /> : hs ? (
+                                <>
+                                    <div className="glass-elevated p-5 mb-4 slide-up">
+                                        <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                                            <div className="relative cursor-pointer" onClick={() => setActiveMetric(metricInfo.bioAge)}>
+                                                <svg width="140" height="140" viewBox="0 0 140 140">
+                                                    <circle cx="70" cy="70" r="58" fill="none" strokeWidth="10" stroke="var(--border)" />
+                                                    <circle cx="70" cy="70" r="58" fill="none" stroke={ringColor} strokeWidth="10" strokeLinecap="round" strokeDasharray={`${progress * 3.64} 364`} transform="rotate(-90 70 70)" style={{ filter: `drop-shadow(0 0 10px ${ringColor})`, transition: 'stroke-dasharray 1s ease' }} />
+                                                </svg>
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                    <span className="text-4xl font-bold font-display" style={{ color: ringColor }}>{hs.healthspan_age}</span>
+                                                    <span className="text-[10px] text-[var(--text-muted)]">Età Biologica</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-center sm:text-left">
+                                                <div className="text-xs text-[var(--text-muted)]">Età Anagrafica</div>
+                                                <div className="text-3xl font-bold mb-2">{hs.real_age}</div>
+                                                <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${isYounger ? 'bg-[var(--accent-green-dim)] text-[var(--accent-green)]' : 'bg-[rgba(255,159,67,0.12)] text-[var(--accent-orange)]'}`}>
+                                                    {isYounger ? '↓' : '↑'} {Math.abs(diff)} anni
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {hs?.suggestions?.length > 0 && (
+                                        <div className="glass p-4 mb-4 slide-up border-l-4 border-[var(--accent-orange)]">
+                                            <h3 className="font-semibold text-sm mb-2">💡 Consigli</h3>
+                                            <div className="space-y-1">{hs.suggestions.map((s, i) => <p key={i} className="text-xs text-[var(--text-secondary)]">{s}</p>)}</div>
+                                        </div>
+                                    )}
+                                    
+                                    {hs?.impacts && (
+                                        <div className="slide-up">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h3 className="font-semibold text-sm">Metriche</h3>
+                                                <button onClick={() => setShowInfo(!showInfo)} className="text-xs text-[var(--accent-green)]">{showInfo ? 'Nascondi' : 'ℹ️ Info'}</button>
+                                            </div>
+                                            
+                                            {showInfo && (
+                                                <div className="glass p-4 mb-4 text-xs text-[var(--text-secondary)]">
+                                                    <p>I pesi sono <strong>normalizzati</strong>: se mancano metriche, le altre vengono ricalcolate.</p>
+                                                </div>
+                                            )}
+                                            
+                                            <div className="stats-grid">
+                                                {Object.entries(hsMetrics).map(([key, meta]) => {
+                                                    const impact = hs.impacts[key];
+                                                    if (!impact || impact.value === undefined) return null;
+                                                    return (
+                                                        <div key={key} className="metric-card">
+                                                            <div className="flex items-start justify-between mb-2">
+                                                                <span className="text-xl">{meta.icon}</span>
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full ${impact.impact <= 0 ? 'bg-[var(--accent-green-dim)] text-[var(--accent-green)]' : 'bg-[rgba(255,159,67,0.12)] text-[var(--accent-orange)]'}`}>
+                                                                    {impact.impact > 0 ? '+' : ''}{impact.impact?.toFixed(1)}y
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-lg font-bold">{impact.value}</div>
+                                                            <div className="text-[10px] text-[var(--text-muted)]">{meta.label}</div>
+                                                            <div className="progress-track mt-2">
+                                                                <div className="progress-fill" style={{ width: `${impact.score * 10}%`, background: impact.score >= 7 ? 'var(--accent-green)' : impact.score >= 5 ? 'var(--accent-orange)' : 'var(--accent-red)' }} />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="text-center py-12 glass">
+                                    <span className="text-4xl block mb-3">📊</span>
+                                    <p className="text-[var(--text-muted)]">Sincronizza più dati</p>
+                                </div>
+                            )}
                         </div>
-                    )}
-                </Modal>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== STATS VIEW ====================
+        
+        const StatsView = ({ onAskCoach }) => {
+            const { token, lastSync, refresh, isRefreshing } = useApp();
+            const [period, setPeriod] = useState('day');
+            const [offset, setOffset] = useState(0);
+            const [data, setData] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [showInfo, setShowInfo] = useState(null);
+            const containerRef = useRef(null);
+            
+            const loadData = useCallback(async () => {
+                setLoading(true);
+                try {
+                    const res = await fetch(`${API}/api/metrics/period?type=${period}&offset=${offset}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (res.ok) setData(await res.json());
+                } catch {}
+                setLoading(false);
+            }, [token, period, offset]);
+            
+            useEffect(() => { loadData(); }, [loadData, lastSync]);
+            
+            const handleRefresh = async () => { await refresh(); await loadData(); };
+            const { pullDistance, isRefreshing: isPulling } = usePullToRefresh(handleRefresh, containerRef);
+            
+            const m = data?.metrics || {};
+            const p = data?.period || {};
+            
+            const getPeriodLabel = () => {
+                if (!p.label) return '...';
+                if (period === 'day') return offset === 0 ? 'Oggi' : offset === -1 ? 'Ieri' : p.label;
+                if (period === 'week') return offset === 0 ? 'Questa sett.' : offset === -1 ? 'Sett. scorsa' : p.label;
+                if (period === 'month') return offset === 0 ? 'Questo mese' : offset === -1 ? 'Mese scorso' : p.label;
+                return p.label;
+            };
+            
+            const handleAskCoachClick = (coach) => {
+                if (!data) return;
+                let msg = `Analizza i miei dati di ${getPeriodLabel().toLowerCase()}:\n`;
+                msg += `• Passi: ${m.steps_total?.toLocaleString() || 'N/D'}\n`;
+                msg += `• Calorie: ${m.calories_total?.toLocaleString() || 'N/D'}\n`;
+                msg += `• Sonno: ${m.sleep_hours?.toFixed(1) || 'N/D'}h\n`;
+                msg += `• RHR: ${m.rhr || 'N/D'} bpm | HRV: ${m.hrv || 'N/D'}ms\n`;
+                msg += `• Recovery: ${m.recovery || 'N/D'}% | Strain: ${m.strain?.toFixed(1) || 'N/D'}/21\n`;
+                msg += `\nCome posso migliorare?`;
+                onAskCoach(coach, msg);
+            };
+            
+            const getActivityIcon = (type) => ({ running: '🏃', cycling: '🚴', swimming: '🏊', walking: '🚶', hiking: '🥾', strength_training: '💪', yoga: '🧘' }[type] || '⚡');
+            
+            const InfoCard = ({ infoKey, children }) => (
+                <div className="metric-card relative" onClick={() => setShowInfo(infoKey)}>
+                    <button className="absolute top-2 right-2 text-[10px] text-[var(--accent-blue)] opacity-50">ℹ️</button>
+                    {children}
+                </div>
+            );
+            
+            return (
+                <div className="h-full flex flex-col">
+                    <ViewHeader title="Statistiche" onRefresh={handleRefresh} isRefreshing={isRefreshing || isPulling} lastSync={lastSync} />
+                    <div ref={containerRef} className="flex-1 overflow-y-auto ptr-container" style={{ paddingBottom: 'calc(80px + var(--safe-bottom))' }}>
+                        <PullIndicator distance={pullDistance} isRefreshing={isPulling} />
+                        
+                        {showInfo && statsInfo[showInfo] && (
+                            <Modal onClose={() => setShowInfo(null)}>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <span className="text-2xl">{statsInfo[showInfo].icon}</span>
+                                    <h3 className="text-lg font-bold text-[var(--accent-green)]">{statsInfo[showInfo].title}</h3>
+                                </div>
+                                <p className="text-[var(--text-secondary)] text-sm">{statsInfo[showInfo].desc}</p>
+                            </Modal>
+                        )}
+                        
+                        <div className="max-w-4xl mx-auto p-4">
+                            <div className="glass p-3 mb-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <button onClick={() => setOffset(o => o - 1)} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[var(--bg-elevated)]">◀</button>
+                                    <div className="text-center">
+                                        <div className="font-bold">{getPeriodLabel()}</div>
+                                        <div className="text-[10px] text-[var(--text-muted)]">{p.days_with_data || 0} giorni con dati</div>
+                                    </div>
+                                    <button onClick={() => setOffset(o => Math.min(o + 1, 0))} disabled={offset >= 0} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[var(--bg-elevated)] disabled:opacity-30">▶</button>
+                                </div>
+                                <div className="flex justify-center gap-1">
+                                    {['day', 'week', 'month', 'year'].map(t => (
+                                        <button key={t} onClick={() => { setPeriod(t); setOffset(0); }}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${period === t ? 'bg-[var(--accent-green)] text-black' : 'hover:bg-[var(--bg-elevated)]'}`}>
+                                            {t === 'day' ? 'Giorno' : t === 'week' ? 'Settimana' : t === 'month' ? 'Mese' : 'Anno'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {loading ? <Loading /> : (
+                                <>
+                                    <div className="stats-grid mb-4">
+                                        <InfoCard infoKey="steps">
+                                            <div className="text-xl mb-1">👟</div>
+                                            <div className="text-xl font-bold text-[var(--accent-orange)]">{m.steps_total ? (m.steps_total / 1000).toFixed(1) + 'k' : '--'}</div>
+                                            <div className="text-[10px] text-[var(--text-muted)]">Passi</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="calories">
+                                            <div className="text-xl mb-1">🔥</div>
+                                            <div className="text-xl font-bold text-[var(--accent-red)]">{m.calories_total ? Math.round(m.calories_total).toLocaleString() : '--'}</div>
+                                            <div className="text-[10px] text-[var(--text-muted)]">Calorie</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="distance">
+                                            <div className="text-xl mb-1">📏</div>
+                                            <div className="text-xl font-bold text-[var(--accent-blue)]">{m.distance_km || '--'}</div>
+                                            <div className="text-[10px] text-[var(--text-muted)]">km</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="intensity">
+                                            <div className="text-xl mb-1">⏱️</div>
+                                            <div className="text-xl font-bold text-[var(--accent-purple)]">{(m.moderate_min || 0) + (m.vigorous_min || 0)}</div>
+                                            <div className="text-[10px] text-[var(--text-muted)]">Min intensi</div>
+                                        </InfoCard>
+                                    </div>
+                                    
+                                    <div className="stats-grid mb-4">
+                                        <InfoCard infoKey="sleep">
+                                            <div className="flex items-center gap-1 mb-1"><span className="text-lg">😴</span><span className="text-xs">Sonno</span></div>
+                                            <div className="text-xl font-bold text-[var(--accent-purple)]">{m.sleep_hours?.toFixed(1) || '--'}h</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="heart">
+                                            <div className="flex items-center gap-1 mb-1"><span className="text-lg">❤️</span><span className="text-xs">Cuore</span></div>
+                                            <div className="text-xl font-bold text-[var(--accent-red)]">{m.rhr || '--'} <span className="text-xs font-normal">bpm</span></div>
+                                            {m.hrv && <div className="text-[10px] text-[var(--text-secondary)]">HRV: {m.hrv}ms</div>}
+                                        </InfoCard>
+                                        <InfoCard infoKey="stress">
+                                            <div className="flex items-center gap-1 mb-1"><span className="text-lg">😤</span><span className="text-xs">Stress</span></div>
+                                            <div className="text-xl font-bold" style={{ color: m.stress_avg > 50 ? 'var(--accent-orange)' : 'var(--accent-green)' }}>{m.stress_avg || '--'}</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="recovery">
+                                            <div className="flex items-center gap-1 mb-1"><span className="text-lg">⚡</span><span className="text-xs">Recovery</span></div>
+                                            <div className="text-xl font-bold text-[var(--accent-green)]">{m.recovery || '--'}%</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="strain">
+                                            <div className="flex items-center gap-1 mb-1"><span className="text-lg">🔥</span><span className="text-xs">Strain</span></div>
+                                            <div className="text-xl font-bold text-[var(--accent-orange)]">{m.strain?.toFixed(1) || '--'}/21</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="bodyBattery">
+                                            <div className="flex items-center gap-1 mb-1"><span className="text-lg">🔋</span><span className="text-xs">Battery</span></div>
+                                            <div className="text-xl font-bold text-[var(--accent-cyan)]">{m.body_battery_low || '--'}-{m.body_battery_high || '--'}</div>
+                                        </InfoCard>
+                                    </div>
+                                    
+                                    {period === 'week' && data?.daily?.length > 0 && (
+                                        <div className="glass p-4 mb-4">
+                                            <h3 className="text-xs font-semibold mb-3">Passi giornalieri</h3>
+                                            <div className="flex items-end justify-between gap-1 h-20">
+                                                {data.daily.map((d, i) => (
+                                                    <div key={i} className="flex-1 flex flex-col items-center">
+                                                        <div className="w-full bg-[var(--accent-green)] rounded-t opacity-80" style={{ height: `${Math.min((d.steps || 0) / 150, 100)}%` }}></div>
+                                                        <div className="text-[9px] text-[var(--text-muted)] mt-1">{d.day}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {data?.activities?.length > 0 && (
+                                        <div className="glass p-4 mb-4">
+                                            <h3 className="text-xs font-semibold mb-3">Attività ({data.activities.length})</h3>
+                                            <div className="space-y-2">
+                                                {data.activities.slice(0, 5).map((a, i) => (
+                                                    <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-[var(--bg-secondary)]">
+                                                        <span className="text-lg">{getActivityIcon(a.type)}</span>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-sm font-medium truncate">{a.name}</div>
+                                                            <div className="text-[10px] text-[var(--text-muted)]">{a.date}</div>
+                                                        </div>
+                                                        <div className="text-right text-sm">{a.duration_min}m</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="glass p-4">
+                                        <h3 className="text-xs font-semibold mb-3 text-center">Chiedi al coach</h3>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button onClick={() => handleAskCoachClick('sensei')} className="btn-primary py-3 rounded-xl text-sm">🥋 Sensei</button>
+                                            <button onClick={() => handleAskCoachClick('sakura')} className="btn-pink py-3 rounded-xl text-sm">🌸 Sakura</button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
             );
         };
         
         // ==================== CHAT VIEW ====================
         
-        const ChatView = ({ token, coach, initialMessage, onMessageSent }) => {
+        const ChatView = ({ coach, initialMessage, onMessageSent }) => {
+            const { token } = useApp();
             const [messages, setMessages] = useState([]);
             const [input, setInput] = useState('');
             const [loading, setLoading] = useState(false);
@@ -267,7 +622,6 @@
             
             const chatRef = useRef(null);
             const recognitionRef = useRef(null);
-            const audioRef = useRef(null);
             
             const isSakura = coach === 'sakura';
             const accent = isSakura ? 'var(--accent-pink)' : 'var(--accent-green)';
@@ -275,38 +629,6 @@
             const coachEmoji = isSakura ? '🌸' : '🥋';
             
             useEffect(() => { if (initialMessage) { setPendingInitialMessage(initialMessage); onMessageSent?.(); } }, [initialMessage]);
-            
-            const toggleRecording = () => {
-                if (isRecording) { recognitionRef.current?.stop(); setIsRecording(false); return; }
-                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SR) { alert('Speech recognition non supportato'); return; }
-                const recognition = new SR();
-                recognition.lang = 'it-IT'; recognition.continuous = false; recognition.interimResults = false;
-                recognition.onresult = e => { setInput(e.results[0][0].transcript); setVoiceInputPending(true); };
-                recognition.onend = () => setIsRecording(false);
-                recognition.onerror = () => setIsRecording(false);
-                recognitionRef.current = recognition;
-                recognition.start();
-                setIsRecording(true);
-            };
-            
-            const playAudio = async (text) => {
-                if (playingAudio) return;
-                setPlayingAudio(true);
-                try {
-                    const cleanText = text.replace(/\[PAUSA:\d+\]/g, '');
-                    const res = await fetch(`${API}/api/tts`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ text: cleanText, coach }) });
-                    const data = await res.json();
-                    if (data.audio) {
-                        const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
-                        audioRef.current = audio;
-                        audio.onended = () => setPlayingAudio(false);
-                        audio.onerror = () => setPlayingAudio(false);
-                        await audio.play();
-                    } else setPlayingAudio(false);
-                } catch { setPlayingAudio(false); }
-            };
-            
             useEffect(() => { setMessages([]); setReady(false); loadHistory(); }, [coach]);
             useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [messages, loading]);
             useEffect(() => { if (voiceInputPending && input.trim()) { setVoiceInputPending(false); send(); } else if (voiceInputPending) setVoiceInputPending(false); }, [voiceInputPending, input]);
@@ -325,7 +647,6 @@
                 setInput('');
                 setMessages(prev => [...prev, { role: 'user', content: text }]);
                 setLoading(true);
-                setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, 50);
                 try {
                     const res = await fetch(`${API}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ message: text, coach }) });
                     const data = await res.json();
@@ -336,11 +657,35 @@
             
             useEffect(() => { if (pendingInitialMessage && ready && !loading) { send(pendingInitialMessage); setPendingInitialMessage(null); } }, [pendingInitialMessage, ready, loading]);
             
+            const toggleRecording = () => {
+                if (isRecording) { recognitionRef.current?.stop(); setIsRecording(false); return; }
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SR) return;
+                const recognition = new SR();
+                recognition.lang = 'it-IT';
+                recognition.onresult = e => { setInput(e.results[0][0].transcript); setVoiceInputPending(true); };
+                recognition.onend = () => setIsRecording(false);
+                recognitionRef.current = recognition;
+                recognition.start();
+                setIsRecording(true);
+            };
+            
+            const playAudio = async (text) => {
+                if (playingAudio) return;
+                setPlayingAudio(true);
+                try {
+                    const res = await fetch(`${API}/api/tts`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ text: text.replace(/\[PAUSA:\d+\]/g, ''), coach }) });
+                    const data = await res.json();
+                    if (data.audio) { const audio = new Audio(`data:audio/mp3;base64,${data.audio}`); audio.onended = () => setPlayingAudio(false); audio.play(); }
+                    else setPlayingAudio(false);
+                } catch { setPlayingAudio(false); }
+            };
+            
             return (
                 <div className={`h-full flex flex-col ${isSakura ? 'bg-gradient-sakura' : 'bg-gradient-sensei'}`}>
                     <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--border)]">
-                        <div className="flex items-center gap-3 max-w-4xl mx-auto">
-                            <img src={`/images/${coach}.png`} alt={coachName} className="w-10 h-10 rounded-full object-cover" style={{ border: `2px solid ${accent}` }} />
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-2xl" style={{ background: isSakura ? 'var(--accent-pink-dim)' : 'var(--accent-green-dim)' }}>{coachEmoji}</div>
                             <div>
                                 <h2 className="font-bold" style={{ color: accent }}>{coachName}</h2>
                                 <p className="text-xs text-[var(--text-muted)]">{isSakura ? 'Mente & Benessere' : 'Sport & Performance'}</p>
@@ -349,12 +694,12 @@
                     </div>
                     
                     <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-                        {!ready ? <Loading text="Caricamento chat..." /> : messages.length === 0 ? (
+                        {!ready ? <Loading text="Caricamento..." /> : messages.length === 0 ? (
                             <div className="h-full flex items-center justify-center">
                                 <div className="text-center max-w-xs">
                                     <span className="text-5xl block mb-3">{coachEmoji}</span>
                                     <h3 className="text-lg font-bold mb-2" style={{ color: accent }}>{coachName}</h3>
-                                    <p className="text-[var(--text-muted)] text-sm">{isSakura ? 'Ciao! Sono qui per mente, stress e benessere.' : 'Ciao! Il tuo coach per performance e longevità.'}</p>
+                                    <p className="text-[var(--text-muted)] text-sm">{isSakura ? 'Ciao! Parliamo di mente, stress e benessere.' : 'Ciao! Il tuo coach per performance e longevità.'}</p>
                                 </div>
                             </div>
                         ) : (
@@ -368,19 +713,18 @@
                                                         <span className="text-lg">{coachEmoji}</span>
                                                         <span className="font-semibold text-sm" style={{ color: accent }}>{coachName}</span>
                                                     </div>
-                                                    <button onClick={() => playAudio(m.content)} disabled={playingAudio} className={`w-7 h-7 flex items-center justify-center rounded-full text-sm ${playingAudio ? 'animate-pulse' : 'hover:bg-[var(--bg-elevated)]'}`}>
+                                                    <button onClick={() => playAudio(m.content)} disabled={playingAudio} className="w-7 h-7 flex items-center justify-center rounded-full text-sm hover:bg-[var(--bg-elevated)]">
                                                         {playingAudio ? '🔉' : '🔊'}
                                                     </button>
                                                 </div>
                                             )}
-                                            <div className="whitespace-pre-wrap leading-relaxed text-[var(--text-secondary)]">{m.content}</div>
+                                            <div className="whitespace-pre-wrap text-[var(--text-secondary)]">{m.content}</div>
                                         </div>
                                     </div>
                                 ))}
                                 {loading && (
                                     <div className="flex justify-start fade-in">
                                         <div className={`chat-bubble chat-ai ${coach}`}>
-                                            <div className="flex items-center gap-2 mb-2"><span className="text-lg">{coachEmoji}</span><span className="font-semibold text-sm" style={{ color: accent }}>{coachName}</span></div>
                                             <div className="flex gap-2 py-1">
                                                 <div className="typing-dot" style={{ background: accent }} />
                                                 <div className="typing-dot" style={{ background: accent }} />
@@ -395,344 +739,13 @@
                     
                     <div className="flex-shrink-0 p-3 border-t border-[var(--border)] bg-[var(--bg-primary)]" style={{ paddingBottom: 'max(12px, calc(var(--safe-bottom) + 76px))' }}>
                         <div className="max-w-4xl mx-auto flex gap-2">
-                            <button onClick={toggleRecording} className={`w-11 h-11 flex items-center justify-center rounded-xl text-lg flex-shrink-0 ${isRecording ? 'bg-[var(--accent-red)] animate-pulse' : 'glass-solid hover:border-[var(--border-light)]'}`}>
+                            <button onClick={toggleRecording} className={`w-11 h-11 flex items-center justify-center rounded-xl text-lg flex-shrink-0 ${isRecording ? 'bg-[var(--accent-red)] animate-pulse' : 'glass-solid'}`}>
                                 {isRecording ? '⏹️' : '🎤'}
                             </button>
-                            <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                                placeholder={isRecording ? 'Ascoltando...' : 'Scrivi...'} className={`input-modern flex-1 min-w-0 px-4 py-2 ${isSakura ? 'pink' : ''}`} disabled={loading || isRecording} />
-                            <button onClick={() => send()} disabled={loading || !input.trim()} className={`${isSakura ? 'btn-pink' : 'btn-primary'} w-11 h-11 rounded-xl text-lg disabled:opacity-40 flex-shrink-0 flex items-center justify-center`}>➤</button>
+                            <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') send(); }}
+                                placeholder="Scrivi..." className={`input-modern flex-1 px-4 py-2 ${isSakura ? 'pink' : ''}`} disabled={loading || isRecording} />
+                            <button onClick={() => send()} disabled={loading || !input.trim()} className={`${isSakura ? 'btn-pink' : 'btn-primary'} w-11 h-11 rounded-xl text-lg disabled:opacity-40 flex items-center justify-center`}>➤</button>
                         </div>
-                    </div>
-                </div>
-            );
-        };
-        
-        // ==================== DATA VIEW (Healthspan Dashboard) ====================
-        
-        const DataView = ({ token, summary }) => {
-            const [activeMetric, setActiveMetric] = useState(null);
-            const [healthspan, setHealthspan] = useState(null);
-            const [loading, setLoading] = useState(true);
-            const [showInfo, setShowInfo] = useState(false);
-            
-            useEffect(() => {
-                fetch(`${API}/api/metrics/healthspan`, { headers: { 'Authorization': `Bearer ${token}` } })
-                    .then(r => r.ok ? r.json() : null).then(setHealthspan).catch(() => {}).finally(() => setLoading(false));
-            }, [token]);
-            
-            const hs = healthspan;
-            const diff = hs?.difference || 0;
-            const isYounger = diff < 0;
-            const ringColor = isYounger ? 'var(--accent-green)' : diff > 2 ? 'var(--accent-red)' : 'var(--accent-orange)';
-            const progress = Math.min(100, Math.abs(diff) * 10 + 50);
-            
-            const hsMetrics = {
-                sleep_duration: { label: 'Sonno', icon: '😴', target: '7-8.5h', science: 'Il sonno ottimale (7-8h) è associato a minor rischio cardiovascolare.' },
-                sleep_consistency: { label: 'Consistenza', icon: '🌙', target: '<30min var.', science: 'Orari regolari migliorano il ritmo circadiano.' },
-                zone_low: { label: 'Cardio Mod.', icon: '💚', target: '150+ min/sett', science: 'WHO raccomanda 150 min/sett di attività moderata.' },
-                zone_high: { label: 'Cardio Int.', icon: '❤️‍🔥', target: '75+ min/sett', science: 'L\'esercizio vigoroso migliora VO2 Max.' },
-                strength: { label: 'Forza', icon: '💪', target: '2+ sess/sett', science: 'Il resistance training preserva massa muscolare.' },
-                steps: { label: 'Passi', icon: '👟', target: '8000+/giorno', science: '8000 passi/giorno riducono mortalità del 51%.' },
-                rhr: { label: 'RHR', icon: '❤️', target: '<60 bpm', science: 'RHR basso indica cuore efficiente.' },
-                vo2_max: { label: 'VO2 Max', icon: '🫁', target: '>42 ml/kg', science: 'VO2 Max è il miglior predittore di longevità.' }
-            };
-            
-            return (
-                <div className="h-full overflow-y-auto bg-gradient-sensei" style={{ paddingBottom: 'calc(76px + var(--safe-bottom))' }}>
-                    {activeMetric && <InfoModal info={activeMetric.info} value={activeMetric.value} onClose={() => setActiveMetric(null)} token={token} />}
-                    
-                    <div className="max-w-4xl mx-auto p-4">
-                        <div className="text-center mb-5 slide-up">
-                            <h1 className="text-2xl sm:text-3xl font-bold font-display mb-1 gradient-text">Healthspan</h1>
-                            <p className="text-xs text-[var(--text-muted)]">{hs ? `${hs.days_analyzed} giorni • ${hs.activities_analyzed} attività` : 'Calcolo...'}</p>
-                        </div>
-                        
-                        <div className="glass-elevated p-5 sm:p-6 mb-4 slide-up">
-                            {loading ? <Loading text="Analisi dati..." /> : hs ? (
-                                <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-                                    <div className="relative cursor-pointer" onClick={() => setActiveMetric({ info: metricInfo.bioAge, value: hs.healthspan_age })}>
-                                        <svg width="140" height="140" viewBox="0 0 140 140">
-                                            <circle cx="70" cy="70" r="58" fill="none" strokeWidth="10" stroke="var(--border)" />
-                                            <circle cx="70" cy="70" r="58" fill="none" stroke={ringColor} strokeWidth="10" strokeLinecap="round"
-                                                strokeDasharray={`${progress * 3.64} 364`} transform="rotate(-90 70 70)"
-                                                style={{ filter: `drop-shadow(0 0 10px ${ringColor})`, transition: 'stroke-dasharray 1s ease' }} />
-                                        </svg>
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                            <span className="text-4xl font-bold font-display" style={{ color: ringColor }}>{hs.healthspan_age}</span>
-                                            <span className="text-[10px] text-[var(--text-muted)]">Età Biologica</span>
-                                        </div>
-                                    </div>
-                                    <div className="text-center sm:text-left">
-                                        <div className="text-xs text-[var(--text-muted)]">Età Anagrafica</div>
-                                        <div className="text-3xl font-bold mb-2">{hs.real_age}</div>
-                                        <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${isYounger ? 'bg-[var(--accent-green-dim)] text-[var(--accent-green)]' : 'bg-[rgba(255,159,67,0.12)] text-[var(--accent-orange)]'}`}>
-                                            {isYounger ? '↓' : '↑'} {Math.abs(diff)} anni
-                                        </div>
-                                        <p className="text-xs text-[var(--text-muted)] mt-2">{isYounger ? '🎉 Più giovane!' : diff > 3 ? '⚠️ Da migliorare' : '👍 Nella norma'}</p>
-                                    </div>
-                                    {hs?.pace_of_aging !== null && (
-                                        <div className="glass p-4 text-center min-w-[120px]">
-                                            <div className="text-[10px] text-[var(--text-muted)]">Pace of Aging</div>
-                                            <div className={`text-xl font-bold ${hs.pace_of_aging < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}`}>
-                                                {hs.pace_of_aging > 0 ? '+' : ''}{hs.pace_of_aging}
-                                            </div>
-                                            <div className="text-[10px] text-[var(--text-muted)]">{hs.pace_status || ''}</div>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="text-center py-6">
-                                    <span className="text-4xl block mb-3">📊</span>
-                                    <p className="text-[var(--text-muted)] text-sm">Sincronizza più dati per Healthspan</p>
-                                </div>
-                            )}
-                        </div>
-                        
-                        {hs?.suggestions?.length > 0 && (
-                            <div className="glass p-4 mb-4 slide-up border-l-4 border-[var(--accent-orange)]">
-                                <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">💡 Consigli</h3>
-                                <div className="space-y-1">{hs.suggestions.map((s, i) => <p key={i} className="text-xs text-[var(--text-secondary)]">{s}</p>)}</div>
-                            </div>
-                        )}
-                        
-                        {hs?.impacts && (
-                            <div className="slide-up">
-                                <div className="flex items-center justify-between mb-3">
-                                    <h3 className="font-semibold text-sm">Metriche Healthspan</h3>
-                                    <button onClick={() => setShowInfo(!showInfo)} className="text-xs text-[var(--accent-green)]">{showInfo ? 'Nascondi' : 'ℹ️ Info'}</button>
-                                </div>
-                                
-                                {showInfo && (
-                                    <div className="glass p-4 mb-4 text-xs text-[var(--text-secondary)]">
-                                        <p className="mb-2"><strong>Healthspan</strong> misura la tua età biologica. I pesi sono <strong>normalizzati</strong>: se mancano metriche, le altre vengono ricalcolate per mantenere lo stesso range (-8 a +8 anni).</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            <span className="px-2 py-1 rounded bg-[var(--accent-green-dim)] text-[var(--accent-green)]">Verde = impatto positivo</span>
-                                            <span className="px-2 py-1 rounded bg-[rgba(255,159,67,0.12)] text-[var(--accent-orange)]">Arancio = da migliorare</span>
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                <div className="stats-grid">
-                                    {Object.entries(hsMetrics).map(([key, meta]) => {
-                                        const impact = hs.impacts[key];
-                                        if (!impact || impact.value === undefined) return null;
-                                        return (
-                                            <div key={key} className="metric-card" onClick={() => setActiveMetric({ info: { ...metricInfo[key] || {}, title: meta.label, icon: meta.icon, desc: meta.science, color: impact.impact <= 0 ? 'var(--accent-green)' : 'var(--accent-orange)' }, value: impact.value })}>
-                                                <div className="flex items-start justify-between mb-2">
-                                                    <span className="text-xl">{meta.icon}</span>
-                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${impact.impact <= 0 ? 'bg-[var(--accent-green-dim)] text-[var(--accent-green)]' : 'bg-[rgba(255,159,67,0.12)] text-[var(--accent-orange)]'}`}>
-                                                        {impact.impact > 0 ? '+' : ''}{impact.impact?.toFixed(1)}y
-                                                    </span>
-                                                </div>
-                                                <div className="text-lg font-bold">{impact.value}</div>
-                                                <div className="text-[10px] text-[var(--text-muted)]">{meta.label}</div>
-                                                <div className="progress-track mt-2">
-                                                    <div className="progress-fill" style={{ width: `${impact.score * 10}%`, background: impact.score >= 7 ? 'var(--accent-green)' : impact.score >= 5 ? 'var(--accent-orange)' : 'var(--accent-red)' }} />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            );
-        };
-        
-        // ==================== STATS VIEW ====================
-        
-        const StatsView = ({ token, onAskCoach }) => {
-            const [period, setPeriod] = useState('day');
-            const [offset, setOffset] = useState(0);
-            const [data, setData] = useState(null);
-            const [loading, setLoading] = useState(true);
-            const [showInfo, setShowInfo] = useState(null);
-            
-            useEffect(() => {
-                setLoading(true);
-                fetch(`${API}/api/metrics/period?type=${period}&offset=${offset}`, { headers: { 'Authorization': `Bearer ${token}` } })
-                    .then(r => r.ok ? r.json() : null).then(setData).catch(() => {}).finally(() => setLoading(false));
-            }, [period, offset, token]);
-            
-            const m = data?.metrics || {};
-            const p = data?.period || {};
-            
-            const getPeriodLabel = () => {
-                if (!p.label) return '...';
-                if (period === 'day') return offset === 0 ? 'Oggi' : offset === -1 ? 'Ieri' : p.label;
-                if (period === 'week') return offset === 0 ? 'Questa settimana' : offset === -1 ? 'Settimana scorsa' : p.label;
-                if (period === 'month') return offset === 0 ? 'Questo mese' : offset === -1 ? 'Mese scorso' : p.label;
-                if (period === 'year') return offset === 0 ? 'Quest\'anno' : p.label;
-                return p.label;
-            };
-            
-            const handleAskCoach = (coach) => {
-                if (!data) return;
-                const periodLabel = getPeriodLabel().toLowerCase();
-                let msg = `Analizza i miei dati di ${periodLabel}:\n\n📊 **METRICHE**\n`;
-                msg += `• Passi: ${m.steps_total?.toLocaleString() || 'N/D'}${m.steps_avg && period !== 'day' ? ` (${Math.round(m.steps_avg)}/giorno)` : ''}\n`;
-                msg += `• Calorie: ${m.calories_total?.toLocaleString() || 'N/D'}${m.active_calories > 0 ? ` (${Math.round(m.active_calories)} attive)` : ''}\n`;
-                msg += `• Distanza: ${m.distance_km || 0} km\n`;
-                msg += `• Sonno: ${m.sleep_hours?.toFixed(1) || 'N/D'}h${m.deep_sleep_min ? ` (Deep: ${Math.round(m.deep_sleep_min)}min)` : ''}\n`;
-                msg += `• RHR: ${m.rhr || 'N/D'} bpm${m.hrv ? ` | HRV: ${m.hrv}ms` : ''}\n`;
-                msg += `• Stress: ${m.stress_avg || 'N/D'}\n`;
-                msg += `• Recovery: ${m.recovery || 'N/D'}% | Strain: ${m.strain?.toFixed(1) || 'N/D'}/21\n`;
-                msg += `• Body Battery: ${m.body_battery_low || 'N/D'}-${m.body_battery_high || 'N/D'}\n`;
-                if (m.activity_count > 0) msg += `• Attività: ${m.activity_count} (${m.activity_duration_min}min)\n`;
-                msg += `\nCosa ne pensi? Come posso migliorare?`;
-                onAskCoach(coach, msg);
-            };
-            
-            const getActivityIcon = (type) => ({ running: '🏃', cycling: '🚴', swimming: '🏊', walking: '🚶', hiking: '🥾', strength_training: '💪', yoga: '🧘' }[type] || '⚡');
-            
-            const InfoCard = ({ infoKey, children }) => (
-                <div className="metric-card relative" onClick={() => setShowInfo(infoKey)}>
-                    <button className="absolute top-2 right-2 text-[10px] text-[var(--accent-blue)] opacity-50">ℹ️</button>
-                    {children}
-                </div>
-            );
-            
-            return (
-                <div className="h-full overflow-y-auto bg-gradient-sensei" style={{ paddingBottom: 'calc(76px + var(--safe-bottom))' }}>
-                    {showInfo && statsInfo[showInfo] && (
-                        <Modal onClose={() => setShowInfo(null)}>
-                            <div className="flex items-center gap-3 mb-4">
-                                <span className="text-2xl">{statsInfo[showInfo].icon}</span>
-                                <h3 className="text-lg font-bold text-[var(--accent-green)]">{statsInfo[showInfo].title}</h3>
-                            </div>
-                            <p className="text-[var(--text-secondary)] text-sm">{statsInfo[showInfo].desc}</p>
-                        </Modal>
-                    )}
-                    
-                    <div className="max-w-4xl mx-auto p-4">
-                        {/* Period Selector */}
-                        <div className="glass p-3 mb-4 slide-up">
-                            <div className="flex items-center justify-between mb-3">
-                                <button onClick={() => setOffset(o => o - 1)} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[var(--bg-elevated)]">◀</button>
-                                <div className="text-center">
-                                    <div className="font-bold">{getPeriodLabel()}</div>
-                                    <div className="text-[10px] text-[var(--text-muted)]">{p.days_with_data || 0} giorni con dati</div>
-                                </div>
-                                <button onClick={() => setOffset(o => Math.min(o + 1, 0))} disabled={offset >= 0} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[var(--bg-elevated)] disabled:opacity-30">▶</button>
-                            </div>
-                            <div className="flex justify-center gap-1">
-                                {['day', 'week', 'month', 'year'].map(t => (
-                                    <button key={t} onClick={() => { setPeriod(t); setOffset(0); }}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${period === t ? 'bg-[var(--accent-green)] text-black' : 'hover:bg-[var(--bg-elevated)]'}`}>
-                                        {t === 'day' ? 'Giorno' : t === 'week' ? 'Settimana' : t === 'month' ? 'Mese' : 'Anno'}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        
-                        {loading ? <Loading /> : (
-                            <>
-                                {/* Main Stats */}
-                                <div className="stats-grid mb-4">
-                                    <InfoCard infoKey="steps">
-                                        <div className="text-xl mb-1">👟</div>
-                                        <div className="text-xl font-bold text-[var(--accent-orange)]">{m.steps_total ? (m.steps_total / 1000).toFixed(1) + 'k' : '--'}</div>
-                                        <div className="text-[10px] text-[var(--text-muted)]">Passi</div>
-                                        {period !== 'day' && m.steps_avg && <div className="text-[10px] text-[var(--text-secondary)] mt-1">{Math.round(m.steps_avg)}/g</div>}
-                                    </InfoCard>
-                                    <InfoCard infoKey="calories">
-                                        <div className="text-xl mb-1">🔥</div>
-                                        <div className="text-xl font-bold text-[var(--accent-red)]">{m.calories_total ? Math.round(m.calories_total).toLocaleString() : '--'}</div>
-                                        <div className="text-[10px] text-[var(--text-muted)]">Calorie</div>
-                                        {m.active_calories > 0 && <div className="text-[10px] text-[var(--text-secondary)] mt-1">{Math.round(m.active_calories)} attive</div>}
-                                    </InfoCard>
-                                    <InfoCard infoKey="distance">
-                                        <div className="text-xl mb-1">📏</div>
-                                        <div className="text-xl font-bold text-[var(--accent-blue)]">{m.distance_km || '--'}</div>
-                                        <div className="text-[10px] text-[var(--text-muted)]">km</div>
-                                        {m.floors > 0 && <div className="text-[10px] text-[var(--text-secondary)] mt-1">{m.floors} piani</div>}
-                                    </InfoCard>
-                                    <InfoCard infoKey="intensity">
-                                        <div className="text-xl mb-1">⏱️</div>
-                                        <div className="text-xl font-bold text-[var(--accent-purple)]">{(m.moderate_min || 0) + (m.vigorous_min || 0)}</div>
-                                        <div className="text-[10px] text-[var(--text-muted)]">Min intensi</div>
-                                        {m.vigorous_min > 0 && <div className="text-[10px] text-[var(--text-secondary)] mt-1">{m.vigorous_min} vigorosi</div>}
-                                    </InfoCard>
-                                </div>
-                                
-                                {/* Health Stats */}
-                                <div className="stats-grid mb-4">
-                                    <InfoCard infoKey="sleep">
-                                        <div className="flex items-center gap-1 mb-1"><span className="text-lg">😴</span><span className="text-xs">Sonno</span></div>
-                                        <div className="text-xl font-bold text-[var(--accent-purple)]">{m.sleep_hours?.toFixed(1) || '--'}h</div>
-                                        {m.deep_sleep_min && <div className="text-[10px] text-[var(--text-secondary)]">Deep: {Math.round(m.deep_sleep_min)}m | REM: {Math.round(m.rem_sleep_min || 0)}m</div>}
-                                    </InfoCard>
-                                    <InfoCard infoKey="heart">
-                                        <div className="flex items-center gap-1 mb-1"><span className="text-lg">❤️</span><span className="text-xs">Cuore</span></div>
-                                        <div className="text-xl font-bold text-[var(--accent-red)]">{m.rhr || '--'} <span className="text-xs font-normal">bpm</span></div>
-                                        {m.hrv && <div className="text-[10px] text-[var(--text-secondary)]">HRV: {m.hrv}ms</div>}
-                                    </InfoCard>
-                                    <InfoCard infoKey="stress">
-                                        <div className="flex items-center gap-1 mb-1"><span className="text-lg">😤</span><span className="text-xs">Stress</span></div>
-                                        <div className="text-xl font-bold" style={{ color: m.stress_avg > 50 ? 'var(--accent-orange)' : 'var(--accent-green)' }}>{m.stress_avg || '--'}</div>
-                                    </InfoCard>
-                                    <InfoCard infoKey="recovery">
-                                        <div className="flex items-center gap-1 mb-1"><span className="text-lg">⚡</span><span className="text-xs">Recovery</span></div>
-                                        <div className="text-xl font-bold text-[var(--accent-green)]">{m.recovery || '--'}%</div>
-                                    </InfoCard>
-                                    <InfoCard infoKey="strain">
-                                        <div className="flex items-center gap-1 mb-1"><span className="text-lg">🔥</span><span className="text-xs">Strain</span></div>
-                                        <div className="text-xl font-bold text-[var(--accent-orange)]">{m.strain?.toFixed(1) || '--'}/21</div>
-                                    </InfoCard>
-                                    <InfoCard infoKey="bodyBattery">
-                                        <div className="flex items-center gap-1 mb-1"><span className="text-lg">🔋</span><span className="text-xs">Battery</span></div>
-                                        <div className="text-xl font-bold text-[var(--accent-cyan)]">{m.body_battery_low || '--'}-{m.body_battery_high || '--'}</div>
-                                    </InfoCard>
-                                </div>
-                                
-                                {/* Daily Chart (week view) */}
-                                {period === 'week' && data?.daily?.length > 0 && (
-                                    <div className="glass p-4 mb-4">
-                                        <h3 className="text-xs font-semibold mb-3">Passi giornalieri</h3>
-                                        <div className="flex items-end justify-between gap-1 h-20">
-                                            {data.daily.map((d, i) => (
-                                                <div key={i} className="flex-1 flex flex-col items-center">
-                                                    <div className="w-full bg-[var(--accent-green)] rounded-t opacity-80" style={{ height: `${Math.min((d.steps || 0) / 150, 100)}%` }}></div>
-                                                    <div className="text-[9px] text-[var(--text-muted)] mt-1">{d.day}</div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {/* Activities */}
-                                {data?.activities?.length > 0 && (
-                                    <div className="glass p-4 mb-4">
-                                        <h3 className="text-xs font-semibold mb-3">Attività ({data.activity_count || data.activities.length})</h3>
-                                        <div className="space-y-2">
-                                            {data.activities.slice(0, 5).map((a, i) => (
-                                                <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-[var(--bg-secondary)]">
-                                                    <span className="text-lg">{getActivityIcon(a.type)}</span>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="text-sm font-medium truncate">{a.name}</div>
-                                                        <div className="text-[10px] text-[var(--text-muted)]">{a.date}</div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="text-sm font-medium">{a.duration_min}m</div>
-                                                        {a.distance_km > 0 && <div className="text-[10px] text-[var(--text-muted)]">{a.distance_km}km</div>}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {/* Ask Coach */}
-                                <div className="glass p-4 slide-up">
-                                    <h3 className="text-xs font-semibold mb-3 text-center">Chiedi al coach i dati di {getPeriodLabel().toLowerCase()}</h3>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button onClick={() => handleAskCoach('sensei')} className="btn-primary py-3 rounded-xl flex items-center justify-center gap-2 text-sm">🥋 Sensei</button>
-                                        <button onClick={() => handleAskCoach('sakura')} className="btn-pink py-3 rounded-xl flex items-center justify-center gap-2 text-sm">🌸 Sakura</button>
-                                    </div>
-                                </div>
-                            </>
-                        )}
                     </div>
                 </div>
             );
@@ -740,75 +753,52 @@
         
         // ==================== TREND VIEW ====================
         
-        const TrendView = ({ token, realAge }) => {
+        const TrendView = () => {
+            const { token, lastSync, refresh, isRefreshing } = useApp();
             const [period, setPeriod] = useState('90d');
             const [activeChart, setActiveChart] = useState('bioAge');
-            const [showInfo, setShowInfo] = useState(null);
             const [data, setData] = useState(null);
             const [loading, setLoading] = useState(true);
             const chartRef = useRef(null);
             const canvasRef = useRef(null);
+            const containerRef = useRef(null);
             
-            const periods = {
-                'today': { label: 'Oggi', days: 1, intraday: true },
-                '7d': { label: '7 Giorni', days: 7 },
-                '30d': { label: '30 Giorni', days: 30 },
-                '90d': { label: '3 Mesi', days: 90 },
-                '180d': { label: '6 Mesi', days: 180 },
-                '365d': { label: 'Anno', days: 365 }
-            };
-            
+            const periods = { 'today': { label: 'Oggi', days: 1, intraday: true }, '7d': { label: '7g', days: 7 }, '30d': { label: '30g', days: 30 }, '90d': { label: '3m', days: 90 }, '180d': { label: '6m', days: 180 }, '365d': { label: 'Anno', days: 365 } };
             const configs = {
-                bioAge: { title: 'Età Biologica', icon: '🧬', color: '#00f593', getData: d => d.bio_age, refLine: realAge, info: 'Trend della tua età biologica. Sotto la linea = più giovane.' },
-                sleep: { title: 'Sonno', icon: '😴', color: '#a855f7', getData: d => d.sleep_hours, refLine: 7.5, unit: 'h', info: 'Ore di sonno per notte. Target: 7-8h.' },
-                hrv: { title: 'HRV', icon: '💓', color: '#ff6eb4', getData: d => d.hrv, unit: 'ms', info: 'Variabilità cardiaca. Più alto = meglio.' },
-                rhr: { title: 'RHR', icon: '❤️', color: '#ff5757', getData: d => d.rhr, refLine: 60, unit: 'bpm', info: 'Battiti a riposo. Più basso = meglio.' },
-                steps: { title: 'Passi', icon: '👟', color: '#4da6ff', getData: d => d.steps, refLine: 10000, info: 'Passi giornalieri. Target: 10.000.' },
-                stress: { title: 'Stress', icon: '😤', color: '#ff9f43', getData: d => d.stress, refLine: 50, info: 'Livello stress. <25 rilassato, >50 alto.' },
-                bodyBattery: { title: 'Battery', icon: '🔋', color: '#22d3ee', getData: d => d.body_battery_high || d.value, refLine: 75, info: 'Energia. Si carica col sonno.' }
+                bioAge: { title: 'Bio Age', icon: '🧬', color: '#00f593', getData: d => d.bio_age },
+                sleep: { title: 'Sonno', icon: '😴', color: '#a855f7', getData: d => d.sleep_hours, refLine: 7.5 },
+                hrv: { title: 'HRV', icon: '💓', color: '#ff6eb4', getData: d => d.hrv },
+                rhr: { title: 'RHR', icon: '❤️', color: '#ff5757', getData: d => d.rhr, refLine: 60 },
+                steps: { title: 'Passi', icon: '👟', color: '#4da6ff', getData: d => d.steps, refLine: 10000 },
+                stress: { title: 'Stress', icon: '😤', color: '#ff9f43', getData: d => d.stress || d.value, refLine: 50 },
+                bodyBattery: { title: 'Battery', icon: '🔋', color: '#22d3ee', getData: d => d.body_battery_high || d.value }
             };
             
-            // Metriche disponibili per intraday
             const intradayMetrics = ['stress', 'bodyBattery', 'rhr'];
-            
-            const config = configs[activeChart];
             const isIntraday = periods[period]?.intraday;
+            const config = configs[activeChart];
             
-            // Fetch data when period changes
-            useEffect(() => {
-                const fetchData = async () => {
-                    setLoading(true);
-                    try {
-                        if (isIntraday) {
-                            // Fetch intraday data
-                            const endpoint = activeChart === 'bodyBattery' ? 'body-battery' : activeChart === 'stress' ? 'stress' : 'heart-rate';
-                            const res = await fetch(`${API}/api/intraday/${endpoint}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                            if (res.ok) {
-                                const json = await res.json();
-                                setData({ intraday: true, data: json.data || [], date: json.date });
-                            }
-                        } else {
-                            // Fetch trend data
-                            const res = await fetch(`${API}/api/metrics/trend?days=${periods[period].days}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                            if (res.ok) {
-                                const json = await res.json();
-                                setData({ intraday: false, ...json });
-                            }
-                        }
-                    } catch (e) { console.error(e); }
-                    setLoading(false);
-                };
-                fetchData();
-            }, [period, activeChart, token]);
+            const loadData = useCallback(async () => {
+                setLoading(true);
+                try {
+                    if (isIntraday) {
+                        const endpoint = activeChart === 'bodyBattery' ? 'body-battery' : activeChart === 'stress' ? 'stress' : 'heart-rate';
+                        const res = await fetch(`${API}/api/intraday/${endpoint}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                        if (res.ok) setData({ intraday: true, ...(await res.json()) });
+                    } else {
+                        const res = await fetch(`${API}/api/metrics/trend?days=${periods[period].days}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                        if (res.ok) setData({ intraday: false, ...(await res.json()) });
+                    }
+                } catch {}
+                setLoading(false);
+            }, [token, period, activeChart]);
             
-            // Switch to valid metric when changing to intraday
-            useEffect(() => {
-                if (isIntraday && !intradayMetrics.includes(activeChart)) {
-                    setActiveChart('bodyBattery');
-                }
-            }, [period]);
+            useEffect(() => { loadData(); }, [loadData, lastSync]);
+            useEffect(() => { if (isIntraday && !intradayMetrics.includes(activeChart)) setActiveChart('bodyBattery'); }, [period]);
             
-            // Draw chart
+            const handleRefresh = async () => { await refresh(); await loadData(); };
+            const { pullDistance, isRefreshing: isPulling } = usePullToRefresh(handleRefresh, containerRef);
+            
             useEffect(() => {
                 if (!canvasRef.current || !data?.data?.length) return;
                 if (chartRef.current) chartRef.current.destroy();
@@ -823,149 +813,77 @@
                     labels = data.data.map(d => d.time);
                     values = data.data.map(d => d.value);
                 } else {
-                    labels = data.data.map(d => {
-                        const date = new Date(d.date);
-                        if (periods[period].days <= 7) return date.toLocaleDateString('it', { weekday: 'short' });
-                        if (periods[period].days <= 30) return date.toLocaleDateString('it', { day: '2-digit' });
-                        if (periods[period].days <= 90) return date.toLocaleDateString('it', { day: '2-digit', month: 'short' });
-                        return date.toLocaleDateString('it', { month: 'short' });
-                    });
+                    labels = data.data.map(d => new Date(d.date).toLocaleDateString('it', periods[period].days <= 30 ? { day: '2-digit' } : { day: '2-digit', month: 'short' }));
                     values = data.data.map(d => config.getData(d));
                 }
                 
-                const datasets = [{ label: config.title, data: values, borderColor: config.color, backgroundColor: gradient, fill: true, tension: 0.4, pointRadius: data.intraday ? 0 : (periods[period].days <= 7 ? 4 : 0), borderWidth: 2 }];
-                if (config.refLine && !data.intraday) {
-                    datasets.push({ label: 'Ref', data: values.map(() => config.refLine), borderColor: 'rgba(255,255,255,0.15)', borderDash: [5, 3], pointRadius: 0, borderWidth: 1, fill: false });
-                }
+                const datasets = [{ data: values, borderColor: config.color, backgroundColor: gradient, fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 }];
+                if (config.refLine && !data.intraday) datasets.push({ data: values.map(() => config.refLine), borderColor: 'rgba(255,255,255,0.15)', borderDash: [5, 3], pointRadius: 0, borderWidth: 1, fill: false });
                 
                 chartRef.current = new Chart(ctx, {
-                    type: 'line',
-                    data: { labels, datasets },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: { intersect: false, mode: 'index' },
-                        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#181a22', titleColor: '#fff', bodyColor: '#8b8d98', borderColor: '#2a2d38', borderWidth: 1 } },
-                        scales: {
-                            x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(255,255,255,0.3)', maxTicksLimit: data.intraday ? 8 : (periods[period].days <= 30 ? 7 : 6), font: { size: 9 } } },
-                            y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 } } }
-                        }
-                    }
+                    type: 'line', data: { labels, datasets },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(255,255,255,0.3)', maxTicksLimit: 6, font: { size: 9 } } }, y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 } } } } }
                 });
                 return () => chartRef.current?.destroy();
             }, [data, activeChart, config, period]);
             
-            // Calculate stats
             const getStats = () => {
                 if (!data?.data?.length) return { avg: '--', min: '--', max: '--' };
-                let values;
-                if (data.intraday) {
-                    values = data.data.map(d => d.value).filter(v => v != null);
-                } else {
-                    values = data.data.map(d => config.getData(d)).filter(v => v != null);
-                }
+                const values = (data.intraday ? data.data.map(d => d.value) : data.data.map(d => config.getData(d))).filter(v => v != null);
                 if (!values.length) return { avg: '--', min: '--', max: '--' };
-                return {
-                    avg: (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1),
-                    min: Math.min(...values).toFixed(1),
-                    max: Math.max(...values).toFixed(1)
-                };
+                return { avg: (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1), min: Math.min(...values).toFixed(1), max: Math.max(...values).toFixed(1) };
             };
             const stats = getStats();
             
             return (
-                <div className="h-full overflow-y-auto bg-gradient-sensei" style={{ paddingBottom: 'calc(76px + var(--safe-bottom))' }}>
-                    {showInfo && configs[showInfo] && (
-                        <Modal onClose={() => setShowInfo(null)}>
-                            <div className="flex items-center gap-3 mb-4">
-                                <span className="text-2xl">{configs[showInfo].icon}</span>
-                                <h3 className="font-bold" style={{ color: configs[showInfo].color }}>{configs[showInfo].title}</h3>
-                            </div>
-                            <p className="text-[var(--text-secondary)] text-sm">{configs[showInfo].info}</p>
-                        </Modal>
-                    )}
-                    
-                    <div className="max-w-4xl mx-auto p-4">
-                        <h1 className="text-xl font-bold font-display mb-4 text-center slide-up">Trend</h1>
+                <div className="h-full flex flex-col">
+                    <ViewHeader title="Trend" onRefresh={handleRefresh} isRefreshing={isRefreshing || isPulling} lastSync={lastSync} />
+                    <div ref={containerRef} className="flex-1 overflow-y-auto ptr-container bg-gradient-sensei" style={{ paddingBottom: 'calc(80px + var(--safe-bottom))' }}>
+                        <PullIndicator distance={pullDistance} isRefreshing={isPulling} />
                         
-                        {/* Period Selector */}
-                        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3 scrollbar-hide slide-up">
-                            {Object.entries(periods).map(([key, p]) => (
-                                <button key={key} onClick={() => setPeriod(key)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${period === key ? 'bg-[var(--accent-green)] text-black' : 'glass hover:bg-[var(--bg-elevated)]'}`}>
-                                    {p.label}
-                                </button>
-                            ))}
-                        </div>
-                        
-                        {/* Metric Selector */}
-                        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide slide-up">
-                            {Object.entries(configs).map(([key, cfg]) => {
-                                // Hide non-intraday metrics when in intraday mode
-                                if (isIntraday && !intradayMetrics.includes(key)) return null;
-                                return (
-                                    <button key={key} onClick={() => setActiveChart(key)}
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full whitespace-nowrap transition-all text-sm ${activeChart === key ? 'text-black font-bold' : 'glass text-[var(--text-muted)]'}`}
-                                        style={activeChart === key ? { background: cfg.color } : {}}>
-                                        <span>{cfg.icon}</span><span className="text-xs">{cfg.title}</span>
+                        <div className="max-w-4xl mx-auto p-4">
+                            <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3 scrollbar-hide">
+                                {Object.entries(periods).map(([key, p]) => (
+                                    <button key={key} onClick={() => setPeriod(key)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${period === key ? 'bg-[var(--accent-green)] text-black' : 'glass'}`}>
+                                        {p.label}
                                     </button>
-                                );
-                            })}
-                        </div>
-                        
-                        {/* Chart */}
-                        <div className="glass-elevated p-4 mb-4 slide-up">
-                            <div className="flex items-center justify-between mb-3">
-                                <div>
+                                ))}
+                            </div>
+                            
+                            <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
+                                {Object.entries(configs).map(([key, cfg]) => {
+                                    if (isIntraday && !intradayMetrics.includes(key)) return null;
+                                    return (
+                                        <button key={key} onClick={() => setActiveChart(key)}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full whitespace-nowrap text-sm ${activeChart === key ? 'text-black font-bold' : 'glass text-[var(--text-muted)]'}`}
+                                            style={activeChart === key ? { background: cfg.color } : {}}>
+                                            <span>{cfg.icon}</span><span className="text-xs">{cfg.title}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            
+                            <div className="glass-elevated p-4 mb-4">
+                                <div className="flex items-center justify-between mb-3">
                                     <h3 className="font-semibold text-sm" style={{ color: config.color }}>{config.icon} {config.title}</h3>
-                                    <p className="text-[10px] text-[var(--text-muted)]">{periods[period].label}{data?.date ? ` • ${data.date}` : ''}</p>
+                                    <span className="text-xs text-[var(--text-muted)]">{periods[period].label}</span>
                                 </div>
-                                <button onClick={() => setShowInfo(activeChart)} className="text-xs text-[var(--accent-blue)]">ℹ️</button>
+                                {loading ? (
+                                    <div className="h-48 flex items-center justify-center"><div className="w-8 h-8 border-2 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin"></div></div>
+                                ) : !data?.data?.length ? (
+                                    <div className="h-48 flex items-center justify-center text-[var(--text-muted)] text-sm">Nessun dato</div>
+                                ) : (
+                                    <div className="h-48"><canvas ref={canvasRef}></canvas></div>
+                                )}
                             </div>
-                            {loading ? (
-                                <div className="h-48 flex items-center justify-center">
-                                    <div className="w-8 h-8 border-2 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin"></div>
-                                </div>
-                            ) : !data?.data?.length ? (
-                                <div className="h-48 flex items-center justify-center text-[var(--text-muted)] text-sm">Nessun dato disponibile</div>
-                            ) : (
-                                <div className="h-48"><canvas ref={canvasRef}></canvas></div>
-                            )}
-                        </div>
-                        
-                        {/* Stats */}
-                        <div className="grid grid-cols-3 gap-2 mb-4 slide-up">
-                            <div className="glass p-3 text-center">
-                                <div className="text-[10px] text-[var(--text-muted)]">Min</div>
-                                <div className="text-lg font-bold" style={{ color: config.color }}>{stats.min}</div>
-                            </div>
-                            <div className="glass p-3 text-center">
-                                <div className="text-[10px] text-[var(--text-muted)]">Media</div>
-                                <div className="text-lg font-bold">{stats.avg}</div>
-                            </div>
-                            <div className="glass p-3 text-center">
-                                <div className="text-[10px] text-[var(--text-muted)]">Max</div>
-                                <div className="text-lg font-bold text-[var(--accent-orange)]">{stats.max}</div>
+                            
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="glass p-3 text-center"><div className="text-[10px] text-[var(--text-muted)]">Min</div><div className="text-lg font-bold" style={{ color: config.color }}>{stats.min}</div></div>
+                                <div className="glass p-3 text-center"><div className="text-[10px] text-[var(--text-muted)]">Media</div><div className="text-lg font-bold">{stats.avg}</div></div>
+                                <div className="glass p-3 text-center"><div className="text-[10px] text-[var(--text-muted)]">Max</div><div className="text-lg font-bold text-[var(--accent-orange)]">{stats.max}</div></div>
                             </div>
                         </div>
-                        
-                        {/* Pace of Aging (only for bioAge and non-intraday) */}
-                        {activeChart === 'bioAge' && !isIntraday && data?.pace_of_aging !== null && data?.pace_of_aging !== undefined && (
-                            <div className="glass-elevated p-5 text-center slide-up">
-                                <div className="text-xs text-[var(--text-muted)] mb-1">Pace of Aging</div>
-                                <div className={`text-3xl font-bold font-display ${data.pace_of_aging <= 0 ? 'text-[var(--accent-green)] glow-text-green' : 'text-[var(--accent-orange)]'}`}>
-                                    {data.pace_of_aging <= 0 ? '' : '+'}{data.pace_of_aging?.toFixed(1)}<span className="text-sm ml-1">anni/anno</span>
-                                </div>
-                                <p className="text-xs text-[var(--text-muted)] mt-2">{data.pace_of_aging < -0.5 ? '🎉 Ringiovanimento!' : data.pace_of_aging < 0 ? '✨ Rallentato' : '👍 Normale'}</p>
-                            </div>
-                        )}
-                        
-                        {/* Intraday hint */}
-                        {isIntraday && (
-                            <div className="glass p-3 text-center text-xs text-[var(--text-muted)] slide-up">
-                                📊 Vista intraday: dati di oggi ora per ora
-                            </div>
-                        )}
                     </div>
                 </div>
             );
@@ -973,56 +891,74 @@
         
         // ==================== ACTIVITY VIEW ====================
         
-        const ActivityView = ({ token, activities, onRefresh }) => {
+        const ActivityView = () => {
+            const { token, lastSync, refresh, isRefreshing } = useApp();
+            const [activities, setActivities] = useState([]);
+            const [loading, setLoading] = useState(true);
             const [commenting, setCommenting] = useState(null);
             const [comments, setComments] = useState({});
+            const containerRef = useRef(null);
             
-            const getIcon = (type) => ({ running: '🏃', treadmill_running: '🏃', cycling: '🚴', indoor_cycling: '🚴', swimming: '🏊', walking: '🚶', hiking: '🥾', strength_training: '💪', yoga: '🧘', skiing: '⛷️', breathwork: '🌬️' }[type] || '⚡');
+            const loadData = useCallback(async () => {
+                try {
+                    const res = await fetch(`${API}/api/activities?days=30`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (res.ok) setActivities(await res.json());
+                } catch {}
+                setLoading(false);
+            }, [token]);
+            
+            useEffect(() => { loadData(); }, [loadData, lastSync]);
+            
+            const handleRefresh = async () => { await refresh(); await loadData(); };
+            const { pullDistance, isRefreshing: isPulling } = usePullToRefresh(handleRefresh, containerRef);
+            
+            const getIcon = (type) => ({ running: '🏃', cycling: '🚴', swimming: '🏊', walking: '🚶', hiking: '🥾', strength_training: '💪', yoga: '🧘' }[type] || '⚡');
             const formatDuration = (sec) => { if (!sec) return '--'; const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
             
             const getComment = async (activity) => {
                 setCommenting(activity.id);
                 try {
                     const res = await fetch(`${API}/api/activity/${activity.id}/comment`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
-                    const data = await res.json();
-                    setComments(prev => ({ ...prev, [activity.id]: data.comment }));
-                } catch { setComments(prev => ({ ...prev, [activity.id]: 'Errore' })); }
+                    setComments(prev => ({ ...prev, [activity.id]: (await res.json()).comment }));
+                } catch {}
                 setCommenting(null);
             };
             
             return (
-                <div className="h-full overflow-y-auto" style={{ paddingBottom: 'calc(76px + var(--safe-bottom))' }}>
-                    <div className="max-w-4xl mx-auto p-4">
-                        <h1 className="text-xl font-bold font-display mb-1 text-center slide-up">Attività</h1>
-                        <p className="text-xs text-[var(--text-muted)] text-center mb-4">Ultimi 30 giorni</p>
+                <div className="h-full flex flex-col">
+                    <ViewHeader title="Attività" onRefresh={handleRefresh} isRefreshing={isRefreshing || isPulling} lastSync={lastSync} />
+                    <div ref={containerRef} className="flex-1 overflow-y-auto ptr-container" style={{ paddingBottom: 'calc(80px + var(--safe-bottom))' }}>
+                        <PullIndicator distance={pullDistance} isRefreshing={isPulling} />
                         
-                        {activities.length === 0 ? (
-                            <div className="glass p-8 text-center"><span className="text-4xl block mb-3">🏃</span><p className="text-[var(--text-muted)]">Nessuna attività</p></div>
-                        ) : (
-                            <div className="space-y-3">
-                                {activities.map((a, i) => (
-                                    <div key={a.id || i} className="glass p-4 slide-up">
-                                        <div className="flex items-start gap-3">
-                                            <span className="text-2xl">{getIcon(a.activity_type)}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <h3 className="font-semibold text-sm truncate">{a.activity_name || a.activity_type || 'Attività'}</h3>
-                                                    <span className="text-[10px] text-[var(--text-muted)]">{a.start_time ? new Date(a.start_time).toLocaleDateString('it', { day: 'numeric', month: 'short' }) : ''}</span>
+                        <div className="max-w-4xl mx-auto p-4">
+                            {loading ? <Loading /> : activities.length === 0 ? (
+                                <div className="glass p-8 text-center"><span className="text-4xl block mb-3">🏃</span><p className="text-[var(--text-muted)]">Nessuna attività</p></div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {activities.map((a, i) => (
+                                        <div key={a.id || i} className="glass p-4">
+                                            <div className="flex items-start gap-3">
+                                                <span className="text-2xl">{getIcon(a.activity_type)}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h3 className="font-semibold text-sm truncate">{a.activity_name || a.activity_type || 'Attività'}</h3>
+                                                        <span className="text-[10px] text-[var(--text-muted)]">{a.start_time ? new Date(a.start_time).toLocaleDateString('it', { day: 'numeric', month: 'short' }) : ''}</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-4 gap-2 text-xs">
+                                                        <div><span className="text-[var(--text-muted)] block text-[10px]">Durata</span><span className="font-medium">{formatDuration(a.duration_seconds)}</span></div>
+                                                        <div><span className="text-[var(--text-muted)] block text-[10px]">Distanza</span><span className="font-medium">{a.distance_meters ? (a.distance_meters / 1000).toFixed(1) + 'km' : '--'}</span></div>
+                                                        <div><span className="text-[var(--text-muted)] block text-[10px]">Calorie</span><span className="font-medium">{a.calories || '--'}</span></div>
+                                                        <div><span className="text-[var(--text-muted)] block text-[10px]">HR</span><span className="font-medium">{a.avg_hr || '--'}</span></div>
+                                                    </div>
+                                                    {!comments[a.id] && <button onClick={() => getComment(a)} disabled={commenting === a.id} className="mt-2 text-[10px] text-[var(--accent-green)]">{commenting === a.id ? 'Analisi...' : '🤖 Commento AI'}</button>}
+                                                    {comments[a.id] && <div className="mt-2 p-2 rounded-lg bg-[var(--bg-elevated)] text-xs text-[var(--text-secondary)]">{comments[a.id]}</div>}
                                                 </div>
-                                                <div className="grid grid-cols-4 gap-2 text-xs">
-                                                    <div><span className="text-[var(--text-muted)] block text-[10px]">Durata</span><span className="font-medium">{formatDuration(a.duration_seconds)}</span></div>
-                                                    <div><span className="text-[var(--text-muted)] block text-[10px]">Distanza</span><span className="font-medium">{a.distance_meters ? (a.distance_meters / 1000).toFixed(1) + 'km' : '--'}</span></div>
-                                                    <div><span className="text-[var(--text-muted)] block text-[10px]">Calorie</span><span className="font-medium">{a.calories || '--'}</span></div>
-                                                    <div><span className="text-[var(--text-muted)] block text-[10px]">HR</span><span className="font-medium">{a.avg_hr || '--'}</span></div>
-                                                </div>
-                                                {!comments[a.id] && <button onClick={() => getComment(a)} disabled={commenting === a.id} className="mt-2 text-[10px] text-[var(--accent-green)]">{commenting === a.id ? 'Analisi...' : '🤖 Commento AI'}</button>}
-                                                {comments[a.id] && <div className="mt-2 p-2 rounded-lg bg-[var(--bg-elevated)] text-xs text-[var(--text-secondary)]">{comments[a.id]}</div>}
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             );
@@ -1030,21 +966,24 @@
         
         // ==================== PROFILE VIEW ====================
         
-        const ProfileView = ({ token, user, onUpdate, onLogout }) => {
+        const ProfileView = ({ onLogout }) => {
+            const { token, user, setUser, refresh, isRefreshing, lastSync } = useApp();
             const [form, setForm] = useState({ name: user?.name || '', birth_year: user?.birth_year || '' });
             const [saving, setSaving] = useState(false);
-            const [saved, setSaved] = useState(false);
             const [syncing, setSyncing] = useState(false);
             const [syncProgress, setSyncProgress] = useState('');
             const [recalculating, setRecalculating] = useState(false);
             const [recalcResult, setRecalcResult] = useState('');
             const [debugData, setDebugData] = useState(null);
+            const containerRef = useRef(null);
+            
+            const { pullDistance, isRefreshing: isPulling } = usePullToRefresh(refresh, containerRef);
             
             const save = async () => {
                 setSaving(true);
                 try {
                     const res = await fetch(`${API}/api/user/profile`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ name: form.name, birth_year: parseInt(form.birth_year) }) });
-                    if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 2000); const updated = { ...user, name: form.name, birth_year: parseInt(form.birth_year) }; localStorage.setItem('user', JSON.stringify(updated)); onUpdate(updated); }
+                    if (res.ok) { const updated = { ...user, name: form.name, birth_year: parseInt(form.birth_year) }; localStorage.setItem('user', JSON.stringify(updated)); setUser(updated); }
                 } catch {}
                 setSaving(false);
             };
@@ -1053,97 +992,70 @@
                 setSyncing(true); setSyncProgress('Avvio...');
                 try {
                     const res = await fetch(`${API}/api/sync/year`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
-                    const data = await res.json();
-                    setSyncProgress(data.message || 'Completato!');
+                    setSyncProgress((await res.json()).message || 'Completato!');
+                    await refresh();
                 } catch { setSyncProgress('Errore'); }
                 setSyncing(false);
             };
             
             const recalculate = async () => {
-                setRecalculating(true); setRecalcResult('');
+                setRecalculating(true);
                 try {
                     const res = await fetch(`${API}/api/recalculate`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
-                    const data = await res.json();
-                    setRecalcResult(data.message || 'Fatto!');
-                    setTimeout(() => setRecalcResult(''), 5000);
-                } catch (e) { setRecalcResult('Errore: ' + e.message); }
+                    setRecalcResult((await res.json()).message || 'Fatto!');
+                    await refresh();
+                } catch (e) { setRecalcResult('Errore'); }
                 setRecalculating(false);
             };
             
             const loadDebug = async () => {
-                try {
-                    const res = await fetch(`${API}/api/debug/bio`, { headers: { 'Authorization': `Bearer ${token}` } });
-                    setDebugData(await res.json());
-                } catch (e) { setDebugData([{ error: e.message }]); }
+                try { setDebugData(await (await fetch(`${API}/api/debug/bio`, { headers: { 'Authorization': `Bearer ${token}` } })).json()); } catch {}
             };
             
-            const age = form.birth_year ? new Date().getFullYear() - parseInt(form.birth_year) : null;
-            
             return (
-                <div className="h-full overflow-y-auto" style={{ paddingBottom: 'calc(76px + var(--safe-bottom))' }}>
-                    <div className="max-w-lg mx-auto p-4">
-                        <h1 className="text-xl font-bold font-display mb-5 text-center slide-up">Profilo</h1>
+                <div className="h-full flex flex-col">
+                    <ViewHeader title="Profilo" onRefresh={refresh} isRefreshing={isRefreshing || isPulling} lastSync={lastSync} />
+                    <div ref={containerRef} className="flex-1 overflow-y-auto ptr-container" style={{ paddingBottom: 'calc(80px + var(--safe-bottom))' }}>
+                        <PullIndicator distance={pullDistance} isRefreshing={isPulling} />
                         
-                        <div className="glass p-5 mb-4 slide-up">
-                            <h3 className="font-semibold text-sm mb-3">Informazioni</h3>
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="text-[10px] text-[var(--text-muted)] block mb-1">Nome</label>
-                                    <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="input-modern w-full px-3 py-2 text-sm" placeholder="Il tuo nome" />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] text-[var(--text-muted)] block mb-1">Anno di nascita</label>
-                                    <input type="number" value={form.birth_year} onChange={e => setForm({ ...form, birth_year: e.target.value })} className="input-modern w-full px-3 py-2 text-sm" placeholder="1985" />
-                                    {age && <p className="text-[10px] text-[var(--text-muted)] mt-1">Età: {age} anni</p>}
-                                </div>
-                                <button onClick={save} disabled={saving} className="btn-primary w-full py-3 text-sm">{saving ? 'Salvataggio...' : saved ? '✓ Salvato!' : 'Salva'}</button>
-                            </div>
-                        </div>
-                        
-                        <div className="glass p-5 mb-4 slide-up">
-                            <h3 className="font-semibold text-sm mb-3">Account</h3>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between py-2 border-b border-[var(--border)]">
-                                    <span className="text-[var(--text-muted)]">Email</span><span>{user?.email}</span>
-                                </div>
-                                <div className="flex justify-between py-2">
-                                    <span className="text-[var(--text-muted)]">Garmin</span>
-                                    <span className={user?.garmin_connected ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}>{user?.garmin_connected ? '✓ Connesso' : '✗ Non connesso'}</span>
+                        <div className="max-w-lg mx-auto p-4">
+                            <div className="glass p-5 mb-4">
+                                <h3 className="font-semibold text-sm mb-3">Informazioni</h3>
+                                <div className="space-y-3">
+                                    <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="input-modern w-full px-3 py-2 text-sm" placeholder="Nome" />
+                                    <input type="number" value={form.birth_year} onChange={e => setForm({ ...form, birth_year: e.target.value })} className="input-modern w-full px-3 py-2 text-sm" placeholder="Anno nascita" />
+                                    <button onClick={save} disabled={saving} className="btn-primary w-full py-3 text-sm">{saving ? 'Salvataggio...' : 'Salva'}</button>
                                 </div>
                             </div>
+                            
+                            <div className="glass p-5 mb-4">
+                                <h3 className="font-semibold text-sm mb-2">Sync Completa</h3>
+                                <p className="text-[10px] text-[var(--text-muted)] mb-3">Sincronizza tutti i dati dell'anno da Garmin</p>
+                                <button onClick={syncYear} disabled={syncing} className="btn-primary w-full py-3 text-sm">{syncing ? '🔄 Sync...' : '📅 Sincronizza Anno'}</button>
+                                {syncProgress && <p className="text-xs text-center text-[var(--text-secondary)] mt-2">{syncProgress}</p>}
+                            </div>
+                            
+                            <div className="glass p-5 mb-4">
+                                <h3 className="font-semibold text-sm mb-2">Ricalcola Bio Age</h3>
+                                <button onClick={recalculate} disabled={recalculating} className="btn-primary w-full py-3 text-sm mb-2">{recalculating ? '🔄...' : '🧬 Ricalcola'}</button>
+                                {recalcResult && <p className="text-xs text-center text-[var(--accent-green)] mb-2">{recalcResult}</p>}
+                                <button onClick={loadDebug} className="btn-ghost w-full py-2 text-xs">🔍 Debug ultimi 5 giorni</button>
+                                {debugData && (
+                                    <div className="mt-3 p-3 rounded-lg bg-[var(--bg-secondary)] text-[10px] font-mono max-h-48 overflow-y-auto">
+                                        {debugData.map((d, i) => (
+                                            <div key={i} className="mb-2 pb-2 border-b border-[var(--border)] last:border-0">
+                                                <div className="text-[var(--accent-green)] font-bold">{d.date}</div>
+                                                <div>Sonno: {d.sleep_hours}h → <span className={d.bio_age_sleep_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_sleep_impact}</span></div>
+                                                <div>RHR: {d.resting_hr} → <span className={d.bio_age_rhr_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_rhr_impact}</span></div>
+                                                <div className="font-bold mt-1">Bio Age: {d.biological_age}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <button onClick={onLogout} className="btn-danger w-full py-3 text-sm">Logout</button>
                         </div>
-                        
-                        <div className="glass p-5 mb-4 slide-up">
-                            <h3 className="font-semibold text-sm mb-2">Sincronizzazione</h3>
-                            <p className="text-[10px] text-[var(--text-muted)] mb-3">Scarica tutti i dati dell'anno</p>
-                            <button onClick={syncYear} disabled={syncing} className="btn-primary w-full py-3 text-sm">{syncing ? '🔄 Sincronizzazione...' : '📅 Sincronizza Anno'}</button>
-                            {syncProgress && <p className="text-center text-xs text-[var(--text-secondary)] mt-2">{syncProgress}</p>}
-                        </div>
-                        
-                        <div className="glass p-5 mb-4 slide-up">
-                            <h3 className="font-semibold text-sm mb-2">Ricalcola Età Biologica</h3>
-                            <p className="text-[10px] text-[var(--text-muted)] mb-3">Ricalcola con la formula aggiornata</p>
-                            <button onClick={recalculate} disabled={recalculating} className="btn-primary w-full py-3 text-sm mb-2">{recalculating ? '🔄 Ricalcolo...' : '🧬 Ricalcola Tutto'}</button>
-                            {recalcResult && <p className="text-center text-xs text-[var(--accent-green)] mb-2">{recalcResult}</p>}
-                            <button onClick={loadDebug} className="btn-ghost w-full py-2 text-xs">🔍 Debug: ultimi 5 giorni</button>
-                            {debugData && (
-                                <div className="mt-3 p-3 rounded-lg bg-[var(--bg-secondary)] text-[10px] font-mono overflow-x-auto max-h-48 overflow-y-auto">
-                                    {debugData.map((d, i) => (
-                                        <div key={i} className="mb-2 pb-2 border-b border-[var(--border)] last:border-0">
-                                            <div className="text-[var(--accent-green)] font-bold">{d.date}</div>
-                                            <div>Sonno: {d.sleep_hours}h → <span className={d.bio_age_sleep_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_sleep_impact}</span></div>
-                                            <div>RHR: {d.resting_hr} → <span className={d.bio_age_rhr_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_rhr_impact}</span></div>
-                                            <div>Passi: {d.steps} → <span className={d.bio_age_steps_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_steps_impact}</span></div>
-                                            <div>Stress: {d.stress_avg} → <span className={d.bio_age_stress_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_stress_impact}</span></div>
-                                            <div>HRZ: <span className={d.bio_age_hrz_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_hrz_impact}</span></div>
-                                            <div className="font-bold mt-1">Bio Age: {d.biological_age}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        
-                        <button onClick={onLogout} className="btn-danger w-full py-3 text-sm slide-up">Logout</button>
                     </div>
                 </div>
             );
@@ -1152,25 +1064,18 @@
         // ==================== AUTH PAGES ====================
         
         const LandingPage = ({ onNavigate }) => (
-            <div className="h-full overflow-y-auto bg-gradient-hero">
-                <div className="min-h-full flex flex-col items-center justify-center p-6 text-center">
-                    <div className="slide-up max-w-md">
-                        <div className="flex gap-4 justify-center mb-6">
-                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl glow-green" style={{ background: 'var(--accent-green-dim)' }}>🥋</div>
-                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl glow-pink" style={{ background: 'var(--accent-pink-dim)' }}>🌸</div>
-                        </div>
-                        <h1 className="text-4xl sm:text-5xl font-bold font-display mb-2 gradient-text">SENSEI</h1>
-                        <p className="text-lg text-[var(--text-secondary)] mb-1">Performance Lab</p>
-                        <p className="text-sm text-[var(--text-muted)] mb-8 max-w-sm mx-auto">Il tuo coach AI personale. Analizza dati Garmin, calcola età biologica, ottimizza performance.</p>
-                        <div className="space-y-3">
-                            <button onClick={() => onNavigate('login')} className="btn-primary w-full py-4 text-lg">Accedi</button>
-                            <button onClick={() => onNavigate('register')} className="btn-ghost w-full py-4">Crea Account</button>
-                        </div>
-                        <div className="mt-10 grid grid-cols-3 gap-3 text-center">
-                            <div className="glass p-3"><div className="text-xl mb-1">🧬</div><div className="text-[10px] text-[var(--text-muted)]">Età Biologica</div></div>
-                            <div className="glass p-3"><div className="text-xl mb-1">🤖</div><div className="text-[10px] text-[var(--text-muted)]">AI Coach</div></div>
-                            <div className="glass p-3"><div className="text-xl mb-1">📈</div><div className="text-[10px] text-[var(--text-muted)]">Trend</div></div>
-                        </div>
+            <div className="h-full flex items-center justify-center p-6 bg-gradient-hero">
+                <div className="text-center max-w-md slide-up">
+                    <div className="flex gap-4 justify-center mb-6">
+                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl glow-green" style={{ background: 'var(--accent-green-dim)' }}>🥋</div>
+                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl glow-pink" style={{ background: 'var(--accent-pink-dim)' }}>🌸</div>
+                    </div>
+                    <h1 className="text-4xl font-bold font-display mb-2 gradient-text">SENSEI</h1>
+                    <p className="text-lg text-[var(--text-secondary)] mb-1">Performance Lab</p>
+                    <p className="text-sm text-[var(--text-muted)] mb-8">AI coach per fitness, salute e longevità</p>
+                    <div className="space-y-3">
+                        <button onClick={() => onNavigate('login')} className="btn-primary w-full py-4 text-lg">Accedi</button>
+                        <button onClick={() => onNavigate('register')} className="btn-ghost w-full py-4">Crea Account</button>
                     </div>
                 </div>
             </div>
@@ -1195,10 +1100,7 @@
             return (
                 <div className="h-full flex items-center justify-center p-6 bg-gradient-hero">
                     <form onSubmit={submit} className="w-full max-w-sm slide-up">
-                        <div className="text-center mb-6">
-                            <div className="text-4xl mb-3">🥋</div>
-                            <h1 className="text-2xl font-bold font-display gradient-text">Bentornato</h1>
-                        </div>
+                        <div className="text-center mb-6"><div className="text-4xl mb-3">🥋</div><h1 className="text-2xl font-bold font-display gradient-text">Bentornato</h1></div>
                         {error && <div className="glass border-[var(--accent-red)] p-3 mb-4 text-[var(--accent-red)] text-sm text-center">{error}</div>}
                         <div className="space-y-3 mb-5">
                             <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Email" required />
@@ -1219,7 +1121,7 @@
             
             const submit = async (e) => {
                 e.preventDefault();
-                if (!form.birth_year) { setError('Anno di nascita richiesto'); return; }
+                if (!form.birth_year) { setError('Anno nascita richiesto'); return; }
                 setLoading(true); setError('');
                 try {
                     const res = await fetch(`${API}/api/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, birth_year: parseInt(form.birth_year) }) });
@@ -1234,8 +1136,8 @@
                 <div className="h-full flex items-center justify-center p-6 bg-gradient-hero">
                     <div className="text-center glass-elevated p-10 scale-in">
                         <div className="text-5xl mb-4">🎉</div>
-                        <h2 className="text-2xl font-bold font-display text-[var(--accent-green)] mb-4">Account Creato!</h2>
-                        <button onClick={() => onNavigate('login')} className="btn-primary px-8 py-3">Accedi Ora</button>
+                        <h2 className="text-2xl font-bold text-[var(--accent-green)] mb-4">Account Creato!</h2>
+                        <button onClick={() => onNavigate('login')} className="btn-primary px-8 py-3">Accedi</button>
                     </div>
                 </div>
             );
@@ -1243,19 +1145,16 @@
             return (
                 <div className="h-full flex items-center justify-center p-6 bg-gradient-hero">
                     <form onSubmit={submit} className="w-full max-w-sm slide-up">
-                        <div className="text-center mb-6">
-                            <div className="text-4xl mb-3">🥋</div>
-                            <h1 className="text-2xl font-bold font-display gradient-text">Registrazione</h1>
-                        </div>
+                        <div className="text-center mb-6"><div className="text-4xl mb-3">🥋</div><h1 className="text-2xl font-bold font-display gradient-text">Registrazione</h1></div>
                         {error && <div className="glass border-[var(--accent-red)] p-3 mb-4 text-[var(--accent-red)] text-sm text-center">{error}</div>}
                         <div className="space-y-3 mb-5">
                             <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Nome" />
                             <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Email" required />
                             <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Password (min 6)" required minLength="6" />
-                            <input type="number" value={form.birth_year} onChange={e => setForm({ ...form, birth_year: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Anno di nascita *" required />
+                            <input type="number" value={form.birth_year} onChange={e => setForm({ ...form, birth_year: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Anno nascita *" required />
                         </div>
                         <button type="submit" disabled={loading} className="btn-primary w-full py-4 mb-4">{loading ? 'Registrazione...' : 'Crea Account'}</button>
-                        <p className="text-center text-sm text-[var(--text-muted)]">Hai già un account? <button type="button" onClick={() => onNavigate('login')} className="text-[var(--accent-green)]">Accedi</button></p>
+                        <p className="text-center text-sm text-[var(--text-muted)]">Hai un account? <button type="button" onClick={() => onNavigate('login')} className="text-[var(--accent-green)]">Accedi</button></p>
                     </form>
                 </div>
             );
@@ -1276,27 +1175,16 @@
                         setStep(2);
                         await fetch(`${API}/api/sync`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ days_back: 90 }) });
                         setStep(3);
-                        setTimeout(onComplete, 2000);
+                        setTimeout(onComplete, 1500);
                     } else setError(data.error || 'Errore');
-                } catch { setError('Errore di connessione'); }
+                } catch { setError('Errore connessione'); }
                 setLoading(false);
             };
             
             if (step >= 2) return (
                 <div className="h-full flex items-center justify-center bg-gradient-hero">
                     <div className="text-center glass-elevated p-10 scale-in">
-                        {step === 2 ? (
-                            <>
-                                <div className="relative w-14 h-14 mx-auto mb-4">
-                                    <div className="absolute inset-0 rounded-full border-4 border-[var(--border)]"></div>
-                                    <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--accent-green)] animate-spin"></div>
-                                </div>
-                                <h3 className="text-xl font-bold mb-1">Sincronizzazione</h3>
-                                <p className="text-sm text-[var(--text-muted)]">Importazione ultimi 90 giorni...</p>
-                            </>
-                        ) : (
-                            <><div className="text-5xl mb-4">✓</div><h3 className="text-xl font-bold text-[var(--accent-green)]">Tutto Pronto!</h3></>
-                        )}
+                        {step === 2 ? (<><div className="w-14 h-14 mx-auto mb-4 border-4 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin"></div><h3 className="text-xl font-bold">Sincronizzazione...</h3></>) : (<><div className="text-5xl mb-4">✓</div><h3 className="text-xl font-bold text-[var(--accent-green)]">Pronto!</h3></>)}
                     </div>
                 </div>
             );
@@ -1304,11 +1192,7 @@
             return (
                 <div className="h-full flex items-center justify-center p-6 bg-gradient-hero">
                     <form onSubmit={connect} className="w-full max-w-sm slide-up">
-                        <div className="text-center mb-6">
-                            <div className="text-4xl mb-3">⌚</div>
-                            <h1 className="text-2xl font-bold font-display">Connetti Garmin</h1>
-                            <p className="text-sm text-[var(--text-muted)] mt-1">Sincronizza i tuoi dati</p>
-                        </div>
+                        <div className="text-center mb-6"><div className="text-4xl mb-3">⌚</div><h1 className="text-2xl font-bold font-display">Connetti Garmin</h1></div>
                         {error && <div className="glass border-[var(--accent-red)] p-3 mb-4 text-[var(--accent-red)] text-sm text-center">{error}</div>}
                         <div className="glass p-3 mb-4 text-xs text-[var(--text-muted)] flex items-center gap-2"><span>🔒</span> Credenziali criptate</div>
                         <div className="space-y-3 mb-5">
@@ -1325,37 +1209,46 @@
         
         const Dashboard = ({ token, user, onLogout, onUserUpdate }) => {
             const [tab, setTab] = useState('data');
-            const [summary, setSummary] = useState(null);
-            const [trend, setTrend] = useState(null);
-            const [activities, setActivities] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [syncing, setSyncing] = useState(false);
+            const [lastSync, setLastSync] = useState(Date.now());
+            const [isRefreshing, setIsRefreshing] = useState(false);
             const [initialMessage, setInitialMessage] = useState(null);
+            const [appReady, setAppReady] = useState(false);
             
-            useEffect(() => { fetchData(); }, []);
+            // Auto-sync on mount
+            useEffect(() => {
+                const init = async () => {
+                    try {
+                        // Sync latest data on app open
+                        await fetch(`${API}/api/sync`, { 
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+                            body: JSON.stringify({ days_back: 7 }) 
+                        });
+                        setLastSync(Date.now());
+                    } catch {}
+                    setAppReady(true);
+                };
+                init();
+            }, [token]);
             
-            const fetchData = async () => {
+            const refresh = useCallback(async () => {
+                setIsRefreshing(true);
                 try {
-                    const headers = { 'Authorization': `Bearer ${token}` };
-                    const [s, t, a] = await Promise.all([
-                        fetch(`${API}/api/metrics/summary?days=30`, { headers }).then(r => r.ok ? r.json() : {}),
-                        fetch(`${API}/api/metrics/trend?days=90`, { headers }).then(r => r.ok ? r.json() : {}),
-                        fetch(`${API}/api/activities?days=30`, { headers }).then(r => r.ok ? r.json() : [])
-                    ]);
-                    setSummary(s); setTrend(t); setActivities(a);
+                    await fetch(`${API}/api/sync`, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+                        body: JSON.stringify({ days_back: 7 }) 
+                    });
+                    setLastSync(Date.now());
                 } catch {}
-                setLoading(false);
-            };
-            
-            const sync = async () => {
-                setSyncing(true);
-                try { await fetch(`${API}/api/sync`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ days_back: 45 }) }); await fetchData(); } catch {}
-                setSyncing(false);
-            };
+                setIsRefreshing(false);
+            }, [token]);
             
             const handleAskCoach = (coach, message) => { setInitialMessage(message); setTab(coach); };
             
-            if (loading) return <Loading text="Caricamento dashboard..." />;
+            const contextValue = { token, user, setUser: onUserUpdate, lastSync, refresh, isRefreshing };
+            
+            if (!appReady) return <Loading text="Sincronizzazione Garmin..." />;
             
             const navItems = [
                 { id: 'data', icon: '📊', label: 'Home' },
@@ -1370,68 +1263,153 @@
             const mobileNav = ['data', 'stats', 'sensei', 'sakura', 'trend', 'profile'];
             
             return (
-                <div className="h-full flex flex-col lg:flex-row">
-                    {/* Desktop Sidebar */}
-                    <nav className="desktop-only sidebar w-56 flex flex-col flex-shrink-0">
-                        <div className="p-5 border-b border-[var(--border)]">
-                            <h1 className="text-lg font-bold font-display gradient-text">SENSEI</h1>
-                            <p className="text-[10px] text-[var(--text-muted)]">Performance Lab</p>
-                        </div>
-                        <div className="flex-1 p-3 space-y-1 overflow-y-auto">
-                            {navItems.map(item => (
-                                <button key={item.id} onClick={() => setTab(item.id)} className={`nav-item-desktop w-full ${tab === item.id ? `active ${item.accent || ''}` : ''}`}>
-                                    <span className="text-lg">{item.icon}</span><span className="text-sm">{item.label}</span>
-                                </button>
-                            ))}
-                        </div>
-                        <div className="p-3 border-t border-[var(--border)]">
-                            <button onClick={sync} disabled={syncing} className="nav-item-desktop w-full">
-                                <span className={`text-lg ${syncing ? 'animate-spin' : ''}`}>🔄</span><span className="text-sm">{syncing ? 'Sync...' : 'Sincronizza'}</span>
-                            </button>
-                        </div>
-                    </nav>
-                    
-                    {/* Content */}
-                    <main className="flex-1 overflow-hidden min-h-0">
-                        {tab === 'data' && <DataView token={token} summary={summary} />}
-                        {tab === 'stats' && <StatsView token={token} onAskCoach={handleAskCoach} />}
-                        {tab === 'sensei' && <ChatView token={token} coach="sensei" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
-                        {tab === 'sakura' && <ChatView token={token} coach="sakura" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
-                        {tab === 'trend' && <TrendView token={token} realAge={summary?.real_age || 42} />}
-                        {tab === 'activities' && <ActivityView token={token} activities={activities} onRefresh={fetchData} />}
-                        {tab === 'profile' && <ProfileView token={token} user={user} onUpdate={onUserUpdate} onLogout={onLogout} />}
-                    </main>
-                    
-                    {/* Mobile Bottom Navigation */}
-                    <nav className="mobile-only bottom-nav">
-                        <div className="h-full flex items-center justify-around px-1">
-                            {mobileNav.map(id => {
-                                const item = navItems.find(n => n.id === id);
-                                return (
-                                    <button key={id} onClick={() => setTab(id)} className={`nav-item-mobile ${tab === id ? `active ${item.accent || ''}` : ''}`}>
-                                        <span className="nav-icon">{item.icon}</span>
-                                        <span className="nav-label">{item.label}</span>
+                <AppContext.Provider value={contextValue}>
+                    <div className="h-full flex flex-col lg:flex-row">
+                        {/* Desktop Sidebar */}
+                        <nav className="desktop-only sidebar w-56 flex flex-col flex-shrink-0">
+                            <div className="p-5 border-b border-[var(--border)]">
+                                <h1 className="text-lg font-bold font-display gradient-text">SENSEI</h1>
+                                <div className="sync-status mt-1">
+                                    <span className={`sync-dot ${Date.now() - lastSync > 3600000 ? 'stale' : ''}`}></span>
+                                    {new Date(lastSync).toLocaleTimeString('it', { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                            </div>
+                            <div className="flex-1 p-3 space-y-1 overflow-y-auto">
+                                {navItems.map(item => (
+                                    <button key={item.id} onClick={() => setTab(item.id)} className={`nav-item-desktop w-full ${tab === item.id ? `active ${item.accent || ''}` : ''}`}>
+                                        <span className="text-lg">{item.icon}</span><span className="text-sm">{item.label}</span>
                                     </button>
-                                );
-                            })}
-                        </div>
-                    </nav>
-                </div>
+                                ))}
+                            </div>
+                            <div className="p-3 border-t border-[var(--border)]">
+                                <button onClick={refresh} disabled={isRefreshing} className="nav-item-desktop w-full">
+                                    <span className={`text-lg ${isRefreshing ? 'animate-spin' : ''}`}>🔄</span>
+                                    <span className="text-sm">{isRefreshing ? 'Sync...' : 'Sincronizza'}</span>
+                                </button>
+                            </div>
+                        </nav>
+                        
+                        {/* Content */}
+                        <main className="flex-1 overflow-hidden min-h-0">
+                            {tab === 'data' && <DataView onAskCoach={handleAskCoach} />}
+                            {tab === 'stats' && <StatsView onAskCoach={handleAskCoach} />}
+                            {tab === 'sensei' && <ChatView coach="sensei" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
+                            {tab === 'sakura' && <ChatView coach="sakura" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
+                            {tab === 'trend' && <TrendView />}
+                            {tab === 'activities' && <ActivityView />}
+                            {tab === 'profile' && <ProfileView onLogout={onLogout} />}
+                        </main>
+                        
+                        {/* Mobile Bottom Nav */}
+                        <nav className="mobile-only bottom-nav">
+                            <div className="h-full flex items-center justify-around px-1">
+                                {mobileNav.map(id => {
+                                    const item = navItems.find(n => n.id === id);
+                                    return (
+                                        <button key={id} onClick={() => setTab(id)} className={`nav-item-mobile ${tab === id ? `active ${item.accent || ''}` : ''}`}>
+                                            <span className="nav-icon">{item.icon}</span>
+                                            <span className="nav-label">{item.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </nav>
+                    </div>
+                </AppContext.Provider>
             );
         };
         
         // ==================== APP ====================
         
         const App = () => {
-            const [page, setPage] = useState('landing');
-            const [token, setToken] = useState(localStorage.getItem('token'));
-            const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
+            const [page, setPage] = useState('loading');
+            const [token, setToken] = useState(null);
+            const [user, setUser] = useState(null);
+            const [error, setError] = useState(null);
             
-            useEffect(() => { if (token && user) setPage(user.garmin_connected ? 'dashboard' : 'setup'); }, []);
+            // Robust startup
+            useEffect(() => {
+                const init = async () => {
+                    try {
+                        const storedToken = localStorage.getItem('token');
+                        const storedUser = localStorage.getItem('user');
+                        
+                        if (!storedToken || !storedUser) {
+                            setPage('landing');
+                            return;
+                        }
+                        
+                        // Verify token is valid
+                        const res = await fetch(`${API}/api/user/profile`, {
+                            headers: { 'Authorization': `Bearer ${storedToken}` }
+                        });
+                        
+                        if (res.ok) {
+                            const userData = await res.json();
+                            setToken(storedToken);
+                            setUser(userData);
+                            setPage(userData.garmin_connected ? 'dashboard' : 'setup');
+                        } else {
+                            // Token invalid, clear and go to login
+                            localStorage.removeItem('token');
+                            localStorage.removeItem('user');
+                            setPage('landing');
+                        }
+                    } catch (e) {
+                        console.error('Init error:', e);
+                        // Network error - try using stored data
+                        const storedToken = localStorage.getItem('token');
+                        const storedUser = localStorage.getItem('user');
+                        if (storedToken && storedUser) {
+                            try {
+                                setToken(storedToken);
+                                setUser(JSON.parse(storedUser));
+                                setPage('dashboard');
+                            } catch {
+                                setPage('landing');
+                            }
+                        } else {
+                            setPage('landing');
+                        }
+                    }
+                };
+                
+                // Small delay to prevent flash
+                setTimeout(init, 100);
+            }, []);
             
-            const handleLogin = (data) => { setToken(data.token); setUser(data.user); setPage(data.user.garmin_connected ? 'dashboard' : 'setup'); };
-            const handleLogout = () => { localStorage.clear(); setToken(null); setUser(null); setPage('landing'); };
-            const handleSetupComplete = () => { const u = { ...user, garmin_connected: true }; setUser(u); localStorage.setItem('user', JSON.stringify(u)); setPage('dashboard'); };
+            const handleLogin = (data) => {
+                setToken(data.token);
+                setUser(data.user);
+                setPage(data.user.garmin_connected ? 'dashboard' : 'setup');
+            };
+            
+            const handleLogout = () => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                setToken(null);
+                setUser(null);
+                setPage('landing');
+            };
+            
+            const handleSetupComplete = () => {
+                const u = { ...user, garmin_connected: true };
+                setUser(u);
+                localStorage.setItem('user', JSON.stringify(u));
+                setPage('dashboard');
+            };
+            
+            if (page === 'loading') {
+                return (
+                    <div className="h-full flex items-center justify-center bg-gradient-hero">
+                        <div className="text-center">
+                            <div className="text-5xl mb-4">🥋</div>
+                            <h1 className="text-2xl font-bold font-display gradient-text mb-2">SENSEI</h1>
+                            <div className="w-8 h-8 mx-auto border-2 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin"></div>
+                        </div>
+                    </div>
+                );
+            }
             
             return (
                 <div className="h-full">
@@ -1444,9 +1422,16 @@
             );
         };
         
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        // Mount app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
         
-        if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); }); }
+        // Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            });
+        }
     </script>
 </body>
 </html>
