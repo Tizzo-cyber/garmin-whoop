@@ -46,9 +46,9 @@ def create_app():
                 except Exception:
                     pass  # Colonna già esiste o altro errore non critico
             db.session.commit()
-            print("✅ Auto-migration completata")
+            print("[OK] Auto-migration completata")
         except Exception as e:
-            print(f⚠️ Auto-migration warning: {e}")
+            print(f"[WARN] Auto-migration warning: {e}")
     
     # ========== AUTH HELPERS ==========
     
@@ -867,7 +867,7 @@ def create_app():
                 elif key == 'zone_low':
                     suggestions.append('💚 Aggiungi cardio moderato: camminate, bici, nuoto (150 min/sett)')
                 elif key == 'zone_high':
-                    suggestions.append('❤️‍🔥 Aggiungi cardio intenso: corsa, HIIT, spinning (75 min/sett)')
+                    suggestions.append(❤️‍🔥 Aggiungi cardio intenso: corsa, HIIT, spinning (75 min/sett)')
                 elif key == 'strength':
                     suggestions.append('💪 Aggiungi allenamento forza: 2 sessioni/settimana')
                 elif key == 'steps':
