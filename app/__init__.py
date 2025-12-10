@@ -1693,17 +1693,35 @@ ANALIZZA E RISPONDI IN ITALIANO. Struttura la risposta cosi:
 
 Sii specifico, cita numeri esatti, evita generalita. Parla come uno scienziato entusiasta!"""
 
-            # Chiama GPT-5 con reasoning
+            # Chiama GPT-5 con reasoning (NO system message - reasoning models potrebbero non supportarlo)
+            full_prompt = f"""RUOLO: Sei Dr. Data, scienziato dei dati biometrici. Analizzi pattern complessi con entusiasmo scientifico, spiegando le correlazioni in modo accessibile ma rigoroso. Fai parte del Performance Lab insieme a Dr. Sensei e Dr. Sakura.
+
+{analysis_prompt}"""
+            
             response = openai_client.chat.completions.create(
                 model="gpt-5",
                 messages=[
-                    {"role": "system", "content": "Sei Dr. Data, scienziato dei dati biometrici. Analizzi pattern complessi con entusiasmo scientifico, spiegando le correlazioni in modo accessibile ma rigoroso. Fai parte del Performance Lab insieme a Dr. Sensei e Dr. Sakura."},
-                    {"role": "user", "content": analysis_prompt}
+                    {"role": "user", "content": full_prompt}
                 ],
                 max_completion_tokens=2000
             )
             
-            analysis_text = response.choices[0].message.content
+            # Debug: stampa la struttura della risposta
+            print(f"[DEBUG] GPT-5 response type: {type(response)}")
+            print(f"[DEBUG] Choices count: {len(response.choices) if response.choices else 0}")
+            
+            # Estrai il contenuto
+            analysis_text = None
+            if response.choices and len(response.choices) > 0:
+                message = response.choices[0].message
+                analysis_text = message.content
+                print(f"[DEBUG] Message content length: {len(analysis_text) if analysis_text else 0}")
+            
+            if not analysis_text:
+                return jsonify({
+                    'error': 'GPT-5 ha restituito una risposta vuota. Riprova.',
+                    'debug': str(response)[:500]
+                }), 500
             
             return jsonify({
                 'analysis': analysis_text,

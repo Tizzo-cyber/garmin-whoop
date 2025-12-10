@@ -1611,7 +1611,7 @@
                                                 </div>
                                                 <div className="prose prose-invert prose-sm max-w-none">
                                                     <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                                                        {deepAnalysis.result.analysis}
+                                                        {deepAnalysis.result.analysis || <span className="text-yellow-400">⚠️ Analisi vuota. Riprova.</span>}
                                                     </div>
                                                 </div>
                                             </div>
