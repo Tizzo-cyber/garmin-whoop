@@ -929,7 +929,7 @@ def create_app():
         # === TONO DINAMICO BASATO SU DATI ===
         recovery = context.get('recovery') or 50
         y = context.get('yesterday', {})
-        fatigue = context.get('wellness', {}).get('fatigue_today', {}).get('value', 5)
+        fatigue = context.get('wellness', {}).get('fatigue_today', 5)
         strain = y.get('strain', 10) if y else 10
         
         if recovery < 50 or fatigue >= 7:
@@ -1102,7 +1102,7 @@ Rispondi in italiano, max 300 parole. CITA SEMPRE DATI SPECIFICI!"""
         stress_avg = y.get('stress_avg', 40) if y else 40
         hrv = y.get('hrv', 40) if y else 40
         sleep_score = y.get('sleep_score', 70) if y else 70
-        mental_check = wellness.get('sakura_check', {})
+        mental_check = wellness.get('sakura_checkin', {})
         anxiety = mental_check.get('answers', {}).get('anxiety', 2)
         stress_reported = mental_check.get('answers', {}).get('stress', 2)
         
