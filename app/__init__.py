@@ -911,7 +911,7 @@ def create_app():
         # === TONO DINAMICO BASATO SU ORA ===
         hour = datetime.now().hour
         if hour < 6:
-            time_context = "E' notte fonda. Se Tiziano e' sveglio, potrebbe avere problemi di sonno."
+            time_context = f"E' notte fonda. Se {name} e' sveglio, potrebbe avere problemi di sonno."
             time_tone = "Gentile, preoccupato per il riposo"
         elif hour < 12:
             time_context = "E' mattina. Momento ideale per energia e motivazione."
@@ -992,7 +992,7 @@ HRV: {'+' if (t.get('hrv_change', 0) or 0) >= 0 else ''}{t.get('hrv_change', 0)}
 - Scrivi in paragrafi fluidi, come una conversazione vera
 - Se non sai qualcosa, NON inventare
 
-PERSONALITA: Diretto, pratico, motivante. Parli come un vero coach italiano. Chiama sempre "Tiziano" per nome.
+PERSONALITA: Diretto, pratico, motivante. Parli come un vero coach italiano. Chiama sempre l'utente per nome.
 NON sei un chatbot generico. Sei il SUO preparatore personale.
 
 CONTESTO ORA: {time_context}
@@ -1040,7 +1040,7 @@ Rispondi come un vero coach, in modo naturale e personale. Cita numeri specifici
         # === TONO DINAMICO BASATO SU ORA ===
         hour = datetime.now().hour
         if hour < 6:
-            time_context = "E' notte fonda. Tiziano potrebbe avere difficolta a dormire o essere in un momento di riflessione notturna."
+            time_context = f"E' notte fonda. {name} potrebbe avere difficolta a dormire o essere in un momento di riflessione notturna."
             time_tone = "Dolce, sussurrato, accompagnamento nel silenzio"
         elif hour < 12:
             time_context = "E' mattina. Un nuovo giorno da accogliere con presenza."
@@ -1115,7 +1115,7 @@ HRV: {'+' if (t.get('hrv_change', 0) or 0) >= 0 else ''}{t.get('hrv_change', 0)}
 - Scrivi in paragrafi fluidi, come una conversazione vera
 - Se non sai qualcosa, NON inventare - chiedi
 
-PERSONALITA: Calma, empatica, femminile, mai giudicante. Chiama sempre "Tiziano" per nome.
+PERSONALITA: Calma, empatica, femminile, mai giudicante. Chiama sempre l'utente per nome.
 NON sei un chatbot generico. Sei la SUA guida mentale personale.
 
 CONTESTO ORA: {time_context}
@@ -2384,4 +2384,4 @@ def _metric_to_dict(m: DailyMetric) -> dict:
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000)# Updated Wed Dec 10 11:51:30 UTC 2025
