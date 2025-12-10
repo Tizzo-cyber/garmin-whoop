@@ -914,6 +914,9 @@
                 if (playingAudio) return;
                 setPlayingAudio(true);
                 
+                // Rileva se è una meditazione (contiene pause)
+                const isMeditation = /\[PAUSA:\d+\]/.test(text);
+                
                 try {
                     // Parsa il testo e trova le pause
                     const pauseRegex = /\[PAUSA:(\d+)\]/g;
@@ -938,7 +941,11 @@
                         const res = await fetch(`${API}/api/tts`, { 
                             method: 'POST', 
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
-                            body: JSON.stringify({ text: text.replace(/\[PAUSA:\d+\]/g, '').replace(/\*\*/g, ''), coach }) 
+                            body: JSON.stringify({ 
+                                text: text.replace(/\[PAUSA:\d+\]/g, '').replace(/\*\*/g, ''), 
+                                coach,
+                                meditation: isMeditation 
+                            }) 
                         });
                         const data = await res.json();
                         if (data.audio) {
@@ -949,7 +956,7 @@
                         return;
                     }
                     
-                    // Riproduci segmenti con pause
+                    // Riproduci segmenti con pause (modalità meditazione)
                     const playSegment = async (index) => {
                         if (index >= segments.length) {
                             setPlayingAudio(false);
@@ -961,11 +968,15 @@
                             // Pausa silenziosa
                             setTimeout(() => playSegment(index + 1), segment.seconds * 1000);
                         } else {
-                            // Riproduci testo
+                            // Riproduci testo con voce meditazione (sussurrata)
                             const res = await fetch(`${API}/api/tts`, { 
                                 method: 'POST', 
                                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
-                                body: JSON.stringify({ text: segment.content.replace(/\*\*/g, ''), coach }) 
+                                body: JSON.stringify({ 
+                                    text: segment.content.replace(/\*\*/g, ''), 
+                                    coach,
+                                    meditation: true 
+                                }) 
                             });
                             const data = await res.json();
                             if (data.audio) {
@@ -1772,3 +1783,4 @@
     </script>
 </body>
 </html>
+<!-- Updated Wed Dec 10 11:51:30 UTC 2025 -->

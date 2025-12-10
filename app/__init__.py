@@ -2117,6 +2117,7 @@ Rispondi in italiano, in modo diretto e motivante."""
         data = request.get_json()
         text = data.get('text', '')[:2000]
         coach = data.get('coach', 'sensei')
+        is_meditation = data.get('meditation', False) or '[PAUSA:' in text
         
         if not text:
             return jsonify({'error': 'Testo vuoto'}), 400
@@ -2142,18 +2143,30 @@ Pacing: Measured, steady, natural; pause briefly after key points to let advice 
 Emotion: Encouraging and supportive; express genuine care for the listener's progress.
 Pronunciation: Clear, precise Italian articulation, natural flow.
 Pauses: Use brief pauses after important recommendations, enhancing clarity and impact."""
-        else:
+        elif coach == 'sakura' and is_meditation:
+            # MODALITÀ MEDITAZIONE - voce sussurrata, lenta, intima
             voice = 'nova'
-            instructions = """Voice Affect: Soft, gentle, soothing; embody tranquility.
+            instructions = """Voice Affect: Whispered, intimate, deeply sensual; like a lover speaking softly in your ear.
+Tone: Hypnotic, seductive, incredibly soothing; create an atmosphere of complete surrender and relaxation.
+Pacing: Extremely slow, breathy, each word savored; long pauses between phrases to let the listener melt.
+Emotion: Tender, intimate, caring; as if guiding someone precious through a dream.
+Pronunciation: Soft, breathy Italian; elongate vowels sensually, let words flow like silk.
+Breathing: Audible soft breaths between sentences, creating intimacy.
+Pauses: Long, pregnant pauses after each instruction; let silence embrace the listener.
+Style: ASMR-like whisper, gentle and mesmerizing, almost hypnotic."""
+        else:
+            # Sakura normale
+            voice = 'nova'
+            instructions = """Voice Affect: Soft, gentle, soothing; embody tranquility and warmth.
 Tone: Calm, reassuring, peaceful; convey genuine warmth and serenity.
-Pacing: Slow, deliberate, and unhurried; pause gently after instructions to allow the listener time to relax and follow along.
+Pacing: Slow, deliberate, and unhurried; pause gently after instructions.
 Emotion: Deeply soothing and comforting; express genuine kindness and care.
-Pronunciation: Smooth, soft articulation, slightly elongating vowels to create a sense of ease.
-Pauses: Use thoughtful pauses, especially between breathing instructions and visualization guidance, enhancing relaxation and mindfulness."""
+Pronunciation: Smooth, soft Italian articulation, slightly elongating vowels.
+Pauses: Use thoughtful pauses, especially between sentences, enhancing relaxation."""
         
         try:
             response = openai_client.audio.speech.create(
-                model="tts-1",
+                model="tts-1-hd" if is_meditation else "tts-1",
                 voice=voice,
                 input=clean_text,
                 instructions=instructions,
@@ -2161,7 +2174,7 @@ Pauses: Use thoughtful pauses, especially between breathing instructions and vis
             )
             
             audio_b64 = base64.b64encode(response.content).decode('utf-8')
-            return jsonify({'audio': audio_b64, 'format': 'mp3'})
+            return jsonify({'audio': audio_b64, 'format': 'mp3', 'meditation': is_meditation})
             
         except Exception as e:
             return jsonify({'error': str(e)}), 500
