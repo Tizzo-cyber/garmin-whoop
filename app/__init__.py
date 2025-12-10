@@ -1504,20 +1504,38 @@ Rispondi come una vera guida mentale, in modo naturale e personale. Max 250 paro
         if not msg:
             return jsonify({'error': 'Messaggio vuoto'}), 400
         
-        context = _build_context(current_user)
-        memories = UserMemory.query.filter_by(user_id=current_user.id, is_active=True).limit(20).all()
+        try:
+            context = _build_context(current_user)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Errore context: {str(e)}'}), 500
+        
+        try:
+            memories = UserMemory.query.filter_by(user_id=current_user.id, is_active=True).limit(20).all()
+        except Exception as e:
+            memories = []
         
         # Get history
-        if coach == 'sensei':
-            history = ChatMessage.query.filter(
-                ChatMessage.user_id == current_user.id,
-                or_(ChatMessage.coach == 'sensei', ChatMessage.coach == None)
-            ).order_by(ChatMessage.created_at.desc()).limit(10).all()
-        else:
-            history = ChatMessage.query.filter_by(user_id=current_user.id, coach=coach).order_by(ChatMessage.created_at.desc()).limit(10).all()
-        history.reverse()
+        try:
+            if coach == 'sensei':
+                history = ChatMessage.query.filter(
+                    ChatMessage.user_id == current_user.id,
+                    or_(ChatMessage.coach == 'sensei', ChatMessage.coach == None)
+                ).order_by(ChatMessage.created_at.desc()).limit(10).all()
+            else:
+                history = ChatMessage.query.filter_by(user_id=current_user.id, coach=coach).order_by(ChatMessage.created_at.desc()).limit(10).all()
+            history.reverse()
+        except Exception as e:
+            history = []
         
-        system_prompt = _get_sakura_prompt(current_user, context, memories) if coach == 'sakura' else _get_sensei_prompt(current_user, context, memories)
+        try:
+            system_prompt = _get_sakura_prompt(current_user, context, memories) if coach == 'sakura' else _get_sensei_prompt(current_user, context, memories)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Errore prompt: {str(e)}'}), 500
+        
         messages = [{"role": "system", "content": system_prompt}]
         messages += [{"role": m.role, "content": m.content} for m in history]
         messages.append({"role": "user", "content": msg})
@@ -1534,7 +1552,9 @@ Rispondi come una vera guida mentale, in modo naturale e personale. Max 250 paro
             
             return jsonify({'response': ai_clean, 'coach': coach})
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Errore AI: {str(e)}'}), 500
 
     @app.route('/api/chat/history', methods=['GET'])
     @token_required
