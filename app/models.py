@@ -1,8 +1,3 @@
-"""
-SENSEI - Models
-Version: 3.0 - With Fatigue & Weekly Check-ins
-"""
-
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from cryptography.fernet import Fernet
@@ -243,6 +238,15 @@ class UserMemory(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+
+
+
+
+
+
+
+# ==================== AGGIUNGI A models.py ====================
+# Copia queste classi nel file app/models.py
 
 class FatigueLog(db.Model):
     """Log fatica percepita giornaliera (1-10)"""
