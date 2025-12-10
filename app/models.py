@@ -285,3 +285,40 @@ class WeeklyCheck(db.Model):
         """Salva answers da dict"""
         import json
         self.answers = json.dumps(answers_dict)
+
+
+class FoodEntry(db.Model):
+    """Tracciamento pasti e nutrizione"""
+    __tablename__ = 'food_entries'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    
+    # Tipo pasto
+    meal_type = db.Column(db.String(20), nullable=False)  # breakfast, lunch, dinner, snack
+    
+    # Info cibo
+    food_name = db.Column(db.String(255), nullable=False)
+    brand = db.Column(db.String(255))
+    barcode = db.Column(db.String(50))
+    
+    # Quantità
+    serving_size = db.Column(db.Float, default=100)  # grammi o porzione
+    serving_unit = db.Column(db.String(20), default='g')  # g, ml, porzione
+    
+    # Valori nutrizionali
+    calories = db.Column(db.Integer, nullable=False)
+    protein = db.Column(db.Float)  # grammi
+    carbs = db.Column(db.Float)    # grammi
+    fat = db.Column(db.Float)      # grammi
+    fiber = db.Column(db.Float)    # grammi
+    sugar = db.Column(db.Float)    # grammi
+    
+    # Origine dati
+    source = db.Column(db.String(50))  # openfoodfacts, manual, ai_estimate
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship('User', backref=db.backref('food_entries', lazy='dynamic'))

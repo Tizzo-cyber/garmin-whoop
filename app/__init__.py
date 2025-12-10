@@ -13,9 +13,10 @@ import jwt
 import os
 
 import json
+import requests
 
 from config import Config
-from app.models import db, User, DailyMetric, Activity, SyncLog, ChatMessage, UserMemory, FatigueLog, WeeklyCheck
+from app.models import db, User, DailyMetric, Activity, SyncLog, ChatMessage, UserMemory, FatigueLog, WeeklyCheck, FoodEntry
 from app.garmin_sync import GarminSyncService
 
 
@@ -2461,6 +2462,242 @@ Pauses: Use thoughtful pauses, especially between sentences, enhancing relaxatio
             'mental_score': scores.get('sakura'),
             'readiness': readiness,
             'recommendation': recommendation
+        })
+    
+    # ========== FOOD TRACKING ==========
+    
+    @app.route('/api/food/search', methods=['GET'])
+    @token_required
+    def search_food(current_user):
+        """Cerca cibo in Open Food Facts o stima con AI"""
+        query = request.args.get('q', '').strip()
+        if not query or len(query) < 2:
+            return jsonify({'results': []})
+        
+        results = []
+        
+        # 1. Cerca in Open Food Facts
+        try:
+            off_url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&search_simple=1&action=process&json=1&page_size=10&fields=product_name,brands,code,nutriments,serving_size"
+            resp = requests.get(off_url, timeout=5, headers={'User-Agent': 'SENSEI-App/1.0'})
+            if resp.status_code == 200:
+                data = resp.json()
+                for p in data.get('products', [])[:8]:
+                    n = p.get('nutriments', {})
+                    if p.get('product_name') and n.get('energy-kcal_100g'):
+                        results.append({
+                            'name': p.get('product_name', ''),
+                            'brand': p.get('brands', ''),
+                            'barcode': p.get('code', ''),
+                            'calories': round(n.get('energy-kcal_100g', 0)),
+                            'protein': round(n.get('proteins_100g', 0), 1),
+                            'carbs': round(n.get('carbohydrates_100g', 0), 1),
+                            'fat': round(n.get('fat_100g', 0), 1),
+                            'fiber': round(n.get('fiber_100g', 0), 1) if n.get('fiber_100g') else None,
+                            'sugar': round(n.get('sugars_100g', 0), 1) if n.get('sugars_100g') else None,
+                            'serving_size': 100,
+                            'serving_unit': 'g',
+                            'source': 'openfoodfacts'
+                        })
+        except Exception as e:
+            print(f"Open Food Facts error: {e}")
+        
+        # 2. Se non trova nulla, stima con AI
+        if not results and openai_client:
+            try:
+                prompt = f"""Stima i valori nutrizionali per 100g di "{query}" (cibo italiano).
+Rispondi SOLO con JSON, niente altro:
+{{"name": "nome cibo", "calories": numero, "protein": numero, "carbs": numero, "fat": numero}}"""
+                
+                resp = openai_client.chat.completions.create(
+                    model="gpt-4.1",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=150,
+                    temperature=0.3
+                )
+                ai_text = resp.choices[0].message.content.strip()
+                # Estrai JSON
+                import re
+                json_match = re.search(r'\{[^}]+\}', ai_text)
+                if json_match:
+                    ai_data = json.loads(json_match.group())
+                    results.append({
+                        'name': ai_data.get('name', query),
+                        'brand': '',
+                        'barcode': '',
+                        'calories': ai_data.get('calories', 0),
+                        'protein': ai_data.get('protein', 0),
+                        'carbs': ai_data.get('carbs', 0),
+                        'fat': ai_data.get('fat', 0),
+                        'fiber': None,
+                        'sugar': None,
+                        'serving_size': 100,
+                        'serving_unit': 'g',
+                        'source': 'ai_estimate'
+                    })
+            except Exception as e:
+                print(f"AI estimate error: {e}")
+        
+        return jsonify({'results': results})
+    
+    @app.route('/api/food', methods=['POST'])
+    @token_required
+    def add_food_entry(current_user):
+        """Aggiungi pasto"""
+        data = request.get_json()
+        
+        food_name = data.get('food_name', '').strip()
+        calories = data.get('calories')
+        meal_type = data.get('meal_type', 'snack')
+        
+        if not food_name or not calories:
+            return jsonify({'error': 'Nome e calorie richiesti'}), 400
+        
+        entry_date = date.today()
+        if data.get('date'):
+            try:
+                entry_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+            except:
+                pass
+        
+        entry = FoodEntry(
+            user_id=current_user.id,
+            date=entry_date,
+            meal_type=meal_type,
+            food_name=food_name,
+            brand=data.get('brand'),
+            barcode=data.get('barcode'),
+            serving_size=data.get('serving_size', 100),
+            serving_unit=data.get('serving_unit', 'g'),
+            calories=calories,
+            protein=data.get('protein'),
+            carbs=data.get('carbs'),
+            fat=data.get('fat'),
+            fiber=data.get('fiber'),
+            sugar=data.get('sugar'),
+            source=data.get('source', 'manual')
+        )
+        
+        db.session.add(entry)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'id': entry.id,
+            'food_name': entry.food_name,
+            'calories': entry.calories
+        })
+    
+    @app.route('/api/food', methods=['GET'])
+    @token_required
+    def get_food_entries(current_user):
+        """Lista pasti per data"""
+        date_str = request.args.get('date')
+        if date_str:
+            try:
+                query_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except:
+                query_date = date.today()
+        else:
+            query_date = date.today()
+        
+        entries = FoodEntry.query.filter_by(
+            user_id=current_user.id,
+            date=query_date
+        ).order_by(FoodEntry.created_at).all()
+        
+        return jsonify({
+            'date': query_date.isoformat(),
+            'entries': [{
+                'id': e.id,
+                'meal_type': e.meal_type,
+                'food_name': e.food_name,
+                'brand': e.brand,
+                'serving_size': e.serving_size,
+                'serving_unit': e.serving_unit,
+                'calories': e.calories,
+                'protein': e.protein,
+                'carbs': e.carbs,
+                'fat': e.fat,
+                'source': e.source
+            } for e in entries]
+        })
+    
+    @app.route('/api/food/<int:entry_id>', methods=['DELETE'])
+    @token_required
+    def delete_food_entry(current_user, entry_id):
+        """Elimina pasto"""
+        entry = FoodEntry.query.filter_by(id=entry_id, user_id=current_user.id).first()
+        if not entry:
+            return jsonify({'error': 'Entry non trovata'}), 404
+        
+        db.session.delete(entry)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    
+    @app.route('/api/food/summary', methods=['GET'])
+    @token_required
+    def get_food_summary(current_user):
+        """Sommario nutrizione giornaliero con confronto Garmin"""
+        date_str = request.args.get('date')
+        if date_str:
+            try:
+                query_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except:
+                query_date = date.today()
+        else:
+            query_date = date.today()
+        
+        entries = FoodEntry.query.filter_by(
+            user_id=current_user.id,
+            date=query_date
+        ).all()
+        
+        # Totali nutrizione
+        total_calories = sum(e.calories or 0 for e in entries)
+        total_protein = sum(e.protein or 0 for e in entries)
+        total_carbs = sum(e.carbs or 0 for e in entries)
+        total_fat = sum(e.fat or 0 for e in entries)
+        
+        # Calorie bruciate da Garmin
+        metric = DailyMetric.query.filter_by(
+            user_id=current_user.id,
+            date=query_date
+        ).first()
+        
+        calories_burned = metric.total_calories if metric else None
+        active_calories = metric.active_calories if metric else None
+        
+        # Bilancio calorico
+        balance = None
+        if calories_burned and total_calories:
+            balance = calories_burned - total_calories
+        
+        # Breakdown per pasto
+        by_meal = {}
+        for e in entries:
+            meal = e.meal_type
+            if meal not in by_meal:
+                by_meal[meal] = {'calories': 0, 'items': 0}
+            by_meal[meal]['calories'] += e.calories or 0
+            by_meal[meal]['items'] += 1
+        
+        return jsonify({
+            'date': query_date.isoformat(),
+            'nutrition': {
+                'calories': total_calories,
+                'protein': round(total_protein, 1),
+                'carbs': round(total_carbs, 1),
+                'fat': round(total_fat, 1)
+            },
+            'garmin': {
+                'total_calories': calories_burned,
+                'active_calories': active_calories
+            },
+            'balance': balance,
+            'by_meal': by_meal,
+            'entries_count': len(entries)
         })
     
     return app
