@@ -993,8 +993,15 @@ DETTAGLIO:
 ══════════════════════════════════════
 {memories_text}
 
+══════════════════════════════════════
+     SENSAZIONI RIPORTATE
+══════════════════════════════════════
+{_format_sensei_wellness(context.get('wellness', {}))}
+
 FOCUS: Allenamento, performance, recupero, prevenzione infortuni, nutrizione sportiva, analisi dati.
 REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: injury, goal, training, nutrition, performance
+
+IMPORTANTE: Se l'utente ha riportato fatica alta o dolori muscolari, ADATTA i consigli di conseguenza!
 Rispondi in italiano, max 300 parole. USA I DATI SPECIFICI nelle risposte!"""
 
     def _get_sakura_prompt(user, context, memories):
@@ -1100,6 +1107,11 @@ ATTIVITÀ E BENESSERE MENTALE:
 - Alto strain + poco sonno = recupero insufficiente
 - Yoga/meditation nel calendario = buona cura di sé
 
+══════════════════════════════════════
+     SENSAZIONI RIPORTATE
+══════════════════════════════════════
+{_format_sakura_wellness(context.get('wellness', {}))}
+
 ═══ MODALITÀ MEDITAZIONE GUIDATA ═══
 Quando l'utente chiede una meditazione, respirazione guidata, o rilassamento:
 - IMPORTANTE: Usa ESATTAMENTE questo formato per le pause: [PAUSA:XX] dove XX sono i secondi
@@ -1116,7 +1128,141 @@ ESEMPIO SBAGLIATO (non fare così):
 
 FOCUS: Benessere mentale, gestione stress, mindfulness, equilibrio vita-sport, motivazione, crescita personale.
 REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: emotion, stress, mindset, relationship, sleep_mental, life_balance
+
+IMPORTANTE: Se l'utente ha riportato stress o ansia elevati, sii particolarmente empatica e gentile!
 Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I DATI SPECIFICI nelle risposte!"""
+
+    def _fatigue_label(value):
+        """Converte valore fatica in etichetta"""
+        if value <= 2: return "fresco"
+        elif value <= 4: return "leggera fatica"
+        elif value <= 6: return "fatica moderata"
+        elif value <= 8: return "fatica alta"
+        else: return "fatica estrema"
+
+    def _format_sensei_wellness(w):
+        """Formatta dati wellness per prompt Sensei"""
+        if not w:
+            return "Nessun dato riportato dall'utente"
+        
+        lines = []
+        
+        if w.get('fatigue_today'):
+            lines.append(f"FATICA PERCEPITA OGGI: {w['fatigue_today']}/10 ({w.get('fatigue_today_label', '')})")
+        
+        if w.get('fatigue_week_avg'):
+            lines.append(f"Media settimanale: {w['fatigue_week_avg']}/10")
+            if w.get('fatigue_days_high', 0) > 0:
+                lines.append(f"[!] Giorni con fatica alta (>=7): {w['fatigue_days_high']}")
+        
+        if w.get('sensei_checkin'):
+            checkin = w['sensei_checkin']
+            if checkin.get('is_recent'):
+                lines.append(f"\nCHECK-IN FISICO (compilato {checkin['days_ago']} giorni fa):")
+                labels = {
+                    'energy': ('Energia', False),
+                    'soreness': ('Dolori muscolari', True),
+                    'performance': ('Performance', False),
+                    'recovery': ('Recupero percepito', False),
+                    'motivation': ('Motivazione', False),
+                    'sleep_quality': ('Qualita sonno', False)
+                }
+                for key, (label, inverted) in labels.items():
+                    if key in checkin['answers']:
+                        val = checkin['answers'][key]
+                        if inverted:
+                            desc = ['nessuno', 'minimo', 'moderato', 'alto', 'estremo'][val-1]
+                        else:
+                            desc = ['pessimo', 'scarso', 'normale', 'buono', 'ottimo'][val-1]
+                        lines.append(f"   - {label}: {val}/5 ({desc})")
+        
+        return "\n".join(lines) if lines else "Nessun dato riportato"
+    
+    def _format_sakura_wellness(w):
+        """Formatta dati wellness per prompt Sakura"""
+        if not w:
+            return "Nessun dato riportato dall'utente"
+        
+        lines = []
+        
+        if w.get('fatigue_today'):
+            lines.append(f"Fatica fisica oggi: {w['fatigue_today']}/10 ({w.get('fatigue_today_label', '')})")
+        
+        if w.get('sakura_checkin'):
+            checkin = w['sakura_checkin']
+            if checkin.get('is_recent'):
+                lines.append(f"\nCHECK-IN MENTALE (compilato {checkin['days_ago']} giorni fa):")
+                labels = {
+                    'mood': ('Umore', False),
+                    'stress': ('Stress mentale', True),
+                    'anxiety': ('Ansia', True),
+                    'focus': ('Concentrazione', False),
+                    'social': ('Vita sociale', False),
+                    'balance': ('Work-life balance', False)
+                }
+                for key, (label, inverted) in labels.items():
+                    if key in checkin['answers']:
+                        val = checkin['answers'][key]
+                        if inverted:
+                            desc = ['nessuno', 'minimo', 'moderato', 'alto', 'estremo'][val-1]
+                        else:
+                            desc = ['pessimo', 'scarso', 'normale', 'buono', 'ottimo'][val-1]
+                        lines.append(f"   - {label}: {val}/5 ({desc})")
+        
+        return "\n".join(lines) if lines else "Nessun dato riportato"
+
+    def _get_wellness_context(user_id):
+        """Costruisce contesto wellness (fatica e check-in) per i coach AI"""
+        today_date = date.today()
+        wellness = {}
+        
+        # Fatica percepita oggi
+        fatigue_today = FatigueLog.query.filter_by(user_id=user_id, date=today_date).first()
+        if fatigue_today:
+            wellness['fatigue_today'] = fatigue_today.value
+            wellness['fatigue_today_label'] = _fatigue_label(fatigue_today.value)
+        
+        # Ultimi 7 giorni di fatica
+        week_start = today_date - timedelta(days=7)
+        recent_fatigue = FatigueLog.query.filter(
+            FatigueLog.user_id == user_id,
+            FatigueLog.date >= week_start
+        ).all()
+        
+        if recent_fatigue:
+            values = [f.value for f in recent_fatigue]
+            wellness['fatigue_week_avg'] = round(sum(values) / len(values), 1)
+            wellness['fatigue_week_max'] = max(values)
+            wellness['fatigue_days_high'] = len([v for v in values if v >= 7])
+        
+        # Check-in settimanali
+        for coach in ['sensei', 'sakura']:
+            check = WeeklyCheck.query.filter_by(
+                user_id=user_id,
+                coach=coach
+            ).order_by(WeeklyCheck.created_at.desc()).first()
+            
+            if check:
+                answers = json.loads(check.answers)
+                days_ago = (datetime.utcnow() - check.created_at).days if check.created_at else 999
+                
+                wellness[f'{coach}_checkin'] = {
+                    'answers': answers,
+                    'days_ago': days_ago,
+                    'is_recent': days_ago <= 7
+                }
+                
+                # Calcola score medio (invertendo domande negative)
+                inverted = {'sensei': ['soreness'], 'sakura': ['stress', 'anxiety']}
+                total = 0
+                for key, val in answers.items():
+                    if key in inverted.get(coach, []):
+                        total += (6 - val)
+                    else:
+                        total += val
+                wellness[f'{coach}_score'] = round(total / len(answers), 1) if answers else None
+        
+        return wellness
 
     def _build_context(user):
         """Costruisce contesto COMPLETO per i coach AI"""
@@ -1307,6 +1453,11 @@ Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I
                 'total_distance_km': round(sum([a.distance_meters/1000 for a in activities if a.distance_meters]), 1),
                 'avg_strain': avg([a.strain_score for a in activities]),
             }
+        
+        # Aggiungi dati wellness (fatica e check-in)
+        wellness = _get_wellness_context(user.id)
+        if wellness:
+            context['wellness'] = wellness
         
         return context
 
