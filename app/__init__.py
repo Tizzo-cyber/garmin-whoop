@@ -41,6 +41,11 @@ def create_app():
                 "ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS race_time_10k INTEGER",
                 "ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS race_time_half INTEGER",
                 "ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS race_time_marathon INTEGER",
+                # User nutrition goals
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS calorie_goal INTEGER DEFAULT 2000",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS protein_goal INTEGER DEFAULT 120",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS carbs_goal INTEGER DEFAULT 250",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS fat_goal INTEGER DEFAULT 70",
             ]
             for sql in migrations:
                 try:
@@ -2943,4 +2948,4 @@ def _metric_to_dict(m: DailyMetric) -> dict:
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)# 
+    app.run(debug=True, port=5000)# Updated Wed Dec 10 11:51:30 UTC 2025
