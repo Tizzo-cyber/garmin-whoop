@@ -33,6 +33,12 @@ class User(db.Model):
     last_sync = db.Column(db.DateTime)
     sync_enabled = db.Column(db.Boolean, default=True)
     
+    # Obiettivi nutrizione
+    calorie_goal = db.Column(db.Integer, default=2000)
+    protein_goal = db.Column(db.Integer, default=120)  # grammi
+    carbs_goal = db.Column(db.Integer, default=250)    # grammi
+    fat_goal = db.Column(db.Integer, default=70)       # grammi
+    
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

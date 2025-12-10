@@ -2700,6 +2700,148 @@ Rispondi SOLO con JSON, niente altro:
             'entries_count': len(entries)
         })
     
+    @app.route('/api/food/goals', methods=['GET'])
+    @token_required
+    def get_food_goals(current_user):
+        """Ottieni obiettivi nutrizionali"""
+        return jsonify({
+            'calorie_goal': current_user.calorie_goal or 2000,
+            'protein_goal': current_user.protein_goal or 120,
+            'carbs_goal': current_user.carbs_goal or 250,
+            'fat_goal': current_user.fat_goal or 70
+        })
+    
+    @app.route('/api/food/goals', methods=['POST'])
+    @token_required
+    def set_food_goals(current_user):
+        """Imposta obiettivi nutrizionali"""
+        data = request.get_json()
+        
+        if 'calorie_goal' in data:
+            current_user.calorie_goal = int(data['calorie_goal'])
+        if 'protein_goal' in data:
+            current_user.protein_goal = int(data['protein_goal'])
+        if 'carbs_goal' in data:
+            current_user.carbs_goal = int(data['carbs_goal'])
+        if 'fat_goal' in data:
+            current_user.fat_goal = int(data['fat_goal'])
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'calorie_goal': current_user.calorie_goal,
+            'protein_goal': current_user.protein_goal,
+            'carbs_goal': current_user.carbs_goal,
+            'fat_goal': current_user.fat_goal
+        })
+    
+    @app.route('/api/food/trend', methods=['GET'])
+    @token_required
+    def get_food_trend(current_user):
+        """Trend calorie ultimi N giorni"""
+        days = request.args.get('days', 7, type=int)
+        end_date = date.today()
+        start_date = end_date - timedelta(days=days-1)
+        
+        # Query tutti i food entries nel range
+        entries = FoodEntry.query.filter(
+            FoodEntry.user_id == current_user.id,
+            FoodEntry.date >= start_date,
+            FoodEntry.date <= end_date
+        ).all()
+        
+        # Query metriche Garmin per calorie bruciate
+        metrics = DailyMetric.query.filter(
+            DailyMetric.user_id == current_user.id,
+            DailyMetric.date >= start_date,
+            DailyMetric.date <= end_date
+        ).all()
+        
+        metrics_by_date = {m.date: m for m in metrics}
+        
+        # Raggruppa per giorno
+        daily_data = {}
+        for e in entries:
+            d = e.date.isoformat()
+            if d not in daily_data:
+                daily_data[d] = {'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0}
+            daily_data[d]['calories'] += e.calories or 0
+            daily_data[d]['protein'] += e.protein or 0
+            daily_data[d]['carbs'] += e.carbs or 0
+            daily_data[d]['fat'] += e.fat or 0
+        
+        # Costruisci array per ogni giorno
+        trend = []
+        current = start_date
+        while current <= end_date:
+            d = current.isoformat()
+            metric = metrics_by_date.get(current)
+            consumed = daily_data.get(d, {})
+            
+            trend.append({
+                'date': d,
+                'day': current.strftime('%a'),
+                'consumed': consumed.get('calories', 0),
+                'burned': metric.total_calories if metric else None,
+                'protein': round(consumed.get('protein', 0), 1),
+                'carbs': round(consumed.get('carbs', 0), 1),
+                'fat': round(consumed.get('fat', 0), 1),
+                'balance': (metric.total_calories - consumed.get('calories', 0)) if metric and consumed.get('calories') else None
+            })
+            current += timedelta(days=1)
+        
+        # Calcola medie
+        days_with_data = [t for t in trend if t['consumed'] > 0]
+        avg_consumed = round(sum(t['consumed'] for t in days_with_data) / len(days_with_data)) if days_with_data else 0
+        avg_burned = round(sum(t['burned'] for t in trend if t['burned']) / len([t for t in trend if t['burned']])) if any(t['burned'] for t in trend) else None
+        
+        return jsonify({
+            'trend': trend,
+            'summary': {
+                'avg_consumed': avg_consumed,
+                'avg_burned': avg_burned,
+                'days_tracked': len(days_with_data),
+                'total_days': days
+            },
+            'goal': current_user.calorie_goal or 2000
+        })
+    
+    @app.route('/api/food/history', methods=['GET'])
+    @token_required
+    def get_food_history(current_user):
+        """Storico pasti per un range di date"""
+        days = request.args.get('days', 7, type=int)
+        end_date = date.today()
+        start_date = end_date - timedelta(days=days-1)
+        
+        entries = FoodEntry.query.filter(
+            FoodEntry.user_id == current_user.id,
+            FoodEntry.date >= start_date,
+            FoodEntry.date <= end_date
+        ).order_by(FoodEntry.date.desc(), FoodEntry.created_at).all()
+        
+        # Raggruppa per data
+        by_date = {}
+        for e in entries:
+            d = e.date.isoformat()
+            if d not in by_date:
+                by_date[d] = []
+            by_date[d].append({
+                'id': e.id,
+                'meal_type': e.meal_type,
+                'food_name': e.food_name,
+                'calories': e.calories,
+                'protein': e.protein,
+                'carbs': e.carbs,
+                'fat': e.fat
+            })
+        
+        return jsonify({
+            'history': by_date,
+            'dates': sorted(by_date.keys(), reverse=True)
+        })
+    
     return app
 
 
