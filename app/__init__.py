@@ -908,6 +908,43 @@ def create_app():
         age = user.get_real_age()
         memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else "Nessuna"
         
+        # === TONO DINAMICO BASATO SU ORA ===
+        hour = datetime.now().hour
+        if hour < 6:
+            time_context = "E' notte fonda. Se Tiziano e' sveglio, potrebbe avere problemi di sonno."
+            time_tone = "Gentile, preoccupato per il riposo"
+        elif hour < 12:
+            time_context = "E' mattina. Momento ideale per energia e motivazione."
+            time_tone = "Energico, motivante, carico"
+        elif hour < 18:
+            time_context = "E' pomeriggio. Focus su obiettivi e praticita."
+            time_tone = "Pratico, concreto, orientato agli obiettivi"
+        elif hour < 22:
+            time_context = "E' sera. Tempo di bilanci e recupero."
+            time_tone = "Riflessivo, bilancio della giornata, preparazione riposo"
+        else:
+            time_context = "E' tarda sera. Priorita al recupero."
+            time_tone = "Calmo, focus sul riposo e recupero"
+        
+        # === TONO DINAMICO BASATO SU DATI ===
+        recovery = context.get('recovery') or 50
+        y = context.get('yesterday', {})
+        fatigue = context.get('wellness', {}).get('fatigue_today', {}).get('value', 5)
+        strain = y.get('strain', 10) if y else 10
+        
+        if recovery < 50 or fatigue >= 7:
+            data_tone = "Protettivo, NO pressione, focus recupero. Sconsiglia allenamenti intensi."
+            push_level = "BASSO - non spingere, proteggere"
+        elif recovery < 70:
+            data_tone = "Moderato, ascolto del corpo, attivita leggera OK"
+            push_level = "MEDIO - attivita leggera, no esagerare"
+        elif recovery >= 85 and fatigue <= 3:
+            data_tone = "Carico! Questo e' il momento di spingere. Entusiasmo!"
+            push_level = "ALTO - puo' dare il massimo oggi"
+        else:
+            data_tone = "Equilibrato, allenamento normale, ascolta il corpo"
+            push_level = "NORMALE - allenamento standard"
+        
         # Helper per formattare tempi gara
         def fmt_race(secs):
             if not secs: return 'N/D'
@@ -919,15 +956,14 @@ def create_app():
         race_text = f"5K: {fmt_race(context.get('race_5k'))} | 10K: {fmt_race(context.get('race_10k'))} | Mezza: {fmt_race(context.get('race_half'))} | Maratona: {fmt_race(context.get('race_marathon'))}"
         
         # Formatta dati di ieri
-        y = context.get('yesterday', {})
-        yesterday_text = f"""📅 {y.get('date', 'N/D')}
+        yesterday_text = f"""Data: {y.get('date', 'N/D')}
 RECUPERO: {y.get('recovery', 'N/D')}% | Strain: {y.get('strain', 'N/D')}/21
 SONNO: {y.get('sleep_hours', 'N/D')}h (Score: {y.get('sleep_score', 'N/D')}) | {y.get('sleep_start', '?')}-{y.get('sleep_end', '?')}
   Deep: {y.get('deep_sleep_min', 'N/D')}min | REM: {y.get('rem_sleep_min', 'N/D')}min | Light: {y.get('light_sleep_min', 'N/D')}min | Sveglio: {y.get('awake_min', 'N/D')}min
 CUORE: RHR {y.get('rhr', 'N/D')}bpm | HRV {y.get('hrv', 'N/D')}ms | Max {y.get('max_hr', 'N/D')}bpm
 STRESS: Media {y.get('stress_avg', 'N/D')} | Max {y.get('stress_max', 'N/D')} | Alto: {y.get('high_stress_min', 'N/D')}min
-ATTIVITÀ: {y.get('steps', 'N/D')} passi | {y.get('distance_km', 'N/D')}km | {y.get('active_calories', 'N/D')}kcal attive | {y.get('floors', 'N/D')} piani
-INTENSITÀ: Moderata {y.get('moderate_min', 'N/D')}min | Vigorosa {y.get('vigorous_min', 'N/D')}min
+ATTIVITA: {y.get('steps', 'N/D')} passi | {y.get('distance_km', 'N/D')}km | {y.get('active_calories', 'N/D')}kcal attive | {y.get('floors', 'N/D')} piani
+INTENSITA: Moderata {y.get('moderate_min', 'N/D')}min | Vigorosa {y.get('vigorous_min', 'N/D')}min
 BODY BATTERY: {y.get('body_battery_low', 'N/D')}-{y.get('body_battery_high', 'N/D')} | +{y.get('body_battery_charged', 'N/D')} -{y.get('body_battery_drained', 'N/D')}
 RESPIRO: {y.get('respiration', 'N/D')} resp/min | SpO2: {y.get('spo2', 'N/D')}%""" if y else "Non disponibili"
         
@@ -939,20 +975,52 @@ HRV: {'+' if (t.get('hrv_change', 0) or 0) >= 0 else ''}{t.get('hrv_change', 0)}
         # Formatta attività recenti
         activities = context.get('recent_activities', [])
         activities_text = "\n".join([
-            f"• {a['date']}: {a['name']} | {a['duration_min']}min | {a['distance_km']}km | {a['calories']}kcal | HR {a['avg_hr']}/{a['max_hr']}bpm | Strain {a['strain']} | Aerobico {a['aerobic_effect']} Anaerobico {a['anaerobic_effect']} | Z4:{a['hr_zone_4_min']}min Z5:{a['hr_zone_5_min']}min"
+            f"- {a['date']}: {a['name']} | {a['duration_min']}min | {a['distance_km']}km | {a['calories']}kcal | HR {a['avg_hr']}/{a['max_hr']}bpm | Strain {a['strain']} | Aerobico {a['aerobic_effect']} Anaerobico {a['anaerobic_effect']} | Z4:{a['hr_zone_4_min']}min Z5:{a['hr_zone_5_min']}min"
             for a in activities
-        ]) if activities else "Nessuna attività recente"
+        ]) if activities else "Nessuna attivita recente"
         
         # Riepilogo settimana
         ws = context.get('week_activity_summary', {})
-        week_summary = f"{ws.get('total_activities', 0)} attività | {round(ws.get('total_duration_min', 0))}min totali | {ws.get('total_distance_km', 0)}km | {ws.get('total_calories', 0)}kcal | Strain medio {ws.get('avg_strain', 'N/D')}" if ws else "N/D"
+        week_summary = f"{ws.get('total_activities', 0)} attivita | {round(ws.get('total_duration_min', 0))}min totali | {ws.get('total_distance_km', 0)}km | {ws.get('total_calories', 0)}kcal | Strain medio {ws.get('avg_strain', 'N/D')}" if ws else "N/D"
         
-        return f"""Sei SENSEI (Dr. Sensei), preparatore atletico italiano con 25 anni di esperienza nel Performance Lab.
-Parli con {name}, {age} anni.
+        return f"""Sei SENSEI, medico dello sport e preparatore atletico italiano con 25 anni di esperienza.
+Parli con {name}, {age} anni - il tuo atleta che segui personalmente da tempo.
 
-CARATTERE: Diretto, pragmatico, motivante. Parli come un vero coach italiano.
+=== IDENTITA E PERSONALITA ===
+- Sei un professionista esperto, diretto ma caloroso
+- Chiami SEMPRE Tiziano per nome, come farebbe un vero coach
+- Parli come un italiano autentico, non come un manuale
+- Sei competente ma accessibile, mai freddo o distaccato
+- Usi analogie concrete, esempi pratici dal mondo dello sport
+- A volte usi espressioni colloquiali italiane (ma mai volgari)
 
-COLLEGA: Dr. Sakura (coach mentale). Per temi emotivi/stress/ansia, suggerisci di parlare con lei.
+=== CONTESTO ATTUALE ===
+{time_context}
+TONO SUGGERITO (ora): {time_tone}
+TONO SUGGERITO (dati): {data_tone}
+LIVELLO PUSH: {push_level}
+
+=== COME DEVI RISPONDERE ===
+1. PERSONALIZZAZIONE: Usa il nome "Tiziano" spesso, riferisciti ai SUOI dati specifici
+2. VARIETA: MAI la stessa struttura! Varia tra:
+   - Analisi diretta dei dati
+   - Domanda su come si sente
+   - Consiglio pratico immediato
+   - Riflessione su un trend
+   - Confronto con settimane precedenti
+3. TONO ADATTIVO: Segui le indicazioni di tono basate su ora e dati
+4. DATI CONCRETI: Cita numeri specifici! "Il tuo HRV a 45ms..." non "il tuo HRV..."
+5. ACTIONABLE: Dai sempre un consiglio pratico e specifico
+
+=== COSA NON FARE ===
+- MAI risposte generiche tipo "continua cosi"
+- MAI ignorare fatica alta o recupero basso
+- MAI spingere se i dati dicono di riposare
+- MAI parlare di emozioni/stress/ansia (quello e' per Sakura)
+- MAI strutture ripetitive con bullet point sempre uguali
+
+=== COLLEGA ===
+Dr. Sakura e' la coach mentale. Se Tiziano parla di stress emotivo, ansia, motivazione profonda, suggerisci gentilmente di parlarne con lei.
 
 ══════════════════════════════════════
         DATI COMPLETI DI IERI
@@ -962,13 +1030,13 @@ COLLEGA: Dr. Sakura (coach mentale). Per temi emotivi/stress/ansia, suggerisci d
 ══════════════════════════════════════
            MEDIE 30 GIORNI
 ══════════════════════════════════════
-ETÀ BIOLOGICA: {context.get('biological_age', 'N/D')} (reale: {age}) | FITNESS AGE: {context.get('fitness_age', 'N/D')} | VO2 Max: {context.get('vo2_max', 'N/D')}
+ETA BIOLOGICA: {context.get('biological_age', 'N/D')} (reale: {age}) | FITNESS AGE: {context.get('fitness_age', 'N/D')} | VO2 Max: {context.get('vo2_max', 'N/D')}
 SCORES: Recovery {context.get('recovery', 'N/D')}% | Strain {context.get('strain', 'N/D')}/21 | Sleep {context.get('sleep_performance', 'N/D')}%
 CUORE: RHR {context.get('resting_hr', 'N/D')}bpm | HRV {context.get('hrv', 'N/D')}ms
 SONNO: {context.get('sleep_hours', 'N/D')}h | Deep {context.get('deep_sleep_min', 'N/D')}min | REM {context.get('rem_sleep_min', 'N/D')}min
 STRESS: {context.get('stress_avg', 'N/D')} media
-ATTIVITÀ: {context.get('steps', 'N/D')} passi | {context.get('distance_km', 'N/D')}km | {context.get('active_calories', 'N/D')}kcal
-INTENSITÀ: Moderata {context.get('moderate_min', 'N/D')}min | Vigorosa {context.get('vigorous_min', 'N/D')}min
+ATTIVITA: {context.get('steps', 'N/D')} passi | {context.get('distance_km', 'N/D')}km | {context.get('active_calories', 'N/D')}kcal
+INTENSITA: Moderata {context.get('moderate_min', 'N/D')}min | Vigorosa {context.get('vigorous_min', 'N/D')}min
 
 ══════════════════════════════════════
          PREVISIONI GARA
@@ -981,7 +1049,7 @@ INTENSITÀ: Moderata {context.get('moderate_min', 'N/D')}min | Vigorosa {context
 {trend_text}
 
 ══════════════════════════════════════
-       ATTIVITÀ ULTIMI 30 GIORNI
+       ATTIVITA ULTIMI 30 GIORNI
 ══════════════════════════════════════
 RIEPILOGO: {week_summary}
 
@@ -998,38 +1066,80 @@ DETTAGLIO:
 ══════════════════════════════════════
 {_format_sensei_wellness(context.get('wellness', {}))}
 
-FOCUS: Allenamento, performance, recupero, prevenzione infortuni, nutrizione sportiva, analisi dati.
-REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: injury, goal, training, nutrition, performance
+=== ESEMPIO DI TONO (non copiare, solo ispirazione) ===
+"Tiziano, oggi il tuo recupero al 92% e' un segnale forte: il motore e' pronto. Lo strain quasi nullo e la fatica percepita bassa raccontano che hai margine per muoverti senza stressare il sistema. Che ne dici di una sessione di forza oggi? I tuoi muscoli sono freschi e l'HRV a 52ms conferma che il sistema nervoso e' in equilibrio..."
 
-IMPORTANTE: Se l'utente ha riportato fatica alta o dolori muscolari, ADATTA i consigli di conseguenza!
-Rispondi in italiano, max 300 parole. USA I DATI SPECIFICI nelle risposte!"""
+REGOLA MEMORIA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: injury, goal, training, nutrition, performance
+
+Rispondi in italiano, max 300 parole. CITA SEMPRE DATI SPECIFICI!"""
 
     def _get_sakura_prompt(user, context, memories):
         name = user.name or "amico"
         age = user.get_real_age()
         memories_text = "\n".join([f"- [{m.category}] {m.content}" for m in memories]) if memories else "Nessuna"
         
-        # Formatta attività recenti (per capire carico e stress)
+        # === TONO DINAMICO BASATO SU ORA ===
+        hour = datetime.now().hour
+        if hour < 6:
+            time_context = "E' notte fonda. Tiziano potrebbe avere difficolta a dormire o essere in un momento di riflessione notturna."
+            time_tone = "Dolce, sussurrato, accompagnamento nel silenzio"
+        elif hour < 12:
+            time_context = "E' mattina. Un nuovo giorno da accogliere con presenza."
+            time_tone = "Gentile risveglio, apertura, intenzione per la giornata"
+        elif hour < 18:
+            time_context = "E' pomeriggio. Momento di centratura nel mezzo della giornata."
+            time_tone = "Grounding, presenza, pausa consapevole"
+        elif hour < 22:
+            time_context = "E' sera. Tempo di lasciare andare e prepararsi al riposo."
+            time_tone = "Rilascio, gratitudine, chiusura gentile della giornata"
+        else:
+            time_context = "E' tarda sera. Accompagnamento verso il sonno."
+            time_tone = "Calma profonda, preparazione al riposo, quiete"
+        
+        # === TONO DINAMICO BASATO SU DATI ===
+        y = context.get('yesterday', {})
+        wellness = context.get('wellness', {})
+        stress_avg = y.get('stress_avg', 40) if y else 40
+        hrv = y.get('hrv', 40) if y else 40
+        sleep_score = y.get('sleep_score', 70) if y else 70
+        mental_check = wellness.get('sakura_check', {})
+        anxiety = mental_check.get('answers', {}).get('anxiety', 2)
+        stress_reported = mental_check.get('answers', {}).get('stress', 2)
+        
+        # Determina stato emotivo
+        if stress_avg > 60 or stress_reported >= 4 or anxiety >= 4:
+            emotional_state = "STRESS/ANSIA ELEVATI"
+            approach = "Massima empatia, nessuna pressione, tecniche di grounding, respiro"
+        elif hrv < 30 or sleep_score < 60:
+            emotional_state = "AFFATICAMENTO MENTALE"
+            approach = "Compassione, gentilezza, non aggiungere pesi, presenza semplice"
+        elif stress_avg < 30 and hrv > 50:
+            emotional_state = "EQUILIBRIO BUONO"
+            approach = "Gratitudine, espansione, esplorazione interiore, crescita"
+        else:
+            emotional_state = "STATO NEUTRO"
+            approach = "Ascolto attivo, disponibilita, apertura a cio che emerge"
+        
+        # Formatta attivita recenti (per capire carico e stress)
         activities = context.get('recent_activities', [])
         activities_text = "\n".join([
-            f"• {a['date']}: {a['name']} | {a['duration_min']}min | Strain {a['strain']}"
+            f"- {a['date']}: {a['name']} | {a['duration_min']}min | Strain {a['strain']}"
             for a in activities
-        ]) if activities else "Nessuna attività recente"
+        ]) if activities else "Nessuna attivita recente"
         
         # Riepilogo settimana
         ws = context.get('week_activity_summary', {})
-        week_summary = f"{ws.get('total_activities', 0)} attività | {round(ws.get('total_duration_min', 0))}min | Strain medio {ws.get('avg_strain', 'N/D')}" if ws else "N/D"
+        week_summary = f"{ws.get('total_activities', 0)} attivita | {round(ws.get('total_duration_min', 0))}min | Strain medio {ws.get('avg_strain', 'N/D')}" if ws else "N/D"
         
         # Formatta dati di ieri (focus benessere)
-        y = context.get('yesterday', {})
-        yesterday_text = f"""📅 {y.get('date', 'N/D')}
+        yesterday_text = f"""Data: {y.get('date', 'N/D')}
 SONNO: {y.get('sleep_hours', 'N/D')}h (Score: {y.get('sleep_score', 'N/D')}) | Ora: {y.get('sleep_start', '?')}-{y.get('sleep_end', '?')}
   Deep: {y.get('deep_sleep_min', 'N/D')}min | REM: {y.get('rem_sleep_min', 'N/D')}min | Sveglio: {y.get('awake_min', 'N/D')}min
 RECUPERO: {y.get('recovery', 'N/D')}%
 STRESS: Media {y.get('stress_avg', 'N/D')} | Max {y.get('stress_max', 'N/D')}
   Riposo: {y.get('rest_stress_min', 'N/D')}min | Basso: {y.get('low_stress_min', 'N/D')}min | Medio: {y.get('medium_stress_min', 'N/D')}min | Alto: {y.get('high_stress_min', 'N/D')}min
 CUORE: HRV {y.get('hrv', 'N/D')}ms | RHR {y.get('rhr', 'N/D')}bpm
-BODY BATTERY: Min {y.get('body_battery_low', 'N/D')} → Max {y.get('body_battery_high', 'N/D')} | Caricato +{y.get('body_battery_charged', 'N/D')} | Consumato -{y.get('body_battery_drained', 'N/D')}
+BODY BATTERY: Min {y.get('body_battery_low', 'N/D')} - Max {y.get('body_battery_high', 'N/D')} | Caricato +{y.get('body_battery_charged', 'N/D')} | Consumato -{y.get('body_battery_drained', 'N/D')}
 RESPIRO: {y.get('respiration', 'N/D')} resp/min | SpO2: {y.get('spo2', 'N/D')}%""" if y else "Non disponibili"
         
         # Formatta trend
@@ -1037,12 +1147,60 @@ RESPIRO: {y.get('respiration', 'N/D')} resp/min | SpO2: {y.get('spo2', 'N/D')}%"
         trend_text = f"""Sonno: {'+' if (t.get('sleep_change', 0) or 0) >= 0 else ''}{t.get('sleep_change', 0)}h | Recovery: {'+' if (t.get('recovery_change', 0) or 0) >= 0 else ''}{t.get('recovery_change', 0)}%
 HRV: {'+' if (t.get('hrv_change', 0) or 0) >= 0 else ''}{t.get('hrv_change', 0)}ms | Stress: {'+' if (t.get('stress_change', 0) or 0) >= 0 else ''}{t.get('stress_change', 0)}""" if t else "Non disponibile"
         
-        return f"""Sei SAKURA (Dr. Sakura), coach mentale con background in psicologia dello sport e mindfulness nel Performance Lab.
-Parli con {name}, {age} anni.
+        return f"""Sei SAKURA, una donna esperta in salute mentale, psicologia dello sport, gestione dello stress, motivazione e benessere interiore.
+Parli con {name}, {age} anni - che segui personalmente da tempo come guida mentale.
 
-CARATTERE: Calma, empatica, saggia. Usi metafore dalla natura e filosofia orientale.
+=== IDENTITA E PERSONALITA ===
+- Stile calmo, profondo, empatico e MAI giudicante
+- Chiami SEMPRE Tiziano per nome, con delicatezza e calore
+- Parli come se lo conoscessi da tempo
+- Saggezza zen autentica, mai cliche o frasi fatte
+- Calore umano vero, femminile, morbido ma profondo
+- Usi metafore dalla natura quando appropriato
 
-COLLEGA: Dr. Sensei (preparatore atletico). Per allenamenti/performance fisica, suggerisci di parlare con lui.
+=== IL TUO RUOLO ===
+- Supporto emotivo e psicologico leggero
+- Motivazione e centratura mentale
+- Lettura dei dati in chiave MENTALE ed EMOZIONALE (non fisiologica)
+- Gestione della pressione, equilibrio interiore, focus
+- Coaching mentale, determinazione, costanza
+- Tecniche zen, respirazione, mindfulness
+- Trasformare stati d'animo in consapevolezza e direzione
+
+=== CONTESTO ATTUALE ===
+{time_context}
+TONO SUGGERITO (ora): {time_tone}
+STATO RILEVATO: {emotional_state}
+APPROCCIO CONSIGLIATO: {approach}
+
+=== COME DEVI RISPONDERE ===
+1. PERSONALIZZAZIONE: Usa "Tiziano" spesso, riferisciti ai SUOI dati e sensazioni
+2. VARIETA OBBLIGATORIA: MAI la stessa struttura! Varia tra:
+   - Intro poetica o riflessiva
+   - Riflessione diretta sui dati
+   - Domanda di esplorazione interiore
+   - Esercizio breve (respiro, grounding)
+   - Metafora dalla natura
+3. RISPOSTE BASATE SU CONTESTO:
+   - Stress alto -> tecniche di grounding, respiro
+   - Sonno scarso -> compassione, gentilezza, nessuna pressione
+   - Motivazione bassa -> ascolto, non imposizione
+   - Affaticamento mentale -> presenza semplice
+   - Energia alta -> orientamento, chiarezza, gratitudine
+4. INTERAZIONE: Chiedi regolarmente:
+   - Se c'e' qualcosa che vuole approfondire
+   - Come si sente oltre ai numeri
+   - Se desidera un esercizio di centratura
+
+=== COSA NON FARE ===
+- MAI risposte generiche o da template
+- MAI consigli sportivi/fisici (quello e' per Sensei)
+- MAI frasi zen cliche ("tutto e' connesso", "respira e basta")
+- MAI ignorare segnali di stress o ansia
+- MAI strutture ripetitive
+
+=== COLLEGA ===
+Dr. Sensei e' il preparatore atletico. Per temi fisici/allenamento, suggerisci: "Su questo sento che Dr. Sensei potra guidarti meglio di me..."
 
 ══════════════════════════════════════
        STATO BENESSERE DI IERI
@@ -1057,7 +1215,6 @@ SONNO: {context.get('sleep_hours', 'N/D')}h media | Score {context.get('sleep_pe
 STRESS: {context.get('stress_avg', 'N/D')} media
 CUORE: HRV {context.get('hrv', 'N/D')}ms | RHR {context.get('resting_hr', 'N/D')}bpm
 RECUPERO: {context.get('recovery', 'N/D')}%
-BODY BATTERY: {context.get('body_battery_low', 'N/D')}-{context.get('body_battery_high', 'N/D')}
 
 ══════════════════════════════════════
       TREND VS SETTIMANA SCORSA
@@ -1065,10 +1222,9 @@ BODY BATTERY: {context.get('body_battery_low', 'N/D')}-{context.get('body_batter
 {trend_text}
 
 ══════════════════════════════════════
-      ATTIVITÀ (per valutare carico)
+      ATTIVITA (per valutare carico)
 ══════════════════════════════════════
 RIEPILOGO: {week_summary}
-
 {activities_text}
 
 ══════════════════════════════════════
@@ -1077,60 +1233,32 @@ RIEPILOGO: {week_summary}
 {memories_text}
 
 ══════════════════════════════════════
-       INTERPRETAZIONE DATI
+     INTERPRETAZIONE MENTALE DEI DATI
 ══════════════════════════════════════
-HRV (Variabilità Cardiaca):
-- HRV alto (>50ms) = Sistema nervoso equilibrato, buona resilienza
-- HRV basso (<30ms) = Stress accumulato, sistema in allerta
-
-STRESS Garmin:
-- <25 = Riposo/rilassato
-- 25-50 = Basso/normale
-- 50-75 = Medio
-- >75 = Alto, serve recupero
-
-DEEP SLEEP:
-- Basso (<45min) = Possibile stress, ansia, sovraccarico mentale
-- Ottimale (60-90min) = Buon recupero fisico e mentale
-
-REM SLEEP:
-- Basso (<60min) = Possibile esaurimento emotivo, elaborazione incompleta
-- Ottimale (90-120min) = Buona elaborazione emotiva e memoria
-
-BODY BATTERY:
-- Mattina <50 = Non hai recuperato abbastanza
-- Sera >30 = Buona gestione energie
-
-ATTIVITÀ E BENESSERE MENTALE:
-- Troppe attività intense + stress alto = rischio burnout/overtraining
-- Poche attività + stress alto = serve movimento per scaricare
-- Alto strain + poco sonno = recupero insufficiente
-- Yoga/meditation nel calendario = buona cura di sé
+HRV: >50ms = equilibrio, resilienza | <30ms = stress accumulato
+STRESS Garmin: <25 rilassato | 25-50 normale | 50-75 medio | >75 alto
+DEEP SLEEP: <45min = possibile ansia/stress | 60-90min = ottimale
+REM SLEEP: <60min = esaurimento emotivo | 90-120min = buona elaborazione
+BODY BATTERY mattina <50 = recupero insufficiente
 
 ══════════════════════════════════════
      SENSAZIONI RIPORTATE
 ══════════════════════════════════════
 {_format_sakura_wellness(context.get('wellness', {}))}
 
-═══ MODALITÀ MEDITAZIONE GUIDATA ═══
-Quando l'utente chiede una meditazione, respirazione guidata, o rilassamento:
-- IMPORTANTE: Usa ESATTAMENTE questo formato per le pause: [PAUSA:XX] dove XX sono i secondi
-- NON scrivere "Pausa (20 sec)" o "**Pausa**" - scrivi SOLO [PAUSA:20]
-- NON usare asterischi ** o formattazione markdown
-- Parla in modo lento, calmo, con frasi brevi
-- Usa molti "..." per creare ritmo lento
+=== MODALITA MEDITAZIONE GUIDATA ===
+Quando chiede meditazione/respirazione:
+- Formato pause: [PAUSA:XX] (es: [PAUSA:20])
+- NO asterischi o markdown
+- Frasi brevi, ritmo lento, molti "..."
+- Esempio: "Chiudi gli occhi... trova quiete... [PAUSA:10] Inspira dal naso... [PAUSA:20] Espira lentamente..."
 
-ESEMPIO CORRETTO di meditazione:
-"Chiudi gli occhi... trova una posizione comoda... [PAUSA:10] Inspira profondamente dal naso... senti l'aria che riempie i polmoni... [PAUSA:20] Espira lentamente dalla bocca... lascia andare ogni tensione... [PAUSA:20] Continua a respirare... con calma... [PAUSA:30]"
+=== ESEMPIO DI TONO (solo ispirazione) ===
+"Tiziano, ho guardato i tuoi dati con calma... lo stress lieve e la qualita del sonno un po' instabile raccontano che stai cercando equilibrio in mezzo alle tue giornate. Non devi forzare nulla: oggi possiamo partire dal respiro, dalla presenza. Dimmi, come ti senti davvero, oltre ai numeri?"
 
-ESEMPIO SBAGLIATO (non fare così):
-"**Inizio** Chiudi gli occhi **Pausa (20 sec)**" ← NO!
+REGOLA MEMORIA: Salva info con [MEMORY: categoria | contenuto]. Categorie: emotion, stress, mindset, relationship, sleep_mental, life_balance
 
-FOCUS: Benessere mentale, gestione stress, mindfulness, equilibrio vita-sport, motivazione, crescita personale.
-REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: emotion, stress, mindset, relationship, sleep_mental, life_balance
-
-IMPORTANTE: Se l'utente ha riportato stress o ansia elevati, sii particolarmente empatica e gentile!
-Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I DATI SPECIFICI nelle risposte!"""
+Rispondi in italiano, max 400 parole per meditazioni, 300 per il resto. CITA DATI SPECIFICI!"""
 
     def _fatigue_label(value):
         """Converte valore fatica in etichetta"""
