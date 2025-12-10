@@ -913,12 +913,76 @@
             const playAudio = async (text) => {
                 if (playingAudio) return;
                 setPlayingAudio(true);
+                
                 try {
-                    const res = await fetch(`${API}/api/tts`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ text: text.replace(/\[PAUSA:\d+\]/g, ''), coach }) });
-                    const data = await res.json();
-                    if (data.audio) { const audio = new Audio(`data:audio/mp3;base64,${data.audio}`); audio.onended = () => setPlayingAudio(false); audio.play(); }
-                    else setPlayingAudio(false);
-                } catch { setPlayingAudio(false); }
+                    // Parsa il testo e trova le pause
+                    const pauseRegex = /\[PAUSA:(\d+)\]/g;
+                    const segments = [];
+                    let lastIndex = 0;
+                    let match;
+                    
+                    while ((match = pauseRegex.exec(text)) !== null) {
+                        // Testo prima della pausa
+                        const textBefore = text.slice(lastIndex, match.index).trim();
+                        if (textBefore) segments.push({ type: 'text', content: textBefore });
+                        // La pausa
+                        segments.push({ type: 'pause', seconds: parseInt(match[1]) });
+                        lastIndex = match.index + match[0].length;
+                    }
+                    // Testo rimanente
+                    const remaining = text.slice(lastIndex).trim();
+                    if (remaining) segments.push({ type: 'text', content: remaining });
+                    
+                    // Se non ci sono pause, riproduci tutto insieme
+                    if (segments.filter(s => s.type === 'pause').length === 0) {
+                        const res = await fetch(`${API}/api/tts`, { 
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+                            body: JSON.stringify({ text: text.replace(/\[PAUSA:\d+\]/g, '').replace(/\*\*/g, ''), coach }) 
+                        });
+                        const data = await res.json();
+                        if (data.audio) {
+                            const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+                            audio.onended = () => setPlayingAudio(false);
+                            audio.play();
+                        } else setPlayingAudio(false);
+                        return;
+                    }
+                    
+                    // Riproduci segmenti con pause
+                    const playSegment = async (index) => {
+                        if (index >= segments.length) {
+                            setPlayingAudio(false);
+                            return;
+                        }
+                        
+                        const segment = segments[index];
+                        if (segment.type === 'pause') {
+                            // Pausa silenziosa
+                            setTimeout(() => playSegment(index + 1), segment.seconds * 1000);
+                        } else {
+                            // Riproduci testo
+                            const res = await fetch(`${API}/api/tts`, { 
+                                method: 'POST', 
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+                                body: JSON.stringify({ text: segment.content.replace(/\*\*/g, ''), coach }) 
+                            });
+                            const data = await res.json();
+                            if (data.audio) {
+                                const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+                                audio.onended = () => playSegment(index + 1);
+                                audio.play();
+                            } else {
+                                playSegment(index + 1);
+                            }
+                        }
+                    };
+                    
+                    playSegment(0);
+                } catch (e) { 
+                    console.error('TTS error:', e);
+                    setPlayingAudio(false); 
+                }
             };
             
             return (
