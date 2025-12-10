@@ -1610,9 +1610,9 @@ Rispondi come una vera guida mentale, in modo naturale e personale. Max 250 paro
                     'weekday': m.date.strftime('%A'),
                     'recovery': m.recovery_score,
                     'strain': m.strain_score,
-                    'sleep_hours': m.sleep_hours,
-                    'deep_sleep': m.deep_sleep_min,
-                    'rem_sleep': m.rem_sleep_min,
+                    'sleep_hours': round(m.sleep_seconds / 3600, 1) if m.sleep_seconds else None,
+                    'deep_sleep': round(m.deep_sleep_seconds / 60) if m.deep_sleep_seconds else None,
+                    'rem_sleep': round(m.rem_sleep_seconds / 60) if m.rem_sleep_seconds else None,
                     'rhr': m.resting_hr,
                     'hrv': m.hrv,
                     'stress_avg': m.stress_avg,
@@ -1646,15 +1646,21 @@ Rispondi come una vera guida mentale, in modo naturale e personale. Max 250 paro
             ).all()
             fatigue_data = {str(f.date): f.value for f in fatigue_logs}
             
-            # Costruisci prompt per GPT-5
+            # Costruisci prompt per GPT-5 con personalità Dr. Data
             import json
-            analysis_prompt = f"""Sei un analista di performance sportiva e benessere con accesso a 90 giorni di dati biometrici di {current_user.name or 'utente'}, {current_user.get_real_age()} anni.
+            analysis_prompt = f"""Sei DR. DATA, scienziato dei dati biometrici del Performance Lab.
 
-COMPITO: Analizza i pattern nascosti nei dati e fornisci insights actionable.
+PERSONALITA:
+- Parli come uno scienziato appassionato ma accessibile
+- Usi analogie scientifiche per spiegare i pattern
+- Sei entusiasta quando trovi correlazioni interessanti
+- Chiami l'utente "{current_user.name or 'atleta'}" e hai un tono professionale ma caldo
+- Collabori con Dr. Sensei (preparatore atletico) e Dr. Sakura (coach mentale)
+
+DATI DISPONIBILI: 90 giorni di dati biometrici di {current_user.name or 'utente'}, {current_user.get_real_age()} anni.
 
 === DATI GIORNALIERI ({len(data_rows)} giorni) ===
 {json.dumps(data_rows[-30:], indent=1)}
-[... altri {len(data_rows)-30} giorni disponibili nel pattern analysis]
 
 === ATTIVITA ({len(activity_data)} sessioni) ===
 {json.dumps(activity_data[:20], indent=1)}
@@ -1665,38 +1671,33 @@ COMPITO: Analizza i pattern nascosti nei dati e fornisci insights actionable.
 === STATISTICHE RAPIDE ===
 - Recovery media: {sum(m['recovery'] or 0 for m in data_rows)/len(data_rows):.1f}%
 - Sonno medio: {sum(m['sleep_hours'] or 0 for m in data_rows)/len(data_rows):.1f}h
-- HRV medio: {sum(m['hrv'] or 0 for m in data_rows if m['hrv'])/len([m for m in data_rows if m['hrv']]):.0f}ms
-- Stress medio: {sum(m['stress_avg'] or 0 for m in data_rows if m['stress_avg'])/len([m for m in data_rows if m['stress_avg']]):.0f}
+- HRV medio: {sum(m['hrv'] or 0 for m in data_rows if m['hrv'])/max(1, len([m for m in data_rows if m['hrv']])):.0f}ms
+- Stress medio: {sum(m['stress_avg'] or 0 for m in data_rows if m['stress_avg'])/max(1, len([m for m in data_rows if m['stress_avg']])):.0f}
 
-ANALIZZA E RISPONDI IN ITALIANO CON:
+ANALIZZA E RISPONDI IN ITALIANO. Struttura la risposta cosi:
 
-1. **CORRELAZIONI SCOPERTE** (3-5 pattern significativi)
-   - Cerca correlazioni tra sonno/recovery, attivita/HRV, giorni settimana/stress
-   - Cerca soglie critiche (es: "sotto X ore di sonno, il recovery crolla")
+🔬 **CORRELAZIONI SCOPERTE**
+(3-5 pattern significativi con numeri precisi)
 
-2. **TREND E PROGRESSI** (miglioramenti o peggioramenti)
-   - Confronta ultime 2 settimane vs mese precedente
-   - Identifica metriche in miglioramento/peggioramento
+📈 **TREND E PROGRESSI**
+(confronto ultime 2 settimane vs prima)
 
-3. **ANOMALIE RILEVATE** (valori insoliti)
-   - Giorni con valori fuori norma
-   - Pattern inattesi
+⚠️ **ANOMALIE RILEVATE**
+(valori fuori norma, giorni critici)
 
-4. **PREDIZIONI** (basate sui pattern)
-   - Stima recovery per domani
-   - Rischio overtraining/burnout
+🔮 **PREDIZIONI**
+(recovery domani, rischio overtraining)
 
-5. **RACCOMANDAZIONI PERSONALIZZATE** (3-5 azioni concrete)
-   - Basate sui pattern trovati
-   - Specifiche per questa persona
+💡 **RACCOMANDAZIONI**
+(3-5 azioni concrete e specifiche)
 
-Sii specifico, cita numeri, evita generalita. Usa emoji per le sezioni."""
+Sii specifico, cita numeri esatti, evita generalita. Parla come uno scienziato entusiasta!"""
 
             # Chiama GPT-5 con reasoning
             response = openai_client.chat.completions.create(
                 model="gpt-5",
                 messages=[
-                    {"role": "system", "content": "Sei un esperto analista di dati biometrici e performance sportiva. Analizza pattern complessi e fornisci insights profondi."},
+                    {"role": "system", "content": "Sei Dr. Data, scienziato dei dati biometrici. Analizzi pattern complessi con entusiasmo scientifico, spiegando le correlazioni in modo accessibile ma rigoroso. Fai parte del Performance Lab insieme a Dr. Sensei e Dr. Sakura."},
                     {"role": "user", "content": analysis_prompt}
                 ],
                 max_tokens=2000,
