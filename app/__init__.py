@@ -928,9 +928,10 @@ def create_app():
         
         # === TONO DINAMICO BASATO SU DATI ===
         recovery = context.get('recovery') or 50
-        y = context.get('yesterday', {})
-        fatigue = context.get('wellness', {}).get('fatigue_today', 5)
-        strain = y.get('strain', 10) if y else 10
+        y = context.get('yesterday', {}) or {}
+        wellness = context.get('wellness', {}) or {}
+        fatigue = wellness.get('fatigue_today') or 5
+        strain = y.get('strain') or 10
         
         if recovery < 50 or fatigue >= 7:
             data_tone = "Protettivo, NO pressione, focus recupero. Sconsiglia allenamenti intensi."
@@ -1056,14 +1057,15 @@ Rispondi come un vero coach, in modo naturale e personale. Cita numeri specifici
             time_tone = "Calma profonda, preparazione al riposo, quiete"
         
         # === TONO DINAMICO BASATO SU DATI ===
-        y = context.get('yesterday', {})
-        wellness = context.get('wellness', {})
-        stress_avg = y.get('stress_avg', 40) if y else 40
-        hrv = y.get('hrv', 40) if y else 40
-        sleep_score = y.get('sleep_score', 70) if y else 70
-        mental_check = wellness.get('sakura_checkin', {})
-        anxiety = mental_check.get('answers', {}).get('anxiety', 2)
-        stress_reported = mental_check.get('answers', {}).get('stress', 2)
+        y = context.get('yesterday', {}) or {}
+        wellness = context.get('wellness', {}) or {}
+        stress_avg = y.get('stress_avg') or 40
+        hrv = y.get('hrv') or 40
+        sleep_score = y.get('sleep_score') or 70
+        mental_check = wellness.get('sakura_checkin', {}) or {}
+        answers = mental_check.get('answers', {}) or {}
+        anxiety = answers.get('anxiety') or 2
+        stress_reported = answers.get('stress') or 2
         
         # Determina stato emotivo
         if stress_avg > 60 or stress_reported >= 4 or anxiety >= 4:
