@@ -1,6 +1,6 @@
 """
 Garmin WHOOP - Flask App with AI Coaches
-Version: 2.8.1 - Pace with negative values for improvement - 2024-12-07
+Version: 3.0 - With Fatigue & Weekly Check-ins - 2024-12-10
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -11,9 +11,10 @@ from functools import wraps
 from sqlalchemy import or_
 import jwt
 import os
+import json
 
 from config import Config
-from app.models import db, User, DailyMetric, Activity, SyncLog, ChatMessage, UserMemory
+from app.models import db, User, DailyMetric, Activity, SyncLog, ChatMessage, UserMemory, FatigueLog, WeeklyCheck
 from app.garmin_sync import GarminSyncService
 
 
@@ -47,7 +48,7 @@ def create_app():
             db.session.commit()
             print("✅ Auto-migration completata")
         except Exception as e:
-            print(f"⚠️ Auto-migration warning: {e}")
+            print(f⚠️ Auto-migration warning: {e}")
     
     # ========== AUTH HELPERS ==========
     
@@ -901,6 +902,77 @@ def create_app():
         from openai import OpenAI
         openai_client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
     
+    def _format_sensei_wellness(w):
+        """Formatta dati wellness per prompt Sensei"""
+        if not w:
+            return "Nessun dato riportato dall'utente"
+        
+        lines = []
+        
+        if w.get('fatigue_today'):
+            lines.append(f"🔴 FATICA PERCEPITA OGGI: {w['fatigue_today']}/10 ({w.get('fatigue_today_label', '')})")
+        
+        if w.get('fatigue_week_avg'):
+            lines.append(f"   Media settimanale: {w['fatigue_week_avg']}/10")
+            if w.get('fatigue_days_high', 0) > 0:
+                lines.append(f"   ⚠️ Giorni con fatica alta (≥7): {w['fatigue_days_high']}")
+        
+        if w.get('sensei_checkin'):
+            checkin = w['sensei_checkin']
+            if checkin.get('is_recent'):
+                lines.append(f"\n📋 CHECK-IN FISICO (compilato {checkin['days_ago']} giorni fa):")
+                labels = {
+                    'energy': ('Energia', False),
+                    'soreness': ('Dolori muscolari', True),
+                    'performance': ('Performance', False),
+                    'recovery': ('Recupero percepito', False),
+                    'motivation': ('Motivazione', False),
+                    'sleep_quality': ('Qualità sonno', False)
+                }
+                for key, (label, inverted) in labels.items():
+                    if key in checkin['answers']:
+                        val = checkin['answers'][key]
+                        if inverted:
+                            desc = ['nessuno', 'minimo', 'moderato', 'alto', 'estremo'][val-1]
+                        else:
+                            desc = ['pessimo', 'scarso', 'normale', 'buono', 'ottimo'][val-1]
+                        lines.append(f"   - {label}: {val}/5 ({desc})")
+        
+        return "\n".join(lines) if lines else "Nessun dato riportato"
+    
+    def _format_sakura_wellness(w):
+        """Formatta dati wellness per prompt Sakura"""
+        if not w:
+            return "Nessun dato riportato dall'utente"
+        
+        lines = []
+        
+        if w.get('fatigue_today'):
+            lines.append(f"💪 Fatica fisica oggi: {w['fatigue_today']}/10 ({w.get('fatigue_today_label', '')})")
+        
+        if w.get('sakura_checkin'):
+            checkin = w['sakura_checkin']
+            if checkin.get('is_recent'):
+                lines.append(f"\n📋 CHECK-IN MENTALE (compilato {checkin['days_ago']} giorni fa):")
+                labels = {
+                    'mood': ('Umore', False),
+                    'stress': ('Stress mentale', True),
+                    'anxiety': ('Ansia', True),
+                    'focus': ('Concentrazione', False),
+                    'social': ('Vita sociale', False),
+                    'balance': ('Work-life balance', False)
+                }
+                for key, (label, inverted) in labels.items():
+                    if key in checkin['answers']:
+                        val = checkin['answers'][key]
+                        if inverted:
+                            desc = ['nessuno', 'minimo', 'moderato', 'alto', 'estremo'][val-1]
+                        else:
+                            desc = ['pessimo', 'scarso', 'normale', 'buono', 'ottimo'][val-1]
+                        lines.append(f"   - {label}: {val}/5 ({desc})")
+        
+        return "\n".join(lines) if lines else "Nessun dato riportato"
+    
     def _get_sensei_prompt(user, context, memories):
         name = user.name or "atleta"
         age = user.get_real_age()
@@ -991,8 +1063,15 @@ DETTAGLIO:
 ══════════════════════════════════════
 {memories_text}
 
+══════════════════════════════════════
+     SENSAZIONI RIPORTATE (se presenti)
+══════════════════════════════════════
+{_format_sensei_wellness(context.get('wellness', {}))}
+
 FOCUS: Allenamento, performance, recupero, prevenzione infortuni, nutrizione sportiva, analisi dati.
 REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: injury, goal, training, nutrition, performance
+
+⚠️ IMPORTANTE: Se l'utente ha riportato fatica alta o dolori muscolari, ADATTA i consigli di conseguenza!
 Rispondi in italiano, max 300 parole. USA I DATI SPECIFICI nelle risposte!"""
 
     def _get_sakura_prompt(user, context, memories):
@@ -1112,9 +1191,77 @@ ESEMPIO CORRETTO di meditazione:
 ESEMPIO SBAGLIATO (non fare così):
 "**Inizio** Chiudi gli occhi **Pausa (20 sec)**" ← NO!
 
+══════════════════════════════════════
+     SENSAZIONI RIPORTATE (se presenti)
+══════════════════════════════════════
+{_format_sakura_wellness(context.get('wellness', {}))}
+
 FOCUS: Benessere mentale, gestione stress, mindfulness, equilibrio vita-sport, motivazione, crescita personale.
 REGOLA: Salva info importanti con [MEMORY: categoria | contenuto]. Categorie: emotion, stress, mindset, relationship, sleep_mental, life_balance
+
+💜 IMPORTANTE: Se l'utente ha riportato stress o ansia elevati, sii particolarmente empatica e gentile!
 Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I DATI SPECIFICI nelle risposte!"""
+
+    def _fatigue_label(value):
+        """Converte valore fatica in etichetta"""
+        if value <= 2: return "fresco"
+        elif value <= 4: return "leggera fatica"
+        elif value <= 6: return "fatica moderata"
+        elif value <= 8: return "fatica alta"
+        else: return "fatica estrema"
+
+    def _get_wellness_context(user_id):
+        """Costruisce contesto wellness (fatica e check-in) per i coach AI"""
+        today_date = date.today()
+        wellness = {}
+        
+        # ═══ FATICA PERCEPITA ═══
+        fatigue_today = FatigueLog.query.filter_by(user_id=user_id, date=today_date).first()
+        if fatigue_today:
+            wellness['fatigue_today'] = fatigue_today.value
+            wellness['fatigue_today_label'] = _fatigue_label(fatigue_today.value)
+        
+        # Ultimi 7 giorni
+        week_start = today_date - timedelta(days=7)
+        recent_fatigue = FatigueLog.query.filter(
+            FatigueLog.user_id == user_id,
+            FatigueLog.date >= week_start
+        ).all()
+        
+        if recent_fatigue:
+            values = [f.value for f in recent_fatigue]
+            wellness['fatigue_week_avg'] = round(sum(values) / len(values), 1)
+            wellness['fatigue_week_max'] = max(values)
+            wellness['fatigue_days_high'] = len([v for v in values if v >= 7])
+        
+        # ═══ CHECK-IN SETTIMANALI ═══
+        for coach in ['sensei', 'sakura']:
+            check = WeeklyCheck.query.filter_by(
+                user_id=user_id,
+                coach=coach
+            ).order_by(WeeklyCheck.created_at.desc()).first()
+            
+            if check:
+                answers = json.loads(check.answers)
+                days_ago = (datetime.utcnow() - check.created_at).days if check.created_at else 999
+                
+                wellness[f'{coach}_checkin'] = {
+                    'answers': answers,
+                    'days_ago': days_ago,
+                    'is_recent': days_ago <= 7
+                }
+                
+                # Calcola score medio
+                inverted = {'sensei': ['soreness'], 'sakura': ['stress', 'anxiety']}
+                total = 0
+                for key, val in answers.items():
+                    if key in inverted.get(coach, []):
+                        total += (6 - val)
+                    else:
+                        total += val
+                wellness[f'{coach}_score'] = round(total / len(answers), 1) if answers else None
+        
+        return wellness
 
     def _build_context(user):
         """Costruisce contesto COMPLETO per i coach AI"""
@@ -1305,6 +1452,11 @@ Rispondi in italiano, max 400 parole per le meditazioni, 300 per il resto. USA I
                 'total_distance_km': round(sum([a.distance_meters/1000 for a in activities if a.distance_meters]), 1),
                 'avg_strain': avg([a.strain_score for a in activities]),
             }
+        
+        # ═══ WELLNESS (Fatica e Check-in) ═══
+        wellness = _get_wellness_context(user.id)
+        if wellness:
+            context['wellness'] = wellness
         
         return context
 
@@ -1716,79 +1868,6 @@ Pauses: Use thoughtful pauses, especially between breathing instructions and vis
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
-    return app
-
-
-def _metric_to_dict(m: DailyMetric) -> dict:
-    """Converte DailyMetric in dict"""
-    return {
-        'date': m.date.isoformat(),
-        'scores': {
-            'recovery': m.recovery_score,
-            'strain': m.strain_score,
-            'sleep_performance': m.sleep_performance
-        },
-        'heart': {
-            'resting_hr': m.resting_hr,
-            'min_hr': m.min_hr,
-            'max_hr': m.max_hr,
-            'hrv_last_night': m.hrv_last_night
-        },
-        'body_battery': {
-            'high': m.body_battery_high,
-            'low': m.body_battery_low,
-            'charged': m.body_battery_charged,
-            'drained': m.body_battery_drained
-        },
-        'sleep': {
-            'total_hours': round(m.sleep_seconds / 3600, 1) if m.sleep_seconds else None,
-            'deep_hours': round(m.deep_sleep_seconds / 3600, 1) if m.deep_sleep_seconds else None,
-            'light_hours': round(m.light_sleep_seconds / 3600, 1) if m.light_sleep_seconds else None,
-            'rem_hours': round(m.rem_sleep_seconds / 3600, 1) if m.rem_sleep_seconds else None,
-            'awake_hours': round(m.awake_seconds / 3600, 1) if m.awake_seconds else None,
-            'score': m.sleep_score,
-            'start': m.sleep_start.strftime('%H:%M') if m.sleep_start else None,
-            'end': m.sleep_end.strftime('%H:%M') if m.sleep_end else None
-        },
-        'stress': {
-            'average': m.stress_avg,
-            'max': m.stress_max
-        },
-        'activity': {
-            'steps': m.steps,
-            'calories': m.total_calories,
-            'active_calories': m.active_calories,
-            'distance_km': round(m.distance_meters / 1000, 2) if m.distance_meters else None,
-            'moderate_minutes': m.moderate_intensity_minutes,
-            'vigorous_minutes': m.vigorous_intensity_minutes
-        },
-        'respiration': {
-            'average': m.avg_respiration,
-            'min': m.min_respiration,
-            'max': m.max_respiration
-        },
-        'spo2': {
-            'average': m.avg_spo2,
-            'min': m.min_spo2
-        }
-    }
-
-
-# Entry point
-app = create_app()
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
-
-
-
-# ==================== AGGIUNGI A __init__.py ====================
-# 
-# 1. Prima aggiungi l'import in cima al file:
-#    from app.models import db, User, DailyMetric, Activity, SyncLog, ChatMessage, UserMemory, FatigueLog, WeeklyCheck
-#
-# 2. Poi copia questi endpoint dentro create_app(), dopo gli altri endpoint (es. dopo /api/activity/<int:activity_id>/comment)
-
     # ========== FATIGUE (Fatica Percepita) ==========
     
     @app.route('/api/fatigue', methods=['GET'])
@@ -1881,7 +1960,6 @@ if __name__ == '__main__':
     @token_required
     def save_weekly_check(current_user):
         """Salva check-in settimanale per un coach"""
-        import json
         data = request.get_json()
         
         coach = data.get('coach')
@@ -1908,7 +1986,6 @@ if __name__ == '__main__':
     @token_required
     def get_latest_weekly_check(current_user):
         """Ottieni ultimo check-in per un coach"""
-        import json
         coach = request.args.get('coach')
         
         if not coach or coach not in ['sensei', 'sakura']:
@@ -1931,7 +2008,6 @@ if __name__ == '__main__':
     @token_required
     def get_weekly_check_history(current_user):
         """Ottieni storico check-in per un coach"""
-        import json
         coach = request.args.get('coach')
         weeks = request.args.get('weeks', 12, type=int)
         
@@ -1953,14 +2029,7 @@ if __name__ == '__main__':
     @app.route('/api/wellness/score', methods=['GET'])
     @token_required
     def get_wellness_score(current_user):
-        """
-        Ottieni punteggio benessere combinato:
-        - Recovery Garmin
-        - Fatica percepita
-        - Check-in settimanali
-        """
-        import json
-        
+        """Ottieni punteggio benessere combinato"""
         today_date = date.today()
         
         # Fatica di oggi
@@ -1987,7 +2056,6 @@ if __name__ == '__main__':
             
             if check:
                 answers = json.loads(check.answers)
-                # Domande invertite (più basso = meglio)
                 inverted = {
                     'sensei': ['soreness'],
                     'sakura': ['stress', 'anxiety']
@@ -1995,7 +2063,7 @@ if __name__ == '__main__':
                 total = 0
                 for key, val in answers.items():
                     if key in inverted.get(coach, []):
-                        total += (6 - val)  # Inverti: 5->1, 1->5
+                        total += (6 - val)
                     else:
                         total += val
                 scores[coach] = round(total / len(answers), 1) if answers else None
@@ -2005,31 +2073,26 @@ if __name__ == '__main__':
         components = []
         weights = []
         
-        # Garmin recovery (peso 40%)
         if garmin_recovery:
             components.append(garmin_recovery)
             weights.append(0.4)
         
-        # Fatica percepita invertita (peso 30%)
         if fatigue:
-            fatigue_score = (11 - fatigue) * 10  # 1->100, 10->10
+            fatigue_score = (11 - fatigue) * 10
             components.append(fatigue_score)
             weights.append(0.3)
         
-        # Score fisico Sensei (peso 20%)
         if scores.get('sensei'):
-            physical_score = scores['sensei'] * 20  # 1-5 -> 20-100
+            physical_score = scores['sensei'] * 20
             components.append(physical_score)
             weights.append(0.2)
         
-        # Score mentale Sakura (peso 10%)
         if scores.get('sakura'):
             mental_score = scores['sakura'] * 20
             components.append(mental_score)
             weights.append(0.1)
         
         if components:
-            # Normalizza pesi
             total_weight = sum(weights)
             readiness = round(sum(c * w / total_weight for c, w in zip(components, weights)))
         
@@ -2044,14 +2107,12 @@ if __name__ == '__main__':
             'readiness': readiness,
             'recommendation': recommendation
         })
+    
+    return app
 
-
-# ========== HELPER FUNCTION (fuori da create_app) ==========
 
 def _get_readiness_recommendation(readiness, fatigue, garmin_recovery):
     """Genera raccomandazione allenamento basata sui punteggi"""
-    
-    # Priorità alla fatica percepita alta
     if fatigue and fatigue >= 8:
         return "🛑 Riposo consigliato - fatica muscolare alta"
     
@@ -2077,7 +2138,6 @@ def _get_readiness_recommendation(readiness, fatigue, garmin_recovery):
                 return "🚶 Recovery basso - attività leggera"
         return "📝 Compila i check-in per consigli personalizzati"
     
-    # Basato su readiness combinato
     if readiness >= 80:
         return "💪 Pronto per allenamento intenso"
     elif readiness >= 65:
@@ -2088,3 +2148,65 @@ def _get_readiness_recommendation(readiness, fatigue, garmin_recovery):
         return "🧘 Recupero attivo consigliato"
     else:
         return "😴 Giornata di riposo"
+
+
+def _metric_to_dict(m: DailyMetric) -> dict:
+    """Converte DailyMetric in dict"""
+    return {
+        'date': m.date.isoformat(),
+        'scores': {
+            'recovery': m.recovery_score,
+            'strain': m.strain_score,
+            'sleep_performance': m.sleep_performance
+        },
+        'heart': {
+            'resting_hr': m.resting_hr,
+            'min_hr': m.min_hr,
+            'max_hr': m.max_hr,
+            'hrv_last_night': m.hrv_last_night
+        },
+        'body_battery': {
+            'high': m.body_battery_high,
+            'low': m.body_battery_low,
+            'charged': m.body_battery_charged,
+            'drained': m.body_battery_drained
+        },
+        'sleep': {
+            'total_hours': round(m.sleep_seconds / 3600, 1) if m.sleep_seconds else None,
+            'deep_hours': round(m.deep_sleep_seconds / 3600, 1) if m.deep_sleep_seconds else None,
+            'light_hours': round(m.light_sleep_seconds / 3600, 1) if m.light_sleep_seconds else None,
+            'rem_hours': round(m.rem_sleep_seconds / 3600, 1) if m.rem_sleep_seconds else None,
+            'awake_hours': round(m.awake_seconds / 3600, 1) if m.awake_seconds else None,
+            'score': m.sleep_score,
+            'start': m.sleep_start.strftime('%H:%M') if m.sleep_start else None,
+            'end': m.sleep_end.strftime('%H:%M') if m.sleep_end else None
+        },
+        'stress': {
+            'average': m.stress_avg,
+            'max': m.stress_max
+        },
+        'activity': {
+            'steps': m.steps,
+            'calories': m.total_calories,
+            'active_calories': m.active_calories,
+            'distance_km': round(m.distance_meters / 1000, 2) if m.distance_meters else None,
+            'moderate_minutes': m.moderate_intensity_minutes,
+            'vigorous_minutes': m.vigorous_intensity_minutes
+        },
+        'respiration': {
+            'average': m.avg_respiration,
+            'min': m.min_respiration,
+            'max': m.max_respiration
+        },
+        'spo2': {
+            'average': m.avg_spo2,
+            'min': m.min_spo2
+        }
+    }
+
+
+# Entry point
+app = create_app()
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
