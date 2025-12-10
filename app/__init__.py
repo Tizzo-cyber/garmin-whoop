@@ -1123,6 +1123,46 @@ Ora: {context.get('temporal', {}).get('weekday', 'N/D')} ore {context.get('tempo
 {context.get('ai_rules', 'Nessuna regola speciale')}
 ═══════════════════════════════════════════════════
 
+═══════════════════════════════════════════════════
+        MEDITAZIONE GUIDATA (se richiesta)
+═══════════════════════════════════════════════════
+Usa [PAUSA:XX] per pause silenziose (XX = secondi).
+
+CALCOLO DURATA (IMPORTANTE!):
+- Parlato: ~25 parole = 30 secondi
+- Pausa breve: [PAUSA:10] = 10 sec
+- Pausa media: [PAUSA:30] = 30 sec  
+- Pausa lunga: [PAUSA:60] = 60 sec
+
+ESEMPIO 5 MINUTI (300 sec):
+Intro 40 parole (~50s) + [PAUSA:20] + 
+Respiro 30 parole (~35s) + [PAUSA:30] +
+Corpo 35 parole (~40s) + [PAUSA:45] +
+Silenzio [PAUSA:60] +
+Chiusura 25 parole (~30s) = ~310 sec ✓
+
+ESEMPIO 10 MINUTI (600 sec):
+- Usa almeno 8-10 segmenti di testo
+- Pause totali: ~400 secondi (usa [PAUSA:30], [PAUSA:45], [PAUSA:60])
+- Testo totale: ~150-200 parole (~200 sec parlato)
+
+ESEMPIO 15 MINUTI (900 sec):
+- Usa almeno 12-15 segmenti
+- Pause totali: ~600 secondi
+- Includi 2-3 pause lunghe [PAUSA:60] o [PAUSA:90]
+
+STRUTTURA:
+1. Accoglienza (posizione, ambiente)
+2. Respiro iniziale + [PAUSA:20-30]
+3. Rilassamento corpo (scansione) + pause tra zone
+4. Visualizzazione/tema + pause lunghe
+5. Silenzio profondo [PAUSA:60-90]
+6. Ritorno graduale
+7. Chiusura dolce
+
+STILE: Frasi brevi... pause naturali... puntini per respirare...
+═══════════════════════════════════════════════════
+
 TONO: {time_tone}
 STATO RILEVATO: {emotional_state}
 APPROCCIO: {approach}
@@ -1137,9 +1177,8 @@ HRV: {y.get('hrv', 'N/D')}ms
 --- SENSAZIONI RIPORTATE ---
 {_format_sakura_wellness(context.get('wellness', {}))}
 
-MEDITAZIONE (se richiesta): usa [PAUSA:XX] per le pause, no markdown, frasi brevi con "..."
-
-Max 200 parole. RISPETTA LE REGOLE CONTESTUALI!"""
+RISPOSTE NORMALI: Max 200 parole.
+MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite parole)."""
 
     def _fatigue_label(value):
         """Converte valore fatica in etichetta"""
@@ -1643,8 +1682,13 @@ Max 200 parole. RISPETTA LE REGOLE CONTESTUALI!"""
         messages += [{"role": m.role, "content": m.content} for m in history]
         messages.append({"role": "user", "content": msg})
         
+        # Aumenta token per meditazioni
+        meditation_keywords = ['meditazione', 'medita', 'guidami', 'rilassamento', 'respiro', 'mindfulness', 'minuti']
+        is_meditation_request = any(kw in msg.lower() for kw in meditation_keywords) and coach == 'sakura'
+        max_tokens = 2000 if is_meditation_request else 800
+        
         try:
-            resp = openai_client.chat.completions.create(model="gpt-4.1", messages=messages, max_tokens=800, temperature=0.8)
+            resp = openai_client.chat.completions.create(model="gpt-4.1", messages=messages, max_tokens=max_tokens, temperature=0.8)
             ai_raw = resp.choices[0].message.content
             
             # Save messages
