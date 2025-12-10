@@ -2210,7 +2210,7 @@ Pauses: Use thoughtful pauses, especially between sentences, enhancing relaxatio
         
         try:
             response = openai_client.audio.speech.create(
-                model="tts-1-hd" if is_meditation else "tts-1",
+                model="gpt-4o-mini-tts",
                 voice=voice,
                 input=clean_text,
                 instructions=instructions,
