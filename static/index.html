@@ -285,26 +285,123 @@
             const [loading, setLoading] = useState(true);
             const [showInfo, setShowInfo] = useState(false);
             const [activeMetric, setActiveMetric] = useState(null);
+            const [fatigue, setFatigue] = useState(null);
+            const [savingFatigue, setSavingFatigue] = useState(false);
+            const [showWeeklyCheck, setShowWeeklyCheck] = useState(null); // 'sensei' | 'sakura' | null
+            const [weeklyAnswers, setWeeklyAnswers] = useState({});
+            const [weeklyHistory, setWeeklyHistory] = useState({ sensei: null, sakura: null });
+            const [savingWeekly, setSavingWeekly] = useState(false);
             const containerRef = useRef(null);
+            
+            const today = new Date().toISOString().split('T')[0];
+            
+            const weeklyQuestions = {
+                sensei: [
+                    { id: 'energy', icon: '⚡', label: 'Energia', desc: 'Livello di energia per allenarti' },
+                    { id: 'soreness', icon: '🦵', label: 'Dolori muscolari', desc: 'DOMS o fastidi muscolari', inverted: true },
+                    { id: 'performance', icon: '📈', label: 'Performance', desc: 'Come sono andati gli allenamenti' },
+                    { id: 'recovery', icon: '🔋', label: 'Recupero', desc: 'Ti senti recuperato tra sessioni' },
+                    { id: 'motivation', icon: '🔥', label: 'Motivazione', desc: 'Voglia di allenarti' },
+                    { id: 'sleep_quality', icon: '😴', label: 'Sonno', desc: 'Qualità del riposo' }
+                ],
+                sakura: [
+                    { id: 'mood', icon: '😊', label: 'Umore', desc: 'Stato d\'animo generale' },
+                    { id: 'stress', icon: '🧠', label: 'Stress', desc: 'Livello di stress mentale', inverted: true },
+                    { id: 'anxiety', icon: '😰', label: 'Ansia', desc: 'Pensieri ansiosi o preoccupazioni', inverted: true },
+                    { id: 'focus', icon: '🎯', label: 'Concentrazione', desc: 'Capacità di focus e attenzione' },
+                    { id: 'social', icon: '👥', label: 'Vita sociale', desc: 'Qualità relazioni e interazioni' },
+                    { id: 'balance', icon: '⚖️', label: 'Equilibrio', desc: 'Work-life balance' }
+                ]
+            };
             
             const loadData = useCallback(async () => {
                 try {
-                    const res = await fetch(`${API}/api/metrics/healthspan`, { headers: { 'Authorization': `Bearer ${token}` } });
-                    if (res.ok) setHealthspan(await res.json());
+                    const headers = { 'Authorization': `Bearer ${token}` };
+                    const [hs, fat, weeklySensei, weeklySakura] = await Promise.all([
+                        fetch(`${API}/api/metrics/healthspan`, { headers }).then(r => r.ok ? r.json() : null),
+                        fetch(`${API}/api/fatigue?date=${today}`, { headers }).then(r => r.ok ? r.json() : null).catch(() => null),
+                        fetch(`${API}/api/weekly-check/latest?coach=sensei`, { headers }).then(r => r.ok ? r.json() : null).catch(() => null),
+                        fetch(`${API}/api/weekly-check/latest?coach=sakura`, { headers }).then(r => r.ok ? r.json() : null).catch(() => null)
+                    ]);
+                    if (hs) setHealthspan(hs);
+                    if (fat?.value) setFatigue(fat.value);
+                    setWeeklyHistory({ sensei: weeklySensei, sakura: weeklySakura });
                 } catch {}
                 setLoading(false);
-            }, [token]);
+            }, [token, today]);
             
             useEffect(() => { loadData(); }, [loadData, lastSync]);
             
             const handleRefresh = async () => { await refresh(); await loadData(); };
             const { pullDistance, isRefreshing: isPulling } = usePullToRefresh(handleRefresh, containerRef);
             
+            const saveFatigue = async (value) => {
+                setFatigue(value);
+                setSavingFatigue(true);
+                try {
+                    await fetch(`${API}/api/fatigue`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ date: today, value })
+                    });
+                } catch {}
+                setSavingFatigue(false);
+            };
+            
+            const saveWeeklyCheck = async (coach) => {
+                const questions = weeklyQuestions[coach];
+                if (Object.keys(weeklyAnswers).length < questions.length) return;
+                setSavingWeekly(true);
+                try {
+                    await fetch(`${API}/api/weekly-check`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ coach, answers: weeklyAnswers })
+                    });
+                    setWeeklyHistory(prev => ({ ...prev, [coach]: { answers: weeklyAnswers, created_at: new Date().toISOString() } }));
+                    setShowWeeklyCheck(null);
+                    setWeeklyAnswers({});
+                } catch {}
+                setSavingWeekly(false);
+            };
+            
             const hs = healthspan;
             const diff = hs?.difference || 0;
             const isYounger = diff < 0;
             const ringColor = isYounger ? 'var(--accent-green)' : diff > 2 ? 'var(--accent-red)' : 'var(--accent-orange)';
             const progress = Math.min(100, Math.abs(diff) * 10 + 50);
+            
+            const getFatigueColor = (val) => val <= 3 ? 'var(--accent-green)' : val <= 6 ? 'var(--accent-orange)' : 'var(--accent-red)';
+            const getFatigueLabel = (val) => val <= 2 ? 'Fresco 💪' : val <= 4 ? 'Leggera' : val <= 6 ? 'Moderata' : val <= 8 ? 'Alta ⚠️' : 'Estrema 🛑';
+            
+            const getRatingLabel = (val, inverted) => {
+                if (inverted) return ['Nessuno', 'Minimo', 'Moderato', 'Alto', 'Estremo'][val - 1];
+                return ['Pessimo', 'Scarso', 'Normale', 'Buono', 'Ottimo'][val - 1];
+            };
+            
+            const isWeeklyCheckDue = (coach) => {
+                const history = weeklyHistory[coach];
+                if (!history?.created_at) return true;
+                const lastCheck = new Date(history.created_at);
+                const daysSince = Math.floor((new Date() - lastCheck) / (1000 * 60 * 60 * 24));
+                return daysSince >= 7;
+            };
+            
+            const getWeeklyAverage = (coach) => {
+                const history = weeklyHistory[coach];
+                if (!history?.answers) return null;
+                const questions = weeklyQuestions[coach];
+                let total = 0, count = 0;
+                questions.forEach(q => {
+                    if (history.answers[q.id]) {
+                        // Per domande invertite (stress, ansia, dolori) invertiamo il punteggio
+                        const val = q.inverted ? (6 - history.answers[q.id]) : history.answers[q.id];
+                        total += val;
+                        count++;
+                    }
+                });
+                return count > 0 ? (total / count).toFixed(1) : null;
+            };
             
             const hsMetrics = {
                 sleep_duration: { label: 'Sonno', icon: '😴', target: '7-8.5h' },
@@ -363,6 +460,123 @@
                                             <h3 className="font-semibold text-sm mb-2">💡 Consigli</h3>
                                             <div className="space-y-1">{hs.suggestions.map((s, i) => <p key={i} className="text-xs text-[var(--text-secondary)]">{s}</p>)}</div>
                                         </div>
+                                    )}
+                                    
+                                    {/* Fatica Percepita */}
+                                    <div className="glass p-4 mb-4 slide-up">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h3 className="font-semibold text-sm">🦵 Fatica Percepita Oggi</h3>
+                                            {fatigue && <span className="text-xs px-2 py-1 rounded-full" style={{ background: getFatigueColor(fatigue) + '20', color: getFatigueColor(fatigue) }}>{getFatigueLabel(fatigue)}</span>}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-[var(--text-muted)]">1</span>
+                                            <div className="flex-1 flex gap-1">
+                                                {[1,2,3,4,5,6,7,8,9,10].map(v => (
+                                                    <button key={v} onClick={() => saveFatigue(v)} disabled={savingFatigue}
+                                                        className={`flex-1 h-8 rounded-lg transition-all ${fatigue === v ? 'scale-110 ring-2 ring-white' : 'hover:scale-105'}`}
+                                                        style={{ background: getFatigueColor(v), opacity: fatigue === v ? 1 : 0.4 }}>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <span className="text-xs text-[var(--text-muted)]">10</span>
+                                        </div>
+                                        <div className="flex justify-between mt-1 text-[9px] text-[var(--text-muted)]">
+                                            <span>Fresco</span>
+                                            <span>Estrema</span>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Weekly Check-ins */}
+                                    <div className="grid grid-cols-2 gap-3 mb-4 slide-up">
+                                        {/* Sensei Check-in */}
+                                        <div className="glass p-4 cursor-pointer hover:border-[var(--accent-green)] transition-all" onClick={() => setShowWeeklyCheck('sensei')}>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-xl">🥋</span>
+                                                <span className="font-semibold text-sm text-[var(--accent-green)]">Check Fisico</span>
+                                            </div>
+                                            {weeklyHistory.sensei ? (
+                                                <div>
+                                                    <div className="text-2xl font-bold" style={{ color: parseFloat(getWeeklyAverage('sensei')) >= 3.5 ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
+                                                        {getWeeklyAverage('sensei')}/5
+                                                    </div>
+                                                    <div className="text-[9px] text-[var(--text-muted)]">
+                                                        {isWeeklyCheckDue('sensei') ? '⚠️ Da rifare' : `✓ ${new Date(weeklyHistory.sensei.created_at).toLocaleDateString('it', { day: 'numeric', month: 'short' })}`}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-xs text-[var(--text-muted)]">Compila →</div>
+                                            )}
+                                        </div>
+                                        
+                                        {/* Sakura Check-in */}
+                                        <div className="glass p-4 cursor-pointer hover:border-[var(--accent-pink)] transition-all" onClick={() => setShowWeeklyCheck('sakura')}>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-xl">🌸</span>
+                                                <span className="font-semibold text-sm text-[var(--accent-pink)]">Check Mentale</span>
+                                            </div>
+                                            {weeklyHistory.sakura ? (
+                                                <div>
+                                                    <div className="text-2xl font-bold" style={{ color: parseFloat(getWeeklyAverage('sakura')) >= 3.5 ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
+                                                        {getWeeklyAverage('sakura')}/5
+                                                    </div>
+                                                    <div className="text-[9px] text-[var(--text-muted)]">
+                                                        {isWeeklyCheckDue('sakura') ? '⚠️ Da rifare' : `✓ ${new Date(weeklyHistory.sakura.created_at).toLocaleDateString('it', { day: 'numeric', month: 'short' })}`}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-xs text-[var(--text-muted)]">Compila →</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Weekly Check Modal */}
+                                    {showWeeklyCheck && (
+                                        <Modal onClose={() => { setShowWeeklyCheck(null); setWeeklyAnswers({}); }}>
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <span className="text-3xl">{showWeeklyCheck === 'sensei' ? '🥋' : '🌸'}</span>
+                                                <div>
+                                                    <h3 className="text-lg font-bold" style={{ color: showWeeklyCheck === 'sensei' ? 'var(--accent-green)' : 'var(--accent-pink)' }}>
+                                                        Check {showWeeklyCheck === 'sensei' ? 'Fisico' : 'Mentale'}
+                                                    </h3>
+                                                    <p className="text-xs text-[var(--text-muted)]">Come ti sei sentito questa settimana?</p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="space-y-4 mb-5">
+                                                {weeklyQuestions[showWeeklyCheck].map(q => (
+                                                    <div key={q.id}>
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <span>{q.icon}</span>
+                                                            <span className="text-sm font-medium">{q.label}</span>
+                                                        </div>
+                                                        <p className="text-[10px] text-[var(--text-muted)] mb-2">{q.desc}</p>
+                                                        <div className="flex gap-2">
+                                                            {[1,2,3,4,5].map(v => (
+                                                                <button key={v} onClick={() => setWeeklyAnswers(prev => ({ ...prev, [q.id]: v }))}
+                                                                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${weeklyAnswers[q.id] === v ? 'ring-2 ring-white scale-105' : 'opacity-60 hover:opacity-80'}`}
+                                                                    style={{ 
+                                                                        background: q.inverted 
+                                                                            ? (v <= 2 ? 'var(--accent-green)' : v === 3 ? 'var(--accent-orange)' : 'var(--accent-red)')
+                                                                            : (v >= 4 ? 'var(--accent-green)' : v === 3 ? 'var(--accent-orange)' : 'var(--accent-red)'),
+                                                                        color: '#000'
+                                                                    }}>
+                                                                    {v}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        <div className="flex justify-between mt-1 text-[9px] text-[var(--text-muted)]">
+                                                            <span>{q.inverted ? 'Nessuno' : 'Pessimo'}</span>
+                                                            <span>{q.inverted ? 'Estremo' : 'Ottimo'}</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            
+                                            <button onClick={() => saveWeeklyCheck(showWeeklyCheck)} disabled={savingWeekly || Object.keys(weeklyAnswers).length < weeklyQuestions[showWeeklyCheck].length}
+                                                className={`w-full py-3 rounded-xl font-bold transition-all ${showWeeklyCheck === 'sensei' ? 'btn-primary' : 'btn-pink'} disabled:opacity-40`}>
+                                                {savingWeekly ? 'Salvataggio...' : `Salva (${Object.keys(weeklyAnswers).length}/${weeklyQuestions[showWeeklyCheck].length})`}
+                                            </button>
+                                        </Modal>
                                     )}
                                     
                                     {hs?.impacts && (

@@ -237,3 +237,51 @@ class UserMemory(db.Model):
     coach = db.Column(db.String(20))
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+
+
+
+
+
+
+# ==================== AGGIUNGI A models.py ====================
+# Copia queste classi nel file app/models.py
+
+class FatigueLog(db.Model):
+    """Log fatica percepita giornaliera (1-10)"""
+    __tablename__ = 'fatigue_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    value = db.Column(db.Integer, nullable=False)  # 1-10
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Unique constraint: un solo valore per utente/giorno
+    __table_args__ = (db.UniqueConstraint('user_id', 'date', name='unique_user_date_fatigue'),)
+    
+    user = db.relationship('User', backref=db.backref('fatigue_logs', lazy='dynamic'))
+
+
+class WeeklyCheck(db.Model):
+    """Check-in settimanale per Sensei (fisico) e Sakura (mentale)"""
+    __tablename__ = 'weekly_checks'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    coach = db.Column(db.String(20), nullable=False)  # 'sensei' o 'sakura'
+    answers = db.Column(db.Text, nullable=False)  # JSON string
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship('User', backref=db.backref('weekly_checks', lazy='dynamic'))
+    
+    def get_answers_dict(self):
+        """Ritorna answers come dict"""
+        import json
+        return json.loads(self.answers) if self.answers else {}
+    
+    def set_answers_dict(self, answers_dict):
+        """Salva answers da dict"""
+        import json
+        self.answers = json.dumps(answers_dict)

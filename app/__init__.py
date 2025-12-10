@@ -1779,3 +1779,312 @@ app = create_app()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
+
+
+# ==================== AGGIUNGI A __init__.py ====================
+# 
+# 1. Prima aggiungi l'import in cima al file:
+#    from app.models import db, User, DailyMetric, Activity, SyncLog, ChatMessage, UserMemory, FatigueLog, WeeklyCheck
+#
+# 2. Poi copia questi endpoint dentro create_app(), dopo gli altri endpoint (es. dopo /api/activity/<int:activity_id>/comment)
+
+    # ========== FATIGUE (Fatica Percepita) ==========
+    
+    @app.route('/api/fatigue', methods=['GET'])
+    @token_required
+    def get_fatigue(current_user):
+        """Ottieni fatica per una data specifica"""
+        date_str = request.args.get('date')
+        
+        if not date_str:
+            return jsonify({'error': 'Date required'}), 400
+        
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Invalid date format'}), 400
+        
+        fatigue = FatigueLog.query.filter_by(
+            user_id=current_user.id,
+            date=target_date
+        ).first()
+        
+        if fatigue:
+            return jsonify({
+                'date': date_str,
+                'value': fatigue.value,
+                'created_at': fatigue.created_at.isoformat() if fatigue.created_at else None
+            })
+        return jsonify({'date': date_str, 'value': None})
+    
+    @app.route('/api/fatigue', methods=['POST'])
+    @token_required
+    def save_fatigue(current_user):
+        """Salva fatica giornaliera (1-10)"""
+        data = request.get_json()
+        
+        date_str = data.get('date')
+        value = data.get('value')
+        
+        if not date_str or value is None:
+            return jsonify({'error': 'Date and value required'}), 400
+        
+        if not (1 <= value <= 10):
+            return jsonify({'error': 'Value must be 1-10'}), 400
+        
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Invalid date format'}), 400
+        
+        # Upsert: trova esistente o crea nuovo
+        fatigue = FatigueLog.query.filter_by(
+            user_id=current_user.id,
+            date=target_date
+        ).first()
+        
+        if fatigue:
+            fatigue.value = value
+            fatigue.created_at = datetime.utcnow()
+        else:
+            fatigue = FatigueLog(
+                user_id=current_user.id,
+                date=target_date,
+                value=value
+            )
+            db.session.add(fatigue)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'date': date_str, 'value': value})
+    
+    @app.route('/api/fatigue/history', methods=['GET'])
+    @token_required
+    def get_fatigue_history(current_user):
+        """Ottieni storico fatica ultimi N giorni"""
+        days = request.args.get('days', 30, type=int)
+        start_date = date.today() - timedelta(days=days)
+        
+        logs = FatigueLog.query.filter(
+            FatigueLog.user_id == current_user.id,
+            FatigueLog.date >= start_date
+        ).order_by(FatigueLog.date.desc()).all()
+        
+        return jsonify([{
+            'date': log.date.isoformat(),
+            'value': log.value
+        } for log in logs])
+    
+    # ========== WEEKLY CHECK (Check-in Settimanali) ==========
+    
+    @app.route('/api/weekly-check', methods=['POST'])
+    @token_required
+    def save_weekly_check(current_user):
+        """Salva check-in settimanale per un coach"""
+        import json
+        data = request.get_json()
+        
+        coach = data.get('coach')
+        answers = data.get('answers')
+        
+        if not coach or coach not in ['sensei', 'sakura']:
+            return jsonify({'error': 'Invalid coach'}), 400
+        
+        if not answers or not isinstance(answers, dict):
+            return jsonify({'error': 'Answers required'}), 400
+        
+        # Crea nuovo check-in
+        check = WeeklyCheck(
+            user_id=current_user.id,
+            coach=coach,
+            answers=json.dumps(answers)
+        )
+        db.session.add(check)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'coach': coach, 'id': check.id})
+    
+    @app.route('/api/weekly-check/latest', methods=['GET'])
+    @token_required
+    def get_latest_weekly_check(current_user):
+        """Ottieni ultimo check-in per un coach"""
+        import json
+        coach = request.args.get('coach')
+        
+        if not coach or coach not in ['sensei', 'sakura']:
+            return jsonify({'error': 'Invalid coach'}), 400
+        
+        check = WeeklyCheck.query.filter_by(
+            user_id=current_user.id,
+            coach=coach
+        ).order_by(WeeklyCheck.created_at.desc()).first()
+        
+        if check:
+            return jsonify({
+                'coach': coach,
+                'answers': json.loads(check.answers),
+                'created_at': check.created_at.isoformat() if check.created_at else None
+            })
+        return jsonify({'coach': coach, 'answers': None})
+    
+    @app.route('/api/weekly-check/history', methods=['GET'])
+    @token_required
+    def get_weekly_check_history(current_user):
+        """Ottieni storico check-in per un coach"""
+        import json
+        coach = request.args.get('coach')
+        weeks = request.args.get('weeks', 12, type=int)
+        
+        if not coach or coach not in ['sensei', 'sakura']:
+            return jsonify({'error': 'Invalid coach'}), 400
+        
+        checks = WeeklyCheck.query.filter_by(
+            user_id=current_user.id,
+            coach=coach
+        ).order_by(WeeklyCheck.created_at.desc()).limit(weeks).all()
+        
+        return jsonify([{
+            'answers': json.loads(c.answers),
+            'created_at': c.created_at.isoformat() if c.created_at else None
+        } for c in checks])
+    
+    # ========== WELLNESS SCORE (Punteggio combinato) ==========
+    
+    @app.route('/api/wellness/score', methods=['GET'])
+    @token_required
+    def get_wellness_score(current_user):
+        """
+        Ottieni punteggio benessere combinato:
+        - Recovery Garmin
+        - Fatica percepita
+        - Check-in settimanali
+        """
+        import json
+        
+        today_date = date.today()
+        
+        # Fatica di oggi
+        fatigue_log = FatigueLog.query.filter_by(
+            user_id=current_user.id,
+            date=today_date
+        ).first()
+        fatigue = fatigue_log.value if fatigue_log else None
+        
+        # Recovery Garmin di oggi
+        today_metric = DailyMetric.query.filter_by(
+            user_id=current_user.id,
+            date=today_date
+        ).first()
+        garmin_recovery = today_metric.recovery_score if today_metric else None
+        
+        # Ultimi check-in settimanali
+        scores = {}
+        for coach in ['sensei', 'sakura']:
+            check = WeeklyCheck.query.filter_by(
+                user_id=current_user.id,
+                coach=coach
+            ).order_by(WeeklyCheck.created_at.desc()).first()
+            
+            if check:
+                answers = json.loads(check.answers)
+                # Domande invertite (più basso = meglio)
+                inverted = {
+                    'sensei': ['soreness'],
+                    'sakura': ['stress', 'anxiety']
+                }
+                total = 0
+                for key, val in answers.items():
+                    if key in inverted.get(coach, []):
+                        total += (6 - val)  # Inverti: 5->1, 1->5
+                    else:
+                        total += val
+                scores[coach] = round(total / len(answers), 1) if answers else None
+        
+        # Calcola readiness combinato (0-100)
+        readiness = None
+        components = []
+        weights = []
+        
+        # Garmin recovery (peso 40%)
+        if garmin_recovery:
+            components.append(garmin_recovery)
+            weights.append(0.4)
+        
+        # Fatica percepita invertita (peso 30%)
+        if fatigue:
+            fatigue_score = (11 - fatigue) * 10  # 1->100, 10->10
+            components.append(fatigue_score)
+            weights.append(0.3)
+        
+        # Score fisico Sensei (peso 20%)
+        if scores.get('sensei'):
+            physical_score = scores['sensei'] * 20  # 1-5 -> 20-100
+            components.append(physical_score)
+            weights.append(0.2)
+        
+        # Score mentale Sakura (peso 10%)
+        if scores.get('sakura'):
+            mental_score = scores['sakura'] * 20
+            components.append(mental_score)
+            weights.append(0.1)
+        
+        if components:
+            # Normalizza pesi
+            total_weight = sum(weights)
+            readiness = round(sum(c * w / total_weight for c, w in zip(components, weights)))
+        
+        # Genera raccomandazione
+        recommendation = _get_readiness_recommendation(readiness, fatigue, garmin_recovery)
+        
+        return jsonify({
+            'garmin_recovery': garmin_recovery,
+            'fatigue_today': fatigue,
+            'physical_score': scores.get('sensei'),
+            'mental_score': scores.get('sakura'),
+            'readiness': readiness,
+            'recommendation': recommendation
+        })
+
+
+# ========== HELPER FUNCTION (fuori da create_app) ==========
+
+def _get_readiness_recommendation(readiness, fatigue, garmin_recovery):
+    """Genera raccomandazione allenamento basata sui punteggi"""
+    
+    # Priorità alla fatica percepita alta
+    if fatigue and fatigue >= 8:
+        return "🛑 Riposo consigliato - fatica muscolare alta"
+    
+    if fatigue and fatigue >= 6 and (not garmin_recovery or garmin_recovery < 60):
+        return "😴 Giornata di recupero - ascolta il corpo"
+    
+    if readiness is None:
+        if fatigue:
+            if fatigue <= 3:
+                return "💪 Pronto per allenamento intenso"
+            elif fatigue <= 5:
+                return "🏃 OK per allenamento normale"
+            elif fatigue <= 7:
+                return "🚶 Meglio attività leggera"
+            else:
+                return "😴 Riposo consigliato"
+        elif garmin_recovery:
+            if garmin_recovery >= 70:
+                return "💪 Recovery alto - via libera!"
+            elif garmin_recovery >= 50:
+                return "🏃 Recovery ok - allenamento moderato"
+            else:
+                return "🚶 Recovery basso - attività leggera"
+        return "📝 Compila i check-in per consigli personalizzati"
+    
+    # Basato su readiness combinato
+    if readiness >= 80:
+        return "💪 Pronto per allenamento intenso"
+    elif readiness >= 65:
+        return "🏃 OK per allenamento normale"
+    elif readiness >= 50:
+        return "🚶 Meglio attività leggera"
+    elif readiness >= 35:
+        return "🧘 Recupero attivo consigliato"
+    else:
+        return "😴 Giornata di riposo"
