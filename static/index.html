@@ -279,7 +279,7 @@
         
         // ==================== DATA VIEW ====================
         
-        const DataView = ({ onAskCoach }) => {
+        const DataView = ({ onAskCoach, onDeepAnalysis }) => {
             const { token, lastSync, refresh, isRefreshing } = useApp();
             const [healthspan, setHealthspan] = useState(null);
             const [loading, setLoading] = useState(true);
@@ -832,6 +832,12 @@
                                             <button onClick={() => handleAskCoachClick('sensei')} className="btn-primary py-3 rounded-xl text-sm">🥋 Sensei</button>
                                             <button onClick={() => handleAskCoachClick('sakura')} className="btn-pink py-3 rounded-xl text-sm">🌸 Sakura</button>
                                         </div>
+                                        <button 
+                                            onClick={onDeepAnalysis} 
+                                            className="w-full mt-3 py-3 rounded-xl text-sm font-medium bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 transition-all"
+                                        >
+                                            🔬 Analisi Pattern (GPT-5)
+                                        </button>
                                     </div>
                                 </>
                             )}
@@ -1448,6 +1454,7 @@
             const [isRefreshing, setIsRefreshing] = useState(false);
             const [initialMessage, setInitialMessage] = useState(null);
             const [appReady, setAppReady] = useState(false);
+            const [deepAnalysis, setDeepAnalysis] = useState({ show: false, loading: false, result: null, error: null });
             
             // Auto-sync on mount
             useEffect(() => {
@@ -1480,6 +1487,24 @@
             }, [token]);
             
             const handleAskCoach = (coach, message) => { setInitialMessage(message); setTab(coach); };
+            
+            const handleDeepAnalysis = async () => {
+                setDeepAnalysis({ show: true, loading: true, result: null, error: null });
+                try {
+                    const res = await fetch(`${API}/api/deep-analysis`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        setDeepAnalysis({ show: true, loading: false, result: data, error: null });
+                    } else {
+                        setDeepAnalysis({ show: true, loading: false, result: null, error: data.error || 'Errore durante l\'analisi' });
+                    }
+                } catch (e) {
+                    setDeepAnalysis({ show: true, loading: false, result: null, error: 'Errore di connessione' });
+                }
+            };
             
             const contextValue = { token, user, setUser: onUserUpdate, lastSync, refresh, isRefreshing };
             
@@ -1526,7 +1551,7 @@
                         
                         {/* Content */}
                         <main className="flex-1 overflow-hidden min-h-0">
-                            {tab === 'data' && <DataView onAskCoach={handleAskCoach} />}
+                            {tab === 'data' && <DataView onAskCoach={handleAskCoach} onDeepAnalysis={handleDeepAnalysis} />}
                             {tab === 'stats' && <StatsView onAskCoach={handleAskCoach} />}
                             {tab === 'sensei' && <ChatView coach="sensei" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
                             {tab === 'sakura' && <ChatView coach="sakura" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
@@ -1549,6 +1574,52 @@
                                 })}
                             </div>
                         </nav>
+                        
+                        {/* Deep Analysis Modal */}
+                        {deepAnalysis.show && (
+                            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                                <div className="glass w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col rounded-2xl">
+                                    <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+                                        <h2 className="text-lg font-bold flex items-center gap-2">
+                                            <span>🔬</span> Analisi Pattern (GPT-5)
+                                        </h2>
+                                        <button 
+                                            onClick={() => setDeepAnalysis({ show: false, loading: false, result: null, error: null })}
+                                            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                                        >✕</button>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto p-4">
+                                        {deepAnalysis.loading && (
+                                            <div className="flex flex-col items-center justify-center py-12">
+                                                <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                                                <p className="text-[var(--text-secondary)]">GPT-5 sta analizzando i tuoi dati...</p>
+                                                <p className="text-xs text-[var(--text-secondary)] mt-1">Questo può richiedere 30-60 secondi</p>
+                                            </div>
+                                        )}
+                                        {deepAnalysis.error && (
+                                            <div className="text-red-400 text-center py-8">
+                                                <p className="text-4xl mb-2">⚠️</p>
+                                                <p>{deepAnalysis.error}</p>
+                                            </div>
+                                        )}
+                                        {deepAnalysis.result && (
+                                            <div className="space-y-4">
+                                                <div className="text-xs text-[var(--text-secondary)] flex gap-4">
+                                                    <span>📊 {deepAnalysis.result.days_analyzed} giorni</span>
+                                                    <span>🏃 {deepAnalysis.result.activities_analyzed} attività</span>
+                                                    <span>🤖 {deepAnalysis.result.model}</span>
+                                                </div>
+                                                <div className="prose prose-invert prose-sm max-w-none">
+                                                    <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                                                        {deepAnalysis.result.analysis}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </AppContext.Provider>
             );

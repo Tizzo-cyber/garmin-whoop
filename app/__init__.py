@@ -1580,6 +1580,143 @@ Rispondi come una vera guida mentale, in modo naturale e personale. Max 250 paro
         if m: m.is_active = False; db.session.commit()
         return jsonify({'message': 'OK'})
     
+    # ═══════════════════════════════════════════════════════════════
+    #                    DEEP ANALYSIS CON GPT-5
+    # ═══════════════════════════════════════════════════════════════
+    @app.route('/api/deep-analysis', methods=['POST'])
+    @token_required
+    def deep_analysis(current_user):
+        """Analisi profonda dei pattern con GPT-5 reasoning"""
+        if not openai_client:
+            return jsonify({'error': 'AI non configurata'}), 500
+        
+        try:
+            # Prendi 90 giorni di dati
+            today = date.today()
+            start_date = today - timedelta(days=90)
+            metrics = DailyMetric.query.filter(
+                DailyMetric.user_id == current_user.id,
+                DailyMetric.date >= start_date
+            ).order_by(DailyMetric.date.asc()).all()
+            
+            if len(metrics) < 14:
+                return jsonify({'error': 'Servono almeno 14 giorni di dati per l\'analisi'}), 400
+            
+            # Prepara dati per analisi
+            data_rows = []
+            for m in metrics:
+                data_rows.append({
+                    'date': str(m.date),
+                    'weekday': m.date.strftime('%A'),
+                    'recovery': m.recovery_score,
+                    'strain': m.strain_score,
+                    'sleep_hours': m.sleep_hours,
+                    'deep_sleep': m.deep_sleep_min,
+                    'rem_sleep': m.rem_sleep_min,
+                    'rhr': m.resting_hr,
+                    'hrv': m.hrv,
+                    'stress_avg': m.stress_avg,
+                    'steps': m.steps,
+                    'active_cal': m.active_calories,
+                    'bio_age': m.biological_age
+                })
+            
+            # Prendi attivita
+            activities = Activity.query.filter(
+                Activity.user_id == current_user.id,
+                Activity.start_time >= datetime.combine(start_date, datetime.min.time())
+            ).order_by(Activity.start_time.desc()).all()
+            
+            activity_data = []
+            for a in activities:
+                activity_data.append({
+                    'date': str(a.start_time.date()),
+                    'weekday': a.start_time.strftime('%A'),
+                    'type': a.activity_type,
+                    'duration_min': a.duration_minutes,
+                    'strain': a.strain_score,
+                    'avg_hr': a.average_hr,
+                    'max_hr': a.max_hr
+                })
+            
+            # Prendi fatica percepita
+            fatigue_logs = FatigueLog.query.filter(
+                FatigueLog.user_id == current_user.id,
+                FatigueLog.date >= start_date
+            ).all()
+            fatigue_data = {str(f.date): f.value for f in fatigue_logs}
+            
+            # Costruisci prompt per GPT-5
+            import json
+            analysis_prompt = f"""Sei un analista di performance sportiva e benessere con accesso a 90 giorni di dati biometrici di {current_user.name or 'utente'}, {current_user.get_real_age()} anni.
+
+COMPITO: Analizza i pattern nascosti nei dati e fornisci insights actionable.
+
+=== DATI GIORNALIERI ({len(data_rows)} giorni) ===
+{json.dumps(data_rows[-30:], indent=1)}
+[... altri {len(data_rows)-30} giorni disponibili nel pattern analysis]
+
+=== ATTIVITA ({len(activity_data)} sessioni) ===
+{json.dumps(activity_data[:20], indent=1)}
+
+=== FATICA PERCEPITA ===
+{json.dumps(fatigue_data, indent=1)}
+
+=== STATISTICHE RAPIDE ===
+- Recovery media: {sum(m['recovery'] or 0 for m in data_rows)/len(data_rows):.1f}%
+- Sonno medio: {sum(m['sleep_hours'] or 0 for m in data_rows)/len(data_rows):.1f}h
+- HRV medio: {sum(m['hrv'] or 0 for m in data_rows if m['hrv'])/len([m for m in data_rows if m['hrv']]):.0f}ms
+- Stress medio: {sum(m['stress_avg'] or 0 for m in data_rows if m['stress_avg'])/len([m for m in data_rows if m['stress_avg']]):.0f}
+
+ANALIZZA E RISPONDI IN ITALIANO CON:
+
+1. **CORRELAZIONI SCOPERTE** (3-5 pattern significativi)
+   - Cerca correlazioni tra sonno/recovery, attivita/HRV, giorni settimana/stress
+   - Cerca soglie critiche (es: "sotto X ore di sonno, il recovery crolla")
+
+2. **TREND E PROGRESSI** (miglioramenti o peggioramenti)
+   - Confronta ultime 2 settimane vs mese precedente
+   - Identifica metriche in miglioramento/peggioramento
+
+3. **ANOMALIE RILEVATE** (valori insoliti)
+   - Giorni con valori fuori norma
+   - Pattern inattesi
+
+4. **PREDIZIONI** (basate sui pattern)
+   - Stima recovery per domani
+   - Rischio overtraining/burnout
+
+5. **RACCOMANDAZIONI PERSONALIZZATE** (3-5 azioni concrete)
+   - Basate sui pattern trovati
+   - Specifiche per questa persona
+
+Sii specifico, cita numeri, evita generalita. Usa emoji per le sezioni."""
+
+            # Chiama GPT-5 con reasoning
+            response = openai_client.chat.completions.create(
+                model="gpt-5",
+                messages=[
+                    {"role": "system", "content": "Sei un esperto analista di dati biometrici e performance sportiva. Analizza pattern complessi e fornisci insights profondi."},
+                    {"role": "user", "content": analysis_prompt}
+                ],
+                max_tokens=2000,
+                temperature=0.7
+            )
+            
+            analysis_text = response.choices[0].message.content
+            
+            return jsonify({
+                'analysis': analysis_text,
+                'days_analyzed': len(data_rows),
+                'activities_analyzed': len(activity_data),
+                'model': 'gpt-5'
+            })
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
+
     @app.route('/api/recalculate', methods=['POST'])
     @token_required
     def recalculate_bio_age(current_user):
