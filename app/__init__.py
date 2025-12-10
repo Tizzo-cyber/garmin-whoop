@@ -1700,8 +1700,7 @@ Sii specifico, cita numeri esatti, evita generalita. Parla come uno scienziato e
                     {"role": "system", "content": "Sei Dr. Data, scienziato dei dati biometrici. Analizzi pattern complessi con entusiasmo scientifico, spiegando le correlazioni in modo accessibile ma rigoroso. Fai parte del Performance Lab insieme a Dr. Sensei e Dr. Sakura."},
                     {"role": "user", "content": analysis_prompt}
                 ],
-                max_completion_tokens=2000,
-                temperature=0.7
+                max_completion_tokens=2000
             )
             
             analysis_text = response.choices[0].message.content
