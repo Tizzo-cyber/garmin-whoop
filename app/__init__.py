@@ -1523,7 +1523,7 @@ Rispondi come una vera guida mentale, in modo naturale e personale. Max 250 paro
         messages.append({"role": "user", "content": msg})
         
         try:
-            resp = openai_client.chat.completions.create(model="gpt-4o-mini", messages=messages, max_tokens=800, temperature=0.8)
+            resp = openai_client.chat.completions.create(model="gpt-4.1", messages=messages, max_tokens=800, temperature=0.8)
             ai_raw = resp.choices[0].message.content
             
             # Save messages
@@ -1817,7 +1817,7 @@ Rispondi in italiano, in modo diretto e motivante."""
 
         try:
             response = openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4.1",
                 messages=[
                     {"role": "system", "content": "Sei Sensei, un coach sportivo esperto. Dai feedback brevi e motivanti sulle attività."},
                     {"role": "user", "content": prompt}
@@ -1879,7 +1879,7 @@ Pauses: Use thoughtful pauses, especially between breathing instructions and vis
         
         try:
             response = openai_client.audio.speech.create(
-                model="gpt-4o-mini-tts",
+                model="tts-1",
                 voice=voice,
                 input=clean_text,
                 instructions=instructions,
