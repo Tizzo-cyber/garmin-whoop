@@ -1614,7 +1614,7 @@ Rispondi come una vera guida mentale, in modo naturale e personale. Max 250 paro
                     'deep_sleep': round(m.deep_sleep_seconds / 60) if m.deep_sleep_seconds else None,
                     'rem_sleep': round(m.rem_sleep_seconds / 60) if m.rem_sleep_seconds else None,
                     'rhr': m.resting_hr,
-                    'hrv': m.hrv,
+                    'hrv': m.hrv_last_night or m.hrv_weekly_avg,
                     'stress_avg': m.stress_avg,
                     'steps': m.steps,
                     'active_cal': m.active_calories,
@@ -1630,12 +1630,12 @@ Rispondi come una vera guida mentale, in modo naturale e personale. Max 250 paro
             activity_data = []
             for a in activities:
                 activity_data.append({
-                    'date': str(a.start_time.date()),
-                    'weekday': a.start_time.strftime('%A'),
+                    'date': str(a.start_time.date()) if a.start_time else None,
+                    'weekday': a.start_time.strftime('%A') if a.start_time else None,
                     'type': a.activity_type,
-                    'duration_min': a.duration_minutes,
+                    'duration_min': round(a.duration_seconds / 60) if a.duration_seconds else None,
                     'strain': a.strain_score,
-                    'avg_hr': a.average_hr,
+                    'avg_hr': a.avg_hr,
                     'max_hr': a.max_hr
                 })
             
