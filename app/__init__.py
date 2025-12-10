@@ -986,52 +986,50 @@ HRV: {'+' if (t.get('hrv_change', 0) or 0) >= 0 else ''}{t.get('hrv_change', 0)}
         
         return f"""Sei SENSEI, preparatore atletico personale di {name}, {age} anni.
 
-!!! REGOLE ASSOLUTE DI FORMATTAZIONE !!!
-- MAI usare markdown: no ##, no **, no -, no elenchi puntati
-- MAI fare liste o bullet points
-- MAI inventare dati: usa SOLO i numeri che vedi sotto
-- Scrivi in paragrafi fluidi, come una conversazione vera
-- Se non sai qualcosa, NON inventare
+!!! REGOLE ASSOLUTE !!!
+- MAI markdown (##, **, -, elenchi)
+- MAI inventare dati
+- Scrivi come parleresti davvero
 
-PERSONALITA: Diretto, pratico, motivante. Parli come un vero coach italiano. Chiama sempre l'utente per nome.
-NON sei un chatbot generico. Sei il SUO preparatore personale.
+PERSONALITA: Diretto, pratico, motivante. Chiama sempre {name} per nome.
 
-CONTESTO ORA: {time_context}
+═══════════════════════════════════════════════════
+        REGOLE CONTESTUALI (RISPETTA QUESTE!)
+═══════════════════════════════════════════════════
+Ora: {context.get('temporal', {}).get('weekday', 'N/D').upper()} ore {context.get('temporal', {}).get('hour', '?')}:00
+Giorno {context.get('temporal', {}).get('days_into_week', '?')}/7 della settimana
+
+{context.get('ai_rules', 'Nessuna regola speciale')}
+═══════════════════════════════════════════════════
+
+STATO ATTUALE:
+- Ultima attivita: {context.get('temporal', {}).get('days_since_activity', 'N/D')} giorni fa ({context.get('temporal', {}).get('last_activity_type', 'N/D')})
+- Questa settimana: {context.get('temporal', {}).get('this_week_activities', 0)} attivita
+- Streak: {context.get('temporal', {}).get('streak', 0)} giorni consecutivi
+- Giorni abituali: {', '.join(context.get('temporal', {}).get('usual_training_days', [])) or 'non definiti'}
+
 TONO: {time_tone}
-DATI: {data_tone}
 PUSH LEVEL: {push_level}
 
 COLLEGA: Dr. Sakura (coach mentale) - per temi emotivi/stress rimanda a lei.
 
 --- DATI DI IERI ({y.get('date', 'N/D')}) ---
 Recupero: {y.get('recovery', 'N/D')}% | Strain: {y.get('strain', 'N/D')}/21
-Sonno: {y.get('sleep_hours', 'N/D')}h (Score: {y.get('sleep_score', 'N/D')}) | Deep {y.get('deep_sleep_min', 'N/D')}min | REM {y.get('rem_sleep_min', 'N/D')}min
+Sonno: {y.get('sleep_hours', 'N/D')}h (Score: {y.get('sleep_score', 'N/D')})
 Cuore: RHR {y.get('rhr', 'N/D')}bpm | HRV {y.get('hrv', 'N/D')}ms
-Attivita: {y.get('steps', 'N/D')} passi | {y.get('active_calories', 'N/D')}kcal
 Body Battery: {y.get('body_battery_low', 'N/D')}-{y.get('body_battery_high', 'N/D')}
 
 --- MEDIE 30 GIORNI ---
 Eta biologica: {context.get('biological_age', 'N/D')} (reale: {age}) | VO2 Max: {context.get('vo2_max', 'N/D')}
-Recovery: {context.get('recovery', 'N/D')}% | Strain: {context.get('strain', 'N/D')}/21
-Sonno: {context.get('sleep_hours', 'N/D')}h | RHR: {context.get('resting_hr', 'N/D')}bpm
-
---- PREVISIONI GARA ---
-{race_text}
-
---- TREND VS SETTIMANA SCORSA ---
-{trend_text}
+Recovery: {context.get('recovery', 'N/D')}%
 
 --- ATTIVITA RECENTI ---
-{week_summary}
 {activities_text}
 
---- SENSAZIONI RIPORTATE ---
+--- SENSAZIONI ---
 {_format_sensei_wellness(context.get('wellness', {}))}
 
---- MEMORIE ---
-{memories_text}
-
-Rispondi come un vero coach, in modo naturale e personale. Cita numeri specifici! Max 250 parole."""
+Max 200 parole. RISPETTA LE REGOLE CONTESTUALI!"""
 
     def _get_sakura_prompt(user, context, memories):
         name = user.name or "amico"
@@ -1110,52 +1108,38 @@ HRV: {'+' if (t.get('hrv_change', 0) or 0) >= 0 else ''}{t.get('hrv_change', 0)}
         
         return f"""Sei SAKURA, guida mentale personale di {name}, {age} anni.
 
-!!! REGOLE ASSOLUTE DI FORMATTAZIONE !!!
-- MAI usare markdown: no ##, no **, no -, no elenchi puntati
-- MAI fare liste o bullet points
-- MAI inventare dati: usa SOLO i numeri che vedi sotto
-- Scrivi in paragrafi fluidi, come una conversazione vera
-- Se non sai qualcosa, NON inventare - chiedi
+!!! REGOLE ASSOLUTE !!!
+- MAI markdown (##, **, -, elenchi)
+- MAI inventare dati
+- Scrivi come parleresti davvero
 
-PERSONALITA: Calma, empatica, femminile, mai giudicante. Chiama sempre l'utente per nome.
-NON sei un chatbot generico. Sei la SUA guida mentale personale.
+PERSONALITA: Calma, empatica, femminile, mai giudicante. Chiama sempre {name} per nome.
 
-CONTESTO ORA: {time_context}
+═══════════════════════════════════════════════════
+        REGOLE CONTESTUALI (RISPETTA QUESTE!)
+═══════════════════════════════════════════════════
+Ora: {context.get('temporal', {}).get('weekday', 'N/D')} ore {context.get('temporal', {}).get('hour', '?')}:00
+
+{context.get('ai_rules', 'Nessuna regola speciale')}
+═══════════════════════════════════════════════════
+
 TONO: {time_tone}
 STATO RILEVATO: {emotional_state}
 APPROCCIO: {approach}
 
-COLLEGA: Dr. Sensei (preparatore atletico) - per temi fisici/allenamento rimanda a lui.
+COLLEGA: Dr. Sensei (preparatore atletico) - per temi fisici rimanda a lui.
 
 --- DATI DI IERI ({y.get('date', 'N/D')}) ---
 Sonno: {y.get('sleep_hours', 'N/D')}h | Deep {y.get('deep_sleep_min', 'N/D')}min | REM {y.get('rem_sleep_min', 'N/D')}min
 Recupero: {y.get('recovery', 'N/D')}% | Stress medio: {y.get('stress_avg', 'N/D')}
-HRV: {y.get('hrv', 'N/D')}ms | RHR: {y.get('rhr', 'N/D')}bpm
-Body Battery: {y.get('body_battery_low', 'N/D')}-{y.get('body_battery_high', 'N/D')}
-
---- MEDIE 30 GIORNI ---
-Sonno: {context.get('sleep_hours', 'N/D')}h | Recupero: {context.get('recovery', 'N/D')}% | Stress: {context.get('stress_avg', 'N/D')}
-
---- TREND VS SETTIMANA SCORSA ---
-{trend_text}
-
---- ATTIVITA RECENTI ---
-{week_summary}
+HRV: {y.get('hrv', 'N/D')}ms
 
 --- SENSAZIONI RIPORTATE ---
 {_format_sakura_wellness(context.get('wellness', {}))}
 
---- MEMORIE ---
-{memories_text}
-
-INTERPRETAZIONE RAPIDA:
-- HRV >50ms = equilibrato | <30ms = stressato
-- Stress <25 = rilassato | >75 = alto
-- Deep sleep <45min = possibile ansia
-
 MEDITAZIONE (se richiesta): usa [PAUSA:XX] per le pause, no markdown, frasi brevi con "..."
 
-Rispondi come una vera guida mentale, in modo naturale e personale. Max 250 parole."""
+Max 200 parole. RISPETTA LE REGOLE CONTESTUALI!"""
 
     def _fatigue_label(value):
         """Converte valore fatica in etichetta"""
@@ -1478,6 +1462,123 @@ Rispondi come una vera guida mentale, in modo naturale e personale. Max 250 paro
                 'total_distance_km': round(sum([a.distance_meters/1000 for a in activities if a.distance_meters]), 1),
                 'avg_strain': avg([a.strain_score for a in activities]),
             }
+        
+        # ═══ CONTESTO TEMPORALE INTELLIGENTE ═══
+        now = datetime.now()
+        weekday_names = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica']
+        current_weekday = now.weekday()  # 0=lunedì
+        current_hour = now.hour
+        
+        # Giorni passati questa settimana (lunedì = giorno 0)
+        days_into_week = current_weekday + 1  # 1-7
+        
+        # Ultima attività e giorni di riposo
+        days_since_activity = None
+        last_activity_type = None
+        if activities:
+            last_activity_date = activities[0].start_time.date() if activities[0].start_time else None
+            if last_activity_date:
+                days_since_activity = (now.date() - last_activity_date).days
+                last_activity_type = activities[0].activity_type
+        
+        # Attività questa settimana (dal lunedì corrente)
+        week_start = now.date() - timedelta(days=current_weekday)
+        this_week_activities = [a for a in activities if a.start_time and a.start_time.date() >= week_start]
+        
+        # Attività settimana scorsa (stesso periodo, es: se è mercoledì, lun-mer scorsi)
+        last_week_start = week_start - timedelta(days=7)
+        last_week_end = last_week_start + timedelta(days=current_weekday)
+        last_week_same_period = [a for a in activities if a.start_time and 
+                                  last_week_start <= a.start_time.date() <= last_week_end]
+        
+        # Pattern settimanale (su quali giorni si allena di solito)
+        training_days_count = {}
+        for a in activities:
+            if a.start_time:
+                day = a.start_time.weekday()
+                training_days_count[day] = training_days_count.get(day, 0) + 1
+        
+        usual_training_days = [weekday_names[d] for d, count in sorted(training_days_count.items(), key=lambda x: -x[1]) if count >= 2][:3]
+        
+        # Streak di giorni consecutivi con attività
+        activity_dates = set(a.start_time.date() for a in activities if a.start_time)
+        streak = 0
+        check_date = now.date()
+        while check_date in activity_dates:
+            streak += 1
+            check_date -= timedelta(days=1)
+        
+        # ═══════════════════════════════════════════════════════════════
+        #            LAYER DI INTERPRETAZIONE INTELLIGENTE
+        # ═══════════════════════════════════════════════════════════════
+        
+        # Lista di cose che l'AI NON deve dire (basate su contesto)
+        ai_dont_say = []
+        ai_can_say = []
+        
+        # --- REGOLE ORARIO ---
+        if current_hour < 10:
+            ai_dont_say.append(f"NON commentare passi/calorie/attività di OGGI - sono solo le {current_hour}:00, la giornata è appena iniziata")
+            ai_can_say.append("Puoi parlare di IERI e dei dati notturni (sonno, recupero, HRV)")
+        elif current_hour < 14:
+            ai_dont_say.append("NON giudicare i passi di oggi come 'pochi' - è ancora mattina/primo pomeriggio")
+        
+        # --- REGOLE GIORNO SETTIMANA ---
+        if current_weekday == 0:  # Lunedì
+            ai_dont_say.append("NON dire 'hai fatto poco questa settimana' - è LUNEDÌ, la settimana è appena iniziata!")
+            ai_can_say.append("Puoi confrontare con la settimana SCORSA")
+        elif current_weekday == 1:  # Martedì
+            ai_dont_say.append("NON giudicare il volume settimanale - siamo solo a martedì")
+        
+        # --- REGOLE RIPOSO ---
+        if days_since_activity is not None:
+            if days_since_activity == 0:
+                ai_can_say.append(f"Si è allenato OGGI ({last_activity_type}) - puoi commentare l'attività")
+            elif days_since_activity == 1:
+                ai_can_say.append("Ieri si è allenato - oggi può essere giorno di recupero attivo")
+            elif days_since_activity == 2:
+                ai_can_say.append("2 giorni di riposo - normale, non allarmante")
+            elif days_since_activity >= 3:
+                ai_can_say.append(f"Sono {days_since_activity} giorni senza allenamento - puoi suggerire di riprendere se il recupero è buono")
+        
+        # --- REGOLE WEEKEND ---
+        if current_weekday >= 5:  # Sabato o Domenica
+            ai_can_say.append("È weekend - momento ideale per attività più lunghe o riposo completo")
+        
+        # --- REGOLE PATTERN ---
+        if usual_training_days:
+            today_name = weekday_names[current_weekday]
+            if today_name in usual_training_days and days_since_activity and days_since_activity >= 1:
+                ai_can_say.append(f"Oggi è {today_name}, di solito si allena - puoi suggerirlo se i dati lo permettono")
+        
+        # --- REGOLE STREAK ---
+        if streak >= 3:
+            ai_can_say.append(f"Ha uno streak di {streak} giorni consecutivi - celebralo!")
+        elif streak == 0 and days_since_activity and days_since_activity >= 2:
+            ai_dont_say.append("NON essere giudicante sul riposo - potrebbe essere necessario")
+        
+        # Costruisci il blocco di regole per il prompt
+        ai_rules_text = ""
+        if ai_dont_say:
+            ai_rules_text += "🚫 NON DIRE:\n" + "\n".join([f"  - {rule}" for rule in ai_dont_say]) + "\n\n"
+        if ai_can_say:
+            ai_rules_text += "✅ PUOI DIRE:\n" + "\n".join([f"  - {rule}" for rule in ai_can_say])
+        
+        context['temporal'] = {
+            'weekday': weekday_names[current_weekday],
+            'weekday_num': current_weekday,
+            'hour': current_hour,
+            'days_into_week': days_into_week,
+            'days_since_activity': days_since_activity,
+            'last_activity_type': last_activity_type,
+            'this_week_activities': len(this_week_activities),
+            'last_week_same_period': len(last_week_same_period),
+            'usual_training_days': usual_training_days,
+            'streak': streak,
+            'is_rest_day': days_since_activity and days_since_activity >= 1,
+        }
+        
+        context['ai_rules'] = ai_rules_text
         
         # Aggiungi dati wellness (fatica e check-in)
         wellness = _get_wellness_context(user.id)
