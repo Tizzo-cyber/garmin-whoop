@@ -630,7 +630,7 @@
         
         // ==================== STATS VIEW ====================
         
-        const StatsView = ({ onAskCoach }) => {
+        const StatsView = ({ onAskCoach, onDeepAnalysis }) => {
             const { token, lastSync, refresh, isRefreshing } = useApp();
             const [period, setPeriod] = useState('day');
             const [offset, setOffset] = useState(0);
@@ -1552,7 +1552,7 @@
                         {/* Content */}
                         <main className="flex-1 overflow-hidden min-h-0">
                             {tab === 'data' && <DataView onAskCoach={handleAskCoach} onDeepAnalysis={handleDeepAnalysis} />}
-                            {tab === 'stats' && <StatsView onAskCoach={handleAskCoach} />}
+                            {tab === 'stats' && <StatsView onAskCoach={handleAskCoach} onDeepAnalysis={handleDeepAnalysis} />}
                             {tab === 'sensei' && <ChatView coach="sensei" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
                             {tab === 'sakura' && <ChatView coach="sakura" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
                             {tab === 'trend' && <TrendView />}
