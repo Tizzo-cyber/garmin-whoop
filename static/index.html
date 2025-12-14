@@ -1685,12 +1685,15 @@
             
             const dayNames = ['', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
             
-            const rescheduleWorkout = async (newDay) => {
+            const rescheduleWorkout = async (newDay, workoutDayId = null) => {
                 try {
+                    const dayId = workoutDayId || todayWorkout?.workout?.day_id;
+                    if (!dayId) return;
+                    
                     const res = await fetch(`${API}/api/gym/reschedule`, {
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ workout_day_id: todayWorkout.workout.day_id, new_day: newDay })
+                        body: JSON.stringify({ workout_day_id: dayId, new_day: newDay })
                     });
                     if (res.ok) {
                         setShowReschedule(false);
@@ -2031,9 +2034,14 @@
                                             <span className="text-5xl block mb-4">🧘</span>
                                             <h3 className="text-lg font-bold mb-2">{todayWorkout?.message || 'Giorno di riposo'}</h3>
                                             {todayWorkout?.next_workout && (
-                                                <p className="text-sm text-[var(--text-muted)]">
+                                                <p className="text-sm text-[var(--text-muted)] mb-4">
                                                     Prossimo: {todayWorkout.next_workout.name}
                                                 </p>
+                                            )}
+                                            {program && (
+                                                <button onClick={() => setShowReschedule('bring')} className="btn-lou px-4 py-2 rounded-xl text-sm">
+                                                    💪 Allenati oggi comunque
+                                                </button>
                                             )}
                                         </div>
                                     )}
@@ -2227,27 +2235,56 @@
                     )}
                     
                     {/* Reschedule Modal */}
-                    {showReschedule && todayWorkout?.workout && (
+                    {showReschedule && (showReschedule === 'bring' || todayWorkout?.workout) && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowReschedule(false)}>
                             <div className="glass p-6 rounded-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
                                 <div className="flex items-center gap-3 mb-4">
                                     <img src={louAvatar} alt="Lou" className="w-12 h-12 rounded-full object-cover" />
                                     <div>
-                                        <h3 className="font-bold">Sposta Allenamento</h3>
-                                        <p className="text-xs text-[var(--text-muted)]">{todayWorkout.workout.name}</p>
+                                        <h3 className="font-bold">{showReschedule === 'bring' ? 'Scegli Allenamento' : 'Sposta Allenamento'}</h3>
+                                        <p className="text-xs text-[var(--text-muted)]">{showReschedule === 'bring' ? 'Quale vuoi fare oggi?' : todayWorkout?.workout?.name}</p>
                                     </div>
                                 </div>
                                 
-                                <p className="text-sm text-[var(--text-muted)] mb-4">Non riesci oggi? Nessun problema, scegli un altro giorno!</p>
-                                
-                                <div className="grid grid-cols-7 gap-1 mb-4">
-                                    {[1,2,3,4,5,6,7].map(day => (
-                                        <button key={day} onClick={() => rescheduleWorkout(day)}
-                                            className={`p-2 rounded-lg text-center text-sm ${day === new Date().getDay() || day === 7 && new Date().getDay() === 0 ? 'bg-[var(--accent-lou)] text-white' : 'bg-[var(--bg-elevated)] hover:bg-[var(--accent-lou-dim)]'}`}>
-                                            {dayNames[day]}
-                                        </button>
-                                    ))}
-                                </div>
+                                {showReschedule === 'bring' ? (
+                                    <>
+                                        <p className="text-sm text-[var(--text-muted)] mb-4">Scegli un allenamento da portare a oggi:</p>
+                                        <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
+                                            {program?.days?.map(day => (
+                                                <button key={day.id} onClick={() => rescheduleWorkout(new Date().getDay() === 0 ? 7 : new Date().getDay(), day.id)}
+                                                    className="w-full p-3 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--accent-lou-dim)] text-left">
+                                                    <div className="flex justify-between items-center">
+                                                        <div>
+                                                            <span className="font-medium">{day.name}</span>
+                                                            <span className="text-xs text-[var(--text-muted)] ml-2">({dayNames[day.day_of_week]})</span>
+                                                        </div>
+                                                        <span className="text-xs text-[var(--text-muted)]">{day.estimated_minutes}min</span>
+                                                    </div>
+                                                    <div className="flex gap-1 mt-1">
+                                                        {day.muscle_groups?.map(mg => (
+                                                            <span key={mg} className="text-[10px] px-1 py-0.5 rounded bg-[var(--accent-lou-dim)] text-[var(--accent-lou)]">
+                                                                {muscleGroups.find(m => m.id === mg)?.label?.split(' ')[0] || mg}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="text-sm text-[var(--text-muted)] mb-4">Non riesci oggi? Nessun problema, scegli un altro giorno!</p>
+                                        
+                                        <div className="grid grid-cols-7 gap-1 mb-4">
+                                            {[1,2,3,4,5,6,7].map(day => (
+                                                <button key={day} onClick={() => rescheduleWorkout(day)}
+                                                    className={`p-2 rounded-lg text-center text-sm ${day === (new Date().getDay() === 0 ? 7 : new Date().getDay()) ? 'bg-[var(--accent-lou)] text-white' : 'bg-[var(--bg-elevated)] hover:bg-[var(--accent-lou-dim)]'}`}>
+                                                    {dayNames[day]}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
                                 
                                 <button onClick={() => setShowReschedule(false)} className="w-full py-2 text-sm text-[var(--text-muted)]">
                                     Annulla
