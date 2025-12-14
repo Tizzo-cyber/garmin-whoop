@@ -1,595 +1,2754 @@
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
-from cryptography.fernet import Fernet
-import base64
-import hashlib
-
-db = SQLAlchemy()
-
-def get_fernet(key: str) -> Fernet:
-    """Crea un oggetto Fernet da una chiave stringa"""
-    key_bytes = hashlib.sha256(key.encode()).digest()
-    key_b64 = base64.urlsafe_b64encode(key_bytes)
-    return Fernet(key_b64)
-
-
-class User(db.Model):
-    __tablename__ = 'users'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(255), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)  # Password app
-    
-    # Profile
-    name = db.Column(db.String(100))
-    birth_year = db.Column(db.Integer)
-    sport_goals = db.Column(db.Text)
-    
-    # Credenziali Garmin (criptate)
-    garmin_email = db.Column(db.String(255))
-    garmin_password_encrypted = db.Column(db.Text)
-    
-    # Stato sync
-    last_sync = db.Column(db.DateTime)
-    sync_enabled = db.Column(db.Boolean, default=True)
-    
-    # Obiettivi nutrizione
-    calorie_goal = db.Column(db.Integer, default=2000)
-    protein_goal = db.Column(db.Integer, default=120)  # grammi
-    carbs_goal = db.Column(db.Integer, default=250)    # grammi
-    fat_goal = db.Column(db.Integer, default=70)       # grammi
-    
-    # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relazioni
-    daily_metrics = db.relationship('DailyMetric', backref='user', lazy='dynamic')
-    activities = db.relationship('Activity', backref='user', lazy='dynamic')
-    
-    def set_garmin_password(self, password: str, encryption_key: str):
-        """Cripta e salva la password Garmin"""
-        f = get_fernet(encryption_key)
-        self.garmin_password_encrypted = f.encrypt(password.encode()).decode()
-    
-    def get_garmin_password(self, encryption_key: str) -> str:
-        """Decripta e ritorna la password Garmin"""
-        if not self.garmin_password_encrypted:
-            return None
-        f = get_fernet(encryption_key)
-        return f.decrypt(self.garmin_password_encrypted.encode()).decode()
-    
-    def get_real_age(self):
-        if self.birth_year:
-            return datetime.now().year - self.birth_year
-        return 42
-
-
-class DailyMetric(db.Model):
-    __tablename__ = 'daily_metrics'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    
-    # Heart
-    resting_hr = db.Column(db.Integer)
-    min_hr = db.Column(db.Integer)
-    max_hr = db.Column(db.Integer)
-    avg_hr = db.Column(db.Integer)
-    
-    # HRV (se disponibile)
-    hrv_weekly_avg = db.Column(db.Float)
-    hrv_last_night = db.Column(db.Float)
-    
-    # Body Battery
-    body_battery_high = db.Column(db.Integer)
-    body_battery_low = db.Column(db.Integer)
-    body_battery_charged = db.Column(db.Integer)
-    body_battery_drained = db.Column(db.Integer)
-    
-    # Sleep
-    sleep_seconds = db.Column(db.Integer)
-    deep_sleep_seconds = db.Column(db.Integer)
-    light_sleep_seconds = db.Column(db.Integer)
-    rem_sleep_seconds = db.Column(db.Integer)
-    awake_seconds = db.Column(db.Integer)
-    sleep_score = db.Column(db.Integer)
-    sleep_start = db.Column(db.DateTime)
-    sleep_end = db.Column(db.DateTime)
-    
-    # Stress
-    stress_avg = db.Column(db.Integer)
-    stress_max = db.Column(db.Integer)
-    rest_stress_duration = db.Column(db.Integer)
-    low_stress_duration = db.Column(db.Integer)
-    medium_stress_duration = db.Column(db.Integer)
-    high_stress_duration = db.Column(db.Integer)
-    
-    # Activity
-    steps = db.Column(db.Integer)
-    total_calories = db.Column(db.Integer)
-    active_calories = db.Column(db.Integer)
-    distance_meters = db.Column(db.Integer)
-    floors_ascended = db.Column(db.Integer)
-    moderate_intensity_minutes = db.Column(db.Integer)
-    vigorous_intensity_minutes = db.Column(db.Integer)
-    active_seconds = db.Column(db.Integer)
-    sedentary_seconds = db.Column(db.Integer)
-    
-    # Respiration
-    avg_respiration = db.Column(db.Float)
-    min_respiration = db.Column(db.Float)
-    max_respiration = db.Column(db.Float)
-    
-    # SpO2
-    avg_spo2 = db.Column(db.Float)
-    min_spo2 = db.Column(db.Float)
-    
-    # VO2 Max
-    vo2_max = db.Column(db.Float)
-    
-    # Fitness Age (da Garmin)
-    fitness_age = db.Column(db.Integer)
-    
-    # Race Predictions (secondi)
-    race_time_5k = db.Column(db.Integer)
-    race_time_10k = db.Column(db.Integer)
-    race_time_half = db.Column(db.Integer)
-    race_time_marathon = db.Column(db.Integer)
-    
-    # Metriche calcolate
-    recovery_score = db.Column(db.Integer)  # 0-100
-    strain_score = db.Column(db.Float)      # 0-21 stile WHOOP
-    sleep_performance = db.Column(db.Integer)  # 0-100
-    biological_age = db.Column(db.Float)
-    
-    # Impatto singoli fattori sull'età biologica
-    bio_age_rhr_impact = db.Column(db.Float)
-    bio_age_vo2_impact = db.Column(db.Float)
-    bio_age_sleep_impact = db.Column(db.Float)
-    bio_age_steps_impact = db.Column(db.Float)
-    bio_age_stress_impact = db.Column(db.Float)
-    bio_age_hrz_impact = db.Column(db.Float)
-    
-    # Raw data per debug
-    raw_json = db.Column(db.Text)
-    
-    # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    __table_args__ = (
-        db.UniqueConstraint('user_id', 'date', name='unique_user_date'),
-    )
-
-
-class Activity(db.Model):
-    __tablename__ = 'activities'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    garmin_activity_id = db.Column(db.BigInteger, unique=True)
-    
-    # Info base
-    activity_name = db.Column(db.String(255))
-    activity_type = db.Column(db.String(100))
-    start_time = db.Column(db.DateTime)
-    end_time = db.Column(db.DateTime)
-    
-    # Metriche
-    duration_seconds = db.Column(db.Float)
-    distance_meters = db.Column(db.Float)
-    calories = db.Column(db.Integer)
-    avg_hr = db.Column(db.Integer)
-    max_hr = db.Column(db.Integer)
-    
-    # Training Effect
-    aerobic_effect = db.Column(db.Float)
-    anaerobic_effect = db.Column(db.Float)
-    
-    # HR Zones (secondi in ogni zona)
-    hr_zone_1 = db.Column(db.Float)
-    hr_zone_2 = db.Column(db.Float)
-    hr_zone_3 = db.Column(db.Float)
-    hr_zone_4 = db.Column(db.Float)
-    hr_zone_5 = db.Column(db.Float)
-    
-    # Intensity minutes
-    moderate_intensity_minutes = db.Column(db.Integer)
-    vigorous_intensity_minutes = db.Column(db.Integer)
-    
-    # Strain calcolato
-    strain_score = db.Column(db.Float)
-    
-    # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-
-class SyncLog(db.Model):
-    """Log delle sincronizzazioni"""
-    __tablename__ = 'sync_logs'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    started_at = db.Column(db.DateTime, default=datetime.utcnow)
-    finished_at = db.Column(db.DateTime)
-    status = db.Column(db.String(50))  # success, error, partial
-    error_message = db.Column(db.Text)
-    metrics_synced = db.Column(db.Integer, default=0)
-    activities_synced = db.Column(db.Integer, default=0)
-
-
-class ChatMessage(db.Model):
-    """Messaggi chat con i coach AI"""
-    __tablename__ = 'chat_messages'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    role = db.Column(db.String(20), nullable=False)  # user, assistant
-    content = db.Column(db.Text, nullable=False)
-    coach = db.Column(db.String(20))  # sensei, sakura
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-
-class UserMemory(db.Model):
-    """Memoria persistente dei coach"""
-    __tablename__ = 'user_memories'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    category = db.Column(db.String(50))
-    content = db.Column(db.Text, nullable=False)
-    coach = db.Column(db.String(20))
-    is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-
-
-
-
-
-
-
-# ==================== AGGIUNGI A models.py ====================
-# Copia queste classi nel file app/models.py
-
-class FatigueLog(db.Model):
-    """Log fatica percepita giornaliera (1-10)"""
-    __tablename__ = 'fatigue_logs'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    value = db.Column(db.Integer, nullable=False)  # 1-10
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Unique constraint: un solo valore per utente/giorno
-    __table_args__ = (db.UniqueConstraint('user_id', 'date', name='unique_user_date_fatigue'),)
-    
-    user = db.relationship('User', backref=db.backref('fatigue_logs', lazy='dynamic'))
-
-
-class WeeklyCheck(db.Model):
-    """Check-in settimanale per Sensei (fisico) e Sakura (mentale)"""
-    __tablename__ = 'weekly_checks'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    coach = db.Column(db.String(20), nullable=False)  # 'sensei' o 'sakura'
-    answers = db.Column(db.Text, nullable=False)  # JSON string
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    user = db.relationship('User', backref=db.backref('weekly_checks', lazy='dynamic'))
-    
-    def get_answers_dict(self):
-        """Ritorna answers come dict"""
-        import json
-        return json.loads(self.answers) if self.answers else {}
-    
-    def set_answers_dict(self, answers_dict):
-        """Salva answers da dict"""
-        import json
-        self.answers = json.dumps(answers_dict)
-
-
-class FoodEntry(db.Model):
-    """Tracciamento pasti e nutrizione"""
-    __tablename__ = 'food_entries'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    
-    # Tipo pasto
-    meal_type = db.Column(db.String(20), nullable=False)  # breakfast, lunch, dinner, snack
-    
-    # Info cibo
-    food_name = db.Column(db.String(255), nullable=False)
-    brand = db.Column(db.String(255))
-    barcode = db.Column(db.String(50))
-    
-    # Quantità
-    serving_size = db.Column(db.Float, default=100)  # grammi o porzione
-    serving_unit = db.Column(db.String(20), default='g')  # g, ml, porzione
-    
-    # Valori nutrizionali
-    calories = db.Column(db.Integer, nullable=False)
-    protein = db.Column(db.Float)  # grammi
-    carbs = db.Column(db.Float)    # grammi
-    fat = db.Column(db.Float)      # grammi
-    fiber = db.Column(db.Float)    # grammi
-    sugar = db.Column(db.Float)    # grammi
-    
-    # Origine dati
-    source = db.Column(db.String(50))  # openfoodfacts, manual, ai_estimate
-    
-    # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    user = db.relationship('User', backref=db.backref('food_entries', lazy='dynamic'))
-
-
-# ==================== LOU - SCULPTING COACH ====================
-
-class GymProfile(db.Model):
-    """Profilo palestra utente per Lou"""
-    __tablename__ = 'gym_profiles'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
-    
-    # Livello esperienza
-    experience = db.Column(db.String(20), default='beginner')  # beginner, intermediate, advanced
-    
-    # Disponibilità
-    days_per_week = db.Column(db.Integer, default=3)  # 3-6
-    session_minutes = db.Column(db.Integer, default=60)  # 45, 60, 90
-    
-    # Muscoli da escludere (JSON array: ["abs", "shoulders"])
-    excluded_muscles = db.Column(db.Text, default='[]')
-    
-    # Muscoli prioritari (JSON array: ["glutes", "legs"])
-    priority_muscles = db.Column(db.Text, default='["glutes", "legs"]')
-    
-    # Equipaggiamento disponibile (JSON array)
-    equipment = db.Column(db.Text, default='["barbell", "dumbbells", "cables", "machines"]')
-    
-    # Modificatore intensità globale (0.6 = relax, 1.0 = normale, 1.2 = beast)
-    intensity_modifier = db.Column(db.Float, default=1.0)
-    
-    # Obiettivo principale
-    primary_goal = db.Column(db.String(50), default='toning')  # toning, strength, hypertrophy
-    
-    # Setup completato?
-    setup_complete = db.Column(db.Boolean, default=False)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    user = db.relationship('User', backref=db.backref('gym_profile', uselist=False))
-    
-    def get_excluded_muscles(self):
-        import json
-        return json.loads(self.excluded_muscles) if self.excluded_muscles else []
-    
-    def set_excluded_muscles(self, muscles):
-        import json
-        self.excluded_muscles = json.dumps(muscles)
-    
-    def get_priority_muscles(self):
-        import json
-        return json.loads(self.priority_muscles) if self.priority_muscles else []
-    
-    def set_priority_muscles(self, muscles):
-        import json
-        self.priority_muscles = json.dumps(muscles)
-    
-    def get_equipment(self):
-        import json
-        return json.loads(self.equipment) if self.equipment else []
-
-
-class WorkoutProgram(db.Model):
-    """Programma di allenamento generato da Lou"""
-    __tablename__ = 'workout_programs'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    
-    name = db.Column(db.String(100), nullable=False)  # "Programma Glutei Focus"
-    description = db.Column(db.Text)
-    
-    # Tipo split
-    split_type = db.Column(db.String(50))  # PPL, Upper-Lower, Bro, FullBody
-    
-    # Durata e progressione
-    weeks_total = db.Column(db.Integer, default=6)
-    current_week = db.Column(db.Integer, default=1)
-    
-    # Stato
-    is_active = db.Column(db.Boolean, default=True)
-    created_by_ai = db.Column(db.Boolean, default=True)
-    
-    # Timestamps
-    started_at = db.Column(db.DateTime)
-    completed_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    user = db.relationship('User', backref=db.backref('workout_programs', lazy='dynamic'))
-    days = db.relationship('WorkoutDay', backref='program', lazy='dynamic', cascade='all, delete-orphan')
-
-
-class WorkoutDay(db.Model):
-    """Giorno di allenamento nel programma"""
-    __tablename__ = 'workout_days'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    program_id = db.Column(db.Integer, db.ForeignKey('workout_programs.id'), nullable=False)
-    
-    # Giorno della settimana (1=Lunedì, 7=Domenica)
-    day_of_week = db.Column(db.Integer, nullable=False)
-    
-    # Nome e descrizione
-    name = db.Column(db.String(100), nullable=False)  # "Leg Day 🦵"
-    
-    # Muscoli target (JSON array)
-    muscle_groups = db.Column(db.Text)  # ["glutes", "quads", "hamstrings"]
-    
-    # Durata stimata in minuti
-    estimated_minutes = db.Column(db.Integer, default=60)
-    
-    # Ordine nel programma
-    order = db.Column(db.Integer, default=0)
-    
-    exercises = db.relationship('ProgramExercise', backref='workout_day', lazy='dynamic', cascade='all, delete-orphan')
-    
-    def get_muscle_groups(self):
-        import json
-        return json.loads(self.muscle_groups) if self.muscle_groups else []
-
-
-class ProgramExercise(db.Model):
-    """Esercizio nel programma"""
-    __tablename__ = 'program_exercises'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    workout_day_id = db.Column(db.Integer, db.ForeignKey('workout_days.id'), nullable=False)
-    
-    # Ordine nell'allenamento
-    order = db.Column(db.Integer, nullable=False)
-    
-    # Info esercizio
-    name = db.Column(db.String(100), nullable=False)  # "Hip Thrust"
-    muscle_group = db.Column(db.String(50))  # glutes, quads, back, shoulders, arms, abs
-    equipment = db.Column(db.String(50))  # barbell, dumbbells, cables, bodyweight, machine
-    
-    # Parametri
-    sets = db.Column(db.Integer, default=4)
-    reps_min = db.Column(db.Integer, default=8)
-    reps_max = db.Column(db.Integer, default=12)
-    rest_seconds = db.Column(db.Integer, default=90)
-    
-    # RPE target (Rate of Perceived Exertion)
-    rpe_target = db.Column(db.Integer, default=7)  # 1-10
-    
-    # Note tecniche
-    notes = db.Column(db.Text)
-    video_url = db.Column(db.String(500))
-    
-    # Peso suggerito (calcolato da storico)
-    suggested_weight = db.Column(db.Float)
-
-
-class ExerciseLog(db.Model):
-    """Log di un esercizio completato"""
-    __tablename__ = 'exercise_logs'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    exercise_id = db.Column(db.Integer, db.ForeignKey('program_exercises.id'))
-    
-    # Data e ora
-    date = db.Column(db.Date, nullable=False)
-    
-    # Nome esercizio (anche per esercizi fuori programma)
-    exercise_name = db.Column(db.String(100), nullable=False)
-    muscle_group = db.Column(db.String(50))
-    
-    # Risultati
-    sets_completed = db.Column(db.Integer)
-    reps_per_set = db.Column(db.Text)  # JSON array: [12, 12, 10, 8]
-    weight_kg = db.Column(db.Float)
-    
-    # Feedback
-    rpe = db.Column(db.Integer)  # 1-10 Rate of Perceived Exertion
-    feedback = db.Column(db.String(20))  # too_easy, perfect, too_hard
-    
-    # PR (Personal Record)?
-    is_pr = db.Column(db.Boolean, default=False)
-    
-    # Note
-    notes = db.Column(db.Text)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    user = db.relationship('User', backref=db.backref('exercise_logs', lazy='dynamic'))
-    
-    def get_reps_array(self):
-        import json
-        return json.loads(self.reps_per_set) if self.reps_per_set else []
-    
-    def set_reps_array(self, reps):
-        import json
-        self.reps_per_set = json.dumps(reps)
-
-
-class WorkoutSession(db.Model):
-    """Sessione di allenamento completata"""
-    __tablename__ = 'workout_sessions'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    workout_day_id = db.Column(db.Integer, db.ForeignKey('workout_days.id'))
-    
-    date = db.Column(db.Date, nullable=False)
-    
-    # Durata effettiva
-    duration_minutes = db.Column(db.Integer)
-    
-    # Volume totale (kg × reps)
-    total_volume = db.Column(db.Float)
-    
-    # Feedback generale
-    overall_rpe = db.Column(db.Integer)  # 1-10
-    feeling = db.Column(db.String(20))  # great, good, okay, tired, exhausted
-    
-    # Note
-    notes = db.Column(db.Text)
-    lou_comment = db.Column(db.Text)  # Commento generato da Lou
-    
-    # PRs in questa sessione (JSON array)
-    prs_achieved = db.Column(db.Text)  # ["Hip Thrust 65kg", "Squat 50kg"]
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    user = db.relationship('User', backref=db.backref('workout_sessions', lazy='dynamic'))
-
-
-class GymWeeklyReport(db.Model):
-    """Report settimanale generato da Lou"""
-    __tablename__ = 'gym_weekly_reports'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    program_id = db.Column(db.Integer, db.ForeignKey('workout_programs.id'))
-    
-    # Settimana
-    week_number = db.Column(db.Integer, nullable=False)
-    week_start = db.Column(db.Date, nullable=False)
-    week_end = db.Column(db.Date, nullable=False)
-    
-    # Statistiche
-    sessions_planned = db.Column(db.Integer)
-    sessions_completed = db.Column(db.Integer)
-    total_volume_kg = db.Column(db.Float)
-    total_duration_min = db.Column(db.Integer)
-    
-    # PRs della settimana
-    prs_achieved = db.Column(db.Text)  # JSON array
-    
-    # Medie
-    avg_rpe = db.Column(db.Float)
-    
-    # Progressi per muscolo (JSON)
-    muscle_progress = db.Column(db.Text)  # {"glutes": +5%, "legs": +3%}
-    
-    # Messaggio di Lou
-    lou_message = db.Column(db.Text)
-    
-    # Scelta utente per prossima settimana
-    user_choice = db.Column(db.String(20))  # push, maintain, deload
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    user = db.relationship('User', backref=db.backref('gym_weekly_reports', lazy='dynamic'))
+<!DOCTYPE html>
+<!-- SENSEI v3.2 - Robust Startup & Sync - 2024-12-09 -->
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SENSEI">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <title>SENSEI — Performance Lab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #050508; --bg-primary: #0a0a0f; --bg-secondary: #0f1015; --bg-card: rgba(18,18,24,0.7); --bg-card-solid: #121218; --bg-elevated: rgba(28,28,38,0.6);
+            --border: rgba(255,255,255,0.06); --border-light: rgba(255,255,255,0.1);
+            --text-primary: #fff; --text-secondary: rgba(255,255,255,0.7); --text-muted: rgba(255,255,255,0.4);
+            --accent-green: #00f593; --accent-green-dim: rgba(0,245,147,0.12); --accent-pink: #ff6eb4; --accent-pink-dim: rgba(255,110,180,0.12); --accent-lou: #a855f7; --accent-lou-dim: rgba(168,85,247,0.12);
+            --accent-blue: #4da6ff; --accent-purple: #a855f7; --accent-orange: #ff9f43; --accent-red: #ff5757; --accent-cyan: #22d3ee;
+            --safe-bottom: env(safe-area-inset-bottom, 0px); --nav-height: 72px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body, #root { height: 100%; height: 100dvh; overflow: hidden; font-family: 'Inter', -apple-system, sans-serif; background: var(--bg-base); color: var(--text-primary); -webkit-font-smoothing: antialiased; }
+        body { overscroll-behavior: none; background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0,245,147,0.08) 0%, transparent 50%), var(--bg-base); }
+        .font-display { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+        
+        .glass { background: var(--bg-card); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 20px; }
+        .glass-solid { background: var(--bg-card-solid); border: 1px solid var(--border); border-radius: 20px; }
+        .glass-elevated { background: var(--bg-elevated); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px); border: 1px solid var(--border-light); border-radius: 24px; box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+        
+        .glow-green { box-shadow: 0 0 60px rgba(0,245,147,0.15); }
+        .glow-pink { box-shadow: 0 0 60px rgba(255,110,180,0.15); }
+        .glow-text-green { text-shadow: 0 0 40px rgba(0,245,147,0.6); }
+        .gradient-text { background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        
+        .btn-primary { background: linear-gradient(135deg, var(--accent-green), #00c978); color: #000; font-weight: 700; border-radius: 16px; transition: all 0.3s; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,245,147,0.35); }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-primary:disabled { opacity: 0.5; transform: none; }
+        .btn-pink { background: linear-gradient(135deg, var(--accent-pink), #e055a0); color: #000; font-weight: 700; border-radius: 16px; }
+        .btn-lou { background: linear-gradient(135deg, var(--accent-lou), #9333ea); color: #fff; font-weight: 700; border-radius: 16px; }
+        .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); border-radius: 14px; transition: all 0.2s; }
+        .btn-ghost:hover { border-color: var(--border-light); background: rgba(255,255,255,0.03); }
+        .btn-danger { background: rgba(255,87,87,0.1); border: 1px solid var(--accent-red); color: var(--accent-red); border-radius: 14px; }
+        .btn-danger:hover { background: var(--accent-red); color: #000; }
+        
+        .input-modern { background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--text-primary); font-size: 16px; border-radius: 14px; transition: all 0.3s; }
+        .input-modern::placeholder { color: var(--text-muted); }
+        .input-modern:focus { border-color: var(--accent-green); outline: none; background: rgba(0,245,147,0.04); box-shadow: 0 0 0 4px rgba(0,245,147,0.1); }
+        .input-modern.pink:focus { border-color: var(--accent-pink); background: rgba(255,110,180,0.04); box-shadow: 0 0 0 4px rgba(255,110,180,0.1); }
+        
+        .chat-bubble { max-width: 85%; padding: 16px 20px; font-size: 15px; line-height: 1.7; border-radius: 20px; }
+        .chat-ai { background: var(--bg-card-solid); border: 1px solid var(--border); border-radius: 6px 20px 20px 20px; }
+        .chat-ai.sensei { border-left: 3px solid var(--accent-green); background: linear-gradient(135deg, rgba(0,245,147,0.04), var(--bg-card-solid)); }
+        .chat-ai.sakura { border-left: 3px solid var(--accent-pink); background: linear-gradient(135deg, rgba(255,110,180,0.04), var(--bg-card-solid)); }
+        .chat-ai.lou { border-left: 3px solid var(--accent-lou); background: linear-gradient(135deg, rgba(168,85,247,0.04), var(--bg-card-solid)); }
+        .chat-user { background: linear-gradient(135deg, rgba(77,166,255,0.15), rgba(77,166,255,0.05)); border: 1px solid rgba(77,166,255,0.2); border-radius: 20px 20px 6px 20px; }
+        
+        .typing-dot { width: 8px; height: 8px; border-radius: 50%; animation: pulse 1.4s infinite ease-in-out; }
+        .typing-dot:nth-child(2) { animation-delay: 0.15s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes pulse { 0%, 60%, 100% { transform: scale(0.8); opacity: 0.4; } 30% { transform: scale(1.2); opacity: 1; } }
+        
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: calc(var(--nav-height) + var(--safe-bottom)); padding-bottom: var(--safe-bottom); background: rgba(10,10,15,0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--border); z-index: 100; }
+        .nav-item-mobile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 12px; border-radius: 12px; transition: all 0.2s; color: var(--text-muted); min-width: 56px; flex-shrink: 0; }
+        .nav-item-mobile.active { color: var(--accent-green); }
+        .nav-item-mobile.active.sakura { color: var(--accent-pink); }
+        .nav-item-mobile.active.lou { color: var(--accent-lou); }
+        .nav-item-mobile .nav-icon { font-size: 22px; }
+        .nav-item-mobile .nav-label { font-size: 9px; font-weight: 500; }
+        
+        .sidebar { background: var(--bg-secondary); border-right: 1px solid var(--border); }
+        .nav-item-desktop { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; transition: all 0.2s; color: var(--text-muted); cursor: pointer; }
+        .nav-item-desktop:hover { background: rgba(255,255,255,0.03); color: var(--text-secondary); }
+        .nav-item-desktop.active { background: var(--accent-green-dim); color: var(--accent-green); }
+        .nav-item-desktop.active.sakura { background: var(--accent-pink-dim); color: var(--accent-pink); }
+        .nav-item-desktop.active.lou { background: var(--accent-lou-dim); color: var(--accent-lou); }
+        
+        .metric-card { background: var(--bg-card-solid); border: 1px solid var(--border); border-radius: 16px; padding: 16px; transition: all 0.3s; cursor: pointer; position: relative; }
+        .metric-card:hover { border-color: var(--border-light); transform: translateY(-2px); }
+        .metric-card:active { transform: scale(0.98); }
+        
+        .progress-track { height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 3px; transition: width 0.8s cubic-bezier(0.4,0,0.2,1); }
+        
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+        
+        .fade-in { animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .slide-up { animation: slideUp 0.5s ease; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+        .scale-in { animation: scaleIn 0.3s ease; }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 16px; }
+        .modal-card { background: var(--bg-card-solid); border: 1px solid var(--border); border-radius: 24px; padding: 24px; max-width: 420px; width: 100%; max-height: 85vh; overflow-y: auto; animation: scaleIn 0.3s ease; }
+        
+        .bg-gradient-hero { background: radial-gradient(ellipse 100% 80% at 50% -20%, rgba(0,245,147,0.12) 0%, transparent 50%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(255,110,180,0.06) 0%, transparent 50%), var(--bg-base); }
+        .bg-gradient-sensei { background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0,245,147,0.06) 0%, transparent 50%); }
+        .bg-gradient-sakura { background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255,110,180,0.06) 0%, transparent 50%); }
+        .bg-gradient-lou { background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(168,85,247,0.06) 0%, transparent 50%); }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        @media (min-width: 640px) { .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; } }
+        @media (min-width: 1024px) { .stats-grid { grid-template-columns: repeat(4, 1fr); } }
+        
+        @media (max-width: 1023px) { .desktop-only { display: none !important; } }
+        @media (min-width: 1024px) { .mobile-only { display: none !important; } }
+        
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Pull to refresh */
+        .ptr-container { position: relative; overflow-y: auto; overflow-x: hidden; }
+        .ptr-indicator { position: absolute; top: -50px; left: 50%; transform: translateX(-50%); transition: all 0.3s; opacity: 0; }
+        .ptr-indicator.visible { opacity: 1; }
+        .ptr-indicator.refreshing { top: 10px; }
+        .ptr-spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent-green); border-radius: 50%; }
+        .ptr-spinner.spin { animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* View header */
+        .view-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); background: rgba(10,10,15,0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 10; }
+        .view-title { font-size: 18px; font-weight: 700; }
+        .refresh-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--bg-card); border: 1px solid var(--border); font-size: 16px; cursor: pointer; transition: all 0.2s; }
+        .refresh-btn:hover { background: var(--bg-elevated); border-color: var(--border-light); }
+        .refresh-btn:active { transform: scale(0.95); }
+        .refresh-btn.spinning { animation: spin 0.8s linear infinite; }
+        
+        /* Sync status */
+        .sync-status { font-size: 10px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+        .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-green); }
+        .sync-dot.stale { background: var(--accent-orange); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback, createContext, useContext } = React;
+        const API = '';
+        
+        // ==================== GLOBAL CONTEXT ====================
+        
+        const AppContext = createContext(null);
+        
+        const useApp = () => useContext(AppContext);
+        
+        // ==================== PULL TO REFRESH HOOK ====================
+        
+        const usePullToRefresh = (onRefresh, containerRef) => {
+            const [pullDistance, setPullDistance] = useState(0);
+            const [isRefreshing, setIsRefreshing] = useState(false);
+            const startY = useRef(0);
+            const pulling = useRef(false);
+            
+            useEffect(() => {
+                const container = containerRef.current;
+                if (!container) return;
+                
+                const handleTouchStart = (e) => {
+                    if (container.scrollTop === 0) {
+                        startY.current = e.touches[0].clientY;
+                        pulling.current = true;
+                    }
+                };
+                
+                const handleTouchMove = (e) => {
+                    if (!pulling.current) return;
+                    const deltaY = e.touches[0].clientY - startY.current;
+                    if (deltaY > 0 && container.scrollTop === 0) {
+                        e.preventDefault();
+                        setPullDistance(Math.min(deltaY * 0.5, 80));
+                    }
+                };
+                
+                const handleTouchEnd = async () => {
+                    if (pullDistance > 60 && !isRefreshing) {
+                        setIsRefreshing(true);
+                        try { await onRefresh(); } catch {}
+                        setIsRefreshing(false);
+                    }
+                    setPullDistance(0);
+                    pulling.current = false;
+                };
+                
+                container.addEventListener('touchstart', handleTouchStart, { passive: true });
+                container.addEventListener('touchmove', handleTouchMove, { passive: false });
+                container.addEventListener('touchend', handleTouchEnd, { passive: true });
+                
+                return () => {
+                    container.removeEventListener('touchstart', handleTouchStart);
+                    container.removeEventListener('touchmove', handleTouchMove);
+                    container.removeEventListener('touchend', handleTouchEnd);
+                };
+            }, [onRefresh, pullDistance, isRefreshing]);
+            
+            return { pullDistance, isRefreshing };
+        };
+        
+        // ==================== SHARED COMPONENTS ====================
+        
+        const Loading = ({ text = "Caricamento..." }) => (
+            <div className="h-full flex items-center justify-center">
+                <div className="text-center">
+                    <div className="relative w-14 h-14 mx-auto mb-4">
+                        <div className="absolute inset-0 rounded-full border-4 border-[var(--border)]"></div>
+                        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--accent-green)] animate-spin"></div>
+                    </div>
+                    <p className="text-[var(--text-muted)] text-sm">{text}</p>
+                </div>
+            </div>
+        );
+        
+        const Modal = ({ children, onClose }) => (
+            <div className="modal-overlay" onClick={onClose}>
+                <div className="modal-card" onClick={e => e.stopPropagation()}>{children}</div>
+            </div>
+        );
+        
+        const ViewHeader = ({ title, onRefresh, isRefreshing, lastSync, children }) => (
+            <div className="view-header">
+                <div>
+                    <h1 className="view-title gradient-text">{title}</h1>
+                    {lastSync && (
+                        <div className="sync-status">
+                            <span className={`sync-dot ${Date.now() - lastSync > 3600000 ? 'stale' : ''}`}></span>
+                            Sync: {new Date(lastSync).toLocaleTimeString('it', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                    )}
+                </div>
+                <div className="flex items-center gap-2">
+                    {children}
+                    {onRefresh && (
+                        <button onClick={onRefresh} disabled={isRefreshing} className={`refresh-btn ${isRefreshing ? 'spinning' : ''}`}>🔄</button>
+                    )}
+                </div>
+            </div>
+        );
+        
+        const PullIndicator = ({ distance, isRefreshing }) => (
+            <div className={`ptr-indicator ${distance > 10 || isRefreshing ? 'visible' : ''} ${isRefreshing ? 'refreshing' : ''}`} style={{ transform: `translateX(-50%) translateY(${Math.min(distance, 60)}px)` }}>
+                <div className={`ptr-spinner ${isRefreshing ? 'spin' : ''}`}></div>
+            </div>
+        );
+        
+        // ==================== INFO DATA ====================
+        
+        const metricInfo = {
+            rhr: { title: 'Frequenza a Riposo', icon: '❤️', color: 'var(--accent-red)', desc: 'Efficienza del cuore. Più basso = meglio.', ranges: [{ label: 'Atleta', value: '40-50 bpm', good: true }, { label: 'Buono', value: '51-65 bpm', good: true }] },
+            vo2: { title: 'VO2 Max', icon: '🫁', color: 'var(--accent-green)', desc: 'Capacità aerobica. Ogni 5 punti in più = 2-3 anni più giovane.', ranges: [{ label: 'Eccellente', value: '50+', good: true }] },
+            steps: { title: 'Passi', icon: '👟', color: 'var(--accent-orange)', desc: '8000+ passi/giorno riducono mortalità del 51%.', ranges: [] },
+            sleep: { title: 'Sonno', icon: '😴', color: 'var(--accent-purple)', desc: '7-8 ore = recupero ottimale.', ranges: [] },
+            recovery: { title: 'Recovery', icon: '⚡', color: 'var(--accent-green)', desc: '70%+ = allenamento intenso OK.', ranges: [] },
+            strain: { title: 'Strain', icon: '🔥', color: 'var(--accent-orange)', desc: 'Carico cardiovascolare (0-21).', ranges: [] },
+            hrv: { title: 'HRV', icon: '💓', color: 'var(--accent-pink)', desc: 'Variabilità cardiaca. Alto = sistema nervoso sano.', ranges: [] },
+            bodyBattery: { title: 'Body Battery', icon: '🔋', color: 'var(--accent-cyan)', desc: 'Riserve di energia. Mattina ideale: 80+.', ranges: [] },
+            stress: { title: 'Stress', icon: '😤', color: 'var(--accent-orange)', desc: '<25 rilassato, >50 alto.', ranges: [] },
+            bioAge: { title: 'Età Biologica', icon: '🧬', color: 'var(--accent-green)', desc: 'Età reale del tuo corpo.', ranges: [] }
+        };
+        
+        const statsInfo = {
+            steps: { icon: '👟', title: 'Passi', desc: 'Passi totali. Target: 10.000/giorno.' },
+            calories: { icon: '🔥', title: 'Calorie', desc: 'Calorie totali bruciate.' },
+            distance: { icon: '📏', title: 'Distanza', desc: 'Km percorsi.' },
+            intensity: { icon: '⏱️', title: 'Min Intensi', desc: 'Minuti in zone HR elevate. WHO: 150 min/sett.' },
+            sleep: { icon: '😴', title: 'Sonno', desc: 'Durata media. Ottimale: 7-8h.' },
+            heart: { icon: '❤️', title: 'Cuore', desc: 'RHR basso + HRV alto = cuore efficiente.' },
+            stress: { icon: '😤', title: 'Stress', desc: 'Livello medio stress (0-100).' },
+            recovery: { icon: '⚡', title: 'Recovery', desc: 'Prontezza per sforzo (0-100%).' },
+            strain: { icon: '🔥', title: 'Strain', desc: 'Carico cardiovascolare (0-21).' },
+            bodyBattery: { icon: '🔋', title: 'Battery', desc: 'Energia (0-100).' }
+        };
+        
+        // ==================== DATA VIEW ====================
+        
+        const DataView = ({ onAskCoach, onDeepAnalysis }) => {
+            const { token, lastSync, refresh, isRefreshing } = useApp();
+            const [healthspan, setHealthspan] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [showInfo, setShowInfo] = useState(false);
+            const [activeMetric, setActiveMetric] = useState(null);
+            const [fatigue, setFatigue] = useState(null);
+            const [savingFatigue, setSavingFatigue] = useState(false);
+            const [showWeeklyCheck, setShowWeeklyCheck] = useState(null); // 'sensei' | 'sakura' | null
+            const [weeklyAnswers, setWeeklyAnswers] = useState({});
+            const [weeklyHistory, setWeeklyHistory] = useState({ sensei: null, sakura: null });
+            const [savingWeekly, setSavingWeekly] = useState(false);
+            const containerRef = useRef(null);
+            
+            const today = new Date().toISOString().split('T')[0];
+            
+            const weeklyQuestions = {
+                sensei: [
+                    { id: 'energy', icon: '⚡', label: 'Energia', desc: 'Livello di energia per allenarti' },
+                    { id: 'soreness', icon: '🦵', label: 'Dolori muscolari', desc: 'DOMS o fastidi muscolari', inverted: true },
+                    { id: 'performance', icon: '📈', label: 'Performance', desc: 'Come sono andati gli allenamenti' },
+                    { id: 'recovery', icon: '🔋', label: 'Recupero', desc: 'Ti senti recuperato tra sessioni' },
+                    { id: 'motivation', icon: '🔥', label: 'Motivazione', desc: 'Voglia di allenarti' },
+                    { id: 'sleep_quality', icon: '😴', label: 'Sonno', desc: 'Qualità del riposo' }
+                ],
+                sakura: [
+                    { id: 'mood', icon: '😊', label: 'Umore', desc: 'Stato d\'animo generale' },
+                    { id: 'stress', icon: '🧠', label: 'Stress', desc: 'Livello di stress mentale', inverted: true },
+                    { id: 'anxiety', icon: '😰', label: 'Ansia', desc: 'Pensieri ansiosi o preoccupazioni', inverted: true },
+                    { id: 'focus', icon: '🎯', label: 'Concentrazione', desc: 'Capacità di focus e attenzione' },
+                    { id: 'social', icon: '👥', label: 'Vita sociale', desc: 'Qualità relazioni e interazioni' },
+                    { id: 'balance', icon: '⚖️', label: 'Equilibrio', desc: 'Work-life balance' }
+                ]
+            };
+            
+            const loadData = useCallback(async () => {
+                try {
+                    const headers = { 'Authorization': `Bearer ${token}` };
+                    const [hs, fat, weeklySensei, weeklySakura] = await Promise.all([
+                        fetch(`${API}/api/metrics/healthspan`, { headers }).then(r => r.ok ? r.json() : null),
+                        fetch(`${API}/api/fatigue?date=${today}`, { headers }).then(r => r.ok ? r.json() : null).catch(() => null),
+                        fetch(`${API}/api/weekly-check/latest?coach=sensei`, { headers }).then(r => r.ok ? r.json() : null).catch(() => null),
+                        fetch(`${API}/api/weekly-check/latest?coach=sakura`, { headers }).then(r => r.ok ? r.json() : null).catch(() => null)
+                    ]);
+                    if (hs) setHealthspan(hs);
+                    if (fat?.value) setFatigue(fat.value);
+                    setWeeklyHistory({ sensei: weeklySensei, sakura: weeklySakura });
+                } catch {}
+                setLoading(false);
+            }, [token, today]);
+            
+            useEffect(() => { loadData(); }, [loadData, lastSync]);
+            
+            const handleRefresh = async () => { await refresh(); await loadData(); };
+            const { pullDistance, isRefreshing: isPulling } = usePullToRefresh(handleRefresh, containerRef);
+            
+            const saveFatigue = async (value) => {
+                setFatigue(value);
+                setSavingFatigue(true);
+                try {
+                    await fetch(`${API}/api/fatigue`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ date: today, value })
+                    });
+                } catch {}
+                setSavingFatigue(false);
+            };
+            
+            const saveWeeklyCheck = async (coach) => {
+                const questions = weeklyQuestions[coach];
+                if (Object.keys(weeklyAnswers).length < questions.length) return;
+                setSavingWeekly(true);
+                try {
+                    await fetch(`${API}/api/weekly-check`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ coach, answers: weeklyAnswers })
+                    });
+                    setWeeklyHistory(prev => ({ ...prev, [coach]: { answers: weeklyAnswers, created_at: new Date().toISOString() } }));
+                    setShowWeeklyCheck(null);
+                    setWeeklyAnswers({});
+                } catch {}
+                setSavingWeekly(false);
+            };
+            
+            const hs = healthspan;
+            const diff = hs?.difference || 0;
+            const isYounger = diff < 0;
+            const ringColor = isYounger ? 'var(--accent-green)' : diff > 2 ? 'var(--accent-red)' : 'var(--accent-orange)';
+            const progress = Math.min(100, Math.abs(diff) * 10 + 50);
+            
+            const getFatigueColor = (val) => val <= 3 ? 'var(--accent-green)' : val <= 6 ? 'var(--accent-orange)' : 'var(--accent-red)';
+            const getFatigueLabel = (val) => val <= 2 ? 'Fresco 💪' : val <= 4 ? 'Leggera' : val <= 6 ? 'Moderata' : val <= 8 ? 'Alta ⚠️' : 'Estrema 🛑';
+            
+            const getRatingLabel = (val, inverted) => {
+                if (inverted) return ['Nessuno', 'Minimo', 'Moderato', 'Alto', 'Estremo'][val - 1];
+                return ['Pessimo', 'Scarso', 'Normale', 'Buono', 'Ottimo'][val - 1];
+            };
+            
+            const isWeeklyCheckDue = (coach) => {
+                const history = weeklyHistory[coach];
+                if (!history?.created_at) return true;
+                const lastCheck = new Date(history.created_at);
+                const daysSince = Math.floor((new Date() - lastCheck) / (1000 * 60 * 60 * 24));
+                return daysSince >= 7;
+            };
+            
+            const getWeeklyAverage = (coach) => {
+                const history = weeklyHistory[coach];
+                if (!history?.answers) return null;
+                const questions = weeklyQuestions[coach];
+                let total = 0, count = 0;
+                questions.forEach(q => {
+                    if (history.answers[q.id]) {
+                        // Per domande invertite (stress, ansia, dolori) invertiamo il punteggio
+                        const val = q.inverted ? (6 - history.answers[q.id]) : history.answers[q.id];
+                        total += val;
+                        count++;
+                    }
+                });
+                return count > 0 ? (total / count).toFixed(1) : null;
+            };
+            
+            const hsMetrics = {
+                sleep_duration: { label: 'Sonno', icon: '😴', target: '7-8.5h' },
+                sleep_consistency: { label: 'Consistenza', icon: '🌙', target: '<30min var.' },
+                zone_low: { label: 'Cardio Mod.', icon: '💚', target: '150+ min/sett' },
+                zone_high: { label: 'Cardio Int.', icon: '❤️‍🔥', target: '75+ min/sett' },
+                strength: { label: 'Forza', icon: '💪', target: '2+ sess/sett' },
+                steps: { label: 'Passi', icon: '👟', target: '8000+/giorno' },
+                rhr: { label: 'RHR', icon: '❤️', target: '<60 bpm' },
+                vo2_max: { label: 'VO2 Max', icon: '🫁', target: '>42 ml/kg' }
+            };
+            
+            return (
+                <div className="h-full flex flex-col">
+                    <ViewHeader title="Healthspan" onRefresh={handleRefresh} isRefreshing={isRefreshing || isPulling} lastSync={lastSync} />
+                    <div ref={containerRef} className="flex-1 overflow-y-auto ptr-container bg-gradient-sensei" style={{ paddingBottom: 'calc(80px + var(--safe-bottom))' }}>
+                        <PullIndicator distance={pullDistance} isRefreshing={isPulling} />
+                        
+                        {activeMetric && (
+                            <Modal onClose={() => setActiveMetric(null)}>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <span className="text-2xl">{activeMetric.icon}</span>
+                                    <h3 className="text-lg font-bold" style={{ color: activeMetric.color || 'var(--accent-green)' }}>{activeMetric.title}</h3>
+                                </div>
+                                <p className="text-[var(--text-secondary)] text-sm">{activeMetric.desc}</p>
+                            </Modal>
+                        )}
+                        
+                        <div className="max-w-4xl mx-auto p-4">
+                            {loading ? <Loading text="Analisi dati..." /> : hs ? (
+                                <>
+                                    <div className="glass-elevated p-5 mb-4 slide-up">
+                                        <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                                            <div className="relative cursor-pointer" onClick={() => setActiveMetric(metricInfo.bioAge)}>
+                                                <svg width="140" height="140" viewBox="0 0 140 140">
+                                                    <circle cx="70" cy="70" r="58" fill="none" strokeWidth="10" stroke="var(--border)" />
+                                                    <circle cx="70" cy="70" r="58" fill="none" stroke={ringColor} strokeWidth="10" strokeLinecap="round" strokeDasharray={`${progress * 3.64} 364`} transform="rotate(-90 70 70)" style={{ filter: `drop-shadow(0 0 10px ${ringColor})`, transition: 'stroke-dasharray 1s ease' }} />
+                                                </svg>
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                    <span className="text-4xl font-bold font-display" style={{ color: ringColor }}>{hs.healthspan_age}</span>
+                                                    <span className="text-[10px] text-[var(--text-muted)]">Età Biologica</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-center sm:text-left">
+                                                <div className="text-xs text-[var(--text-muted)]">Età Anagrafica</div>
+                                                <div className="text-3xl font-bold mb-2">{hs.real_age}</div>
+                                                <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${isYounger ? 'bg-[var(--accent-green-dim)] text-[var(--accent-green)]' : 'bg-[rgba(255,159,67,0.12)] text-[var(--accent-orange)]'}`}>
+                                                    {isYounger ? '↓' : '↑'} {Math.abs(diff)} anni
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {hs?.suggestions?.length > 0 && (
+                                        <div className="glass p-4 mb-4 slide-up border-l-4 border-[var(--accent-orange)]">
+                                            <h3 className="font-semibold text-sm mb-2">💡 Consigli</h3>
+                                            <div className="space-y-1">{hs.suggestions.map((s, i) => <p key={i} className="text-xs text-[var(--text-secondary)]">{s}</p>)}</div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Fatica Percepita */}
+                                    <div className="glass p-4 mb-4 slide-up">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h3 className="font-semibold text-sm">🦵 Fatica Percepita Oggi</h3>
+                                            {fatigue && <span className="text-xs px-2 py-1 rounded-full" style={{ background: getFatigueColor(fatigue) + '20', color: getFatigueColor(fatigue) }}>{getFatigueLabel(fatigue)}</span>}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-[var(--text-muted)]">1</span>
+                                            <div className="flex-1 flex gap-1">
+                                                {[1,2,3,4,5,6,7,8,9,10].map(v => (
+                                                    <button key={v} onClick={() => saveFatigue(v)} disabled={savingFatigue}
+                                                        className={`flex-1 h-8 rounded-lg transition-all ${fatigue === v ? 'scale-110 ring-2 ring-white' : 'hover:scale-105'}`}
+                                                        style={{ background: getFatigueColor(v), opacity: fatigue === v ? 1 : 0.4 }}>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <span className="text-xs text-[var(--text-muted)]">10</span>
+                                        </div>
+                                        <div className="flex justify-between mt-1 text-[9px] text-[var(--text-muted)]">
+                                            <span>Fresco</span>
+                                            <span>Estrema</span>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Weekly Check-ins */}
+                                    <div className="grid grid-cols-2 gap-3 mb-4 slide-up">
+                                        {/* Sensei Check-in */}
+                                        <div className="glass p-4 cursor-pointer hover:border-[var(--accent-green)] transition-all" onClick={() => setShowWeeklyCheck('sensei')}>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-xl">🥋</span>
+                                                <span className="font-semibold text-sm text-[var(--accent-green)]">Check Fisico</span>
+                                            </div>
+                                            {weeklyHistory.sensei ? (
+                                                <div>
+                                                    <div className="text-2xl font-bold" style={{ color: parseFloat(getWeeklyAverage('sensei')) >= 3.5 ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
+                                                        {getWeeklyAverage('sensei')}/5
+                                                    </div>
+                                                    <div className="text-[9px] text-[var(--text-muted)]">
+                                                        {isWeeklyCheckDue('sensei') ? '⚠️ Da rifare' : `✓ ${new Date(weeklyHistory.sensei.created_at).toLocaleDateString('it', { day: 'numeric', month: 'short' })}`}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-xs text-[var(--text-muted)]">Compila →</div>
+                                            )}
+                                        </div>
+                                        
+                                        {/* Sakura Check-in */}
+                                        <div className="glass p-4 cursor-pointer hover:border-[var(--accent-pink)] transition-all" onClick={() => setShowWeeklyCheck('sakura')}>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-xl">🌸</span>
+                                                <span className="font-semibold text-sm text-[var(--accent-pink)]">Check Mentale</span>
+                                            </div>
+                                            {weeklyHistory.sakura ? (
+                                                <div>
+                                                    <div className="text-2xl font-bold" style={{ color: parseFloat(getWeeklyAverage('sakura')) >= 3.5 ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
+                                                        {getWeeklyAverage('sakura')}/5
+                                                    </div>
+                                                    <div className="text-[9px] text-[var(--text-muted)]">
+                                                        {isWeeklyCheckDue('sakura') ? '⚠️ Da rifare' : `✓ ${new Date(weeklyHistory.sakura.created_at).toLocaleDateString('it', { day: 'numeric', month: 'short' })}`}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-xs text-[var(--text-muted)]">Compila →</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Weekly Check Modal */}
+                                    {showWeeklyCheck && (
+                                        <Modal onClose={() => { setShowWeeklyCheck(null); setWeeklyAnswers({}); }}>
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <span className="text-3xl">{showWeeklyCheck === 'sensei' ? '🥋' : '🌸'}</span>
+                                                <div>
+                                                    <h3 className="text-lg font-bold" style={{ color: showWeeklyCheck === 'sensei' ? 'var(--accent-green)' : 'var(--accent-pink)' }}>
+                                                        Check {showWeeklyCheck === 'sensei' ? 'Fisico' : 'Mentale'}
+                                                    </h3>
+                                                    <p className="text-xs text-[var(--text-muted)]">Come ti sei sentito questa settimana?</p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="space-y-4 mb-5">
+                                                {weeklyQuestions[showWeeklyCheck].map(q => (
+                                                    <div key={q.id}>
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <span>{q.icon}</span>
+                                                            <span className="text-sm font-medium">{q.label}</span>
+                                                        </div>
+                                                        <p className="text-[10px] text-[var(--text-muted)] mb-2">{q.desc}</p>
+                                                        <div className="flex gap-2">
+                                                            {[1,2,3,4,5].map(v => (
+                                                                <button key={v} onClick={() => setWeeklyAnswers(prev => ({ ...prev, [q.id]: v }))}
+                                                                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${weeklyAnswers[q.id] === v ? 'ring-2 ring-white scale-105' : 'opacity-60 hover:opacity-80'}`}
+                                                                    style={{ 
+                                                                        background: q.inverted 
+                                                                            ? (v <= 2 ? 'var(--accent-green)' : v === 3 ? 'var(--accent-orange)' : 'var(--accent-red)')
+                                                                            : (v >= 4 ? 'var(--accent-green)' : v === 3 ? 'var(--accent-orange)' : 'var(--accent-red)'),
+                                                                        color: '#000'
+                                                                    }}>
+                                                                    {v}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        <div className="flex justify-between mt-1 text-[9px] text-[var(--text-muted)]">
+                                                            <span>{q.inverted ? 'Nessuno' : 'Pessimo'}</span>
+                                                            <span>{q.inverted ? 'Estremo' : 'Ottimo'}</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            
+                                            <button onClick={() => saveWeeklyCheck(showWeeklyCheck)} disabled={savingWeekly || Object.keys(weeklyAnswers).length < weeklyQuestions[showWeeklyCheck].length}
+                                                className={`w-full py-3 rounded-xl font-bold transition-all ${showWeeklyCheck === 'sensei' ? 'btn-primary' : 'btn-pink'} disabled:opacity-40`}>
+                                                {savingWeekly ? 'Salvataggio...' : `Salva (${Object.keys(weeklyAnswers).length}/${weeklyQuestions[showWeeklyCheck].length})`}
+                                            </button>
+                                        </Modal>
+                                    )}
+                                    
+                                    {hs?.impacts && (
+                                        <div className="slide-up">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h3 className="font-semibold text-sm">Metriche</h3>
+                                                <button onClick={() => setShowInfo(!showInfo)} className="text-xs text-[var(--accent-green)]">{showInfo ? 'Nascondi' : 'ℹ️ Info'}</button>
+                                            </div>
+                                            
+                                            {showInfo && (
+                                                <div className="glass p-4 mb-4 text-xs text-[var(--text-secondary)]">
+                                                    <p>I pesi sono <strong>normalizzati</strong>: se mancano metriche, le altre vengono ricalcolate.</p>
+                                                </div>
+                                            )}
+                                            
+                                            <div className="stats-grid">
+                                                {Object.entries(hsMetrics).map(([key, meta]) => {
+                                                    const impact = hs.impacts[key];
+                                                    if (!impact || impact.value === undefined) return null;
+                                                    return (
+                                                        <div key={key} className="metric-card">
+                                                            <div className="flex items-start justify-between mb-2">
+                                                                <span className="text-xl">{meta.icon}</span>
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full ${impact.impact <= 0 ? 'bg-[var(--accent-green-dim)] text-[var(--accent-green)]' : 'bg-[rgba(255,159,67,0.12)] text-[var(--accent-orange)]'}`}>
+                                                                    {impact.impact > 0 ? '+' : ''}{impact.impact?.toFixed(1)}y
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-lg font-bold">{impact.value}</div>
+                                                            <div className="text-[10px] text-[var(--text-muted)]">{meta.label}</div>
+                                                            <div className="progress-track mt-2">
+                                                                <div className="progress-fill" style={{ width: `${impact.score * 10}%`, background: impact.impact <= 0 ? 'var(--accent-green)' : 'var(--accent-orange)' }} />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="text-center py-12 glass">
+                                    <span className="text-4xl block mb-3">📊</span>
+                                    <p className="text-[var(--text-muted)]">Sincronizza più dati</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== STATS VIEW ====================
+        
+        const StatsView = ({ onAskCoach, onDeepAnalysis }) => {
+            const { token, lastSync, refresh, isRefreshing } = useApp();
+            const [period, setPeriod] = useState('day');
+            const [offset, setOffset] = useState(0);
+            const [data, setData] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [showInfo, setShowInfo] = useState(null);
+            const containerRef = useRef(null);
+            
+            const loadData = useCallback(async () => {
+                setLoading(true);
+                try {
+                    const res = await fetch(`${API}/api/metrics/period?type=${period}&offset=${offset}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (res.ok) setData(await res.json());
+                } catch {}
+                setLoading(false);
+            }, [token, period, offset]);
+            
+            useEffect(() => { loadData(); }, [loadData, lastSync]);
+            
+            const handleRefresh = async () => { await refresh(); await loadData(); };
+            const { pullDistance, isRefreshing: isPulling } = usePullToRefresh(handleRefresh, containerRef);
+            
+            const m = data?.metrics || {};
+            const p = data?.period || {};
+            
+            const getPeriodLabel = () => {
+                if (!p.label) return '...';
+                if (period === 'day') return offset === 0 ? 'Oggi' : offset === -1 ? 'Ieri' : p.label;
+                if (period === 'week') return offset === 0 ? 'Questa sett.' : offset === -1 ? 'Sett. scorsa' : p.label;
+                if (period === 'month') return offset === 0 ? 'Questo mese' : offset === -1 ? 'Mese scorso' : p.label;
+                return p.label;
+            };
+            
+            const handleAskCoachClick = (coach) => {
+                if (!data) return;
+                let msg = `Analizza i miei dati di ${getPeriodLabel().toLowerCase()}:\n`;
+                msg += `• Passi: ${m.steps_total?.toLocaleString() || 'N/D'}\n`;
+                msg += `• Calorie: ${m.calories_total?.toLocaleString() || 'N/D'}\n`;
+                msg += `• Sonno: ${m.sleep_hours?.toFixed(1) || 'N/D'}h\n`;
+                msg += `• RHR: ${m.rhr || 'N/D'} bpm | HRV: ${m.hrv || 'N/D'}ms\n`;
+                msg += `• Recovery: ${m.recovery || 'N/D'}% | Strain: ${m.strain?.toFixed(1) || 'N/D'}/21\n`;
+                msg += `\nCome posso migliorare?`;
+                onAskCoach(coach, msg);
+            };
+            
+            const getActivityIcon = (type) => ({ running: '🏃', cycling: '🚴', swimming: '🏊', walking: '🚶', hiking: '🥾', strength_training: '💪', yoga: '🧘' }[type] || '⚡');
+            
+            const InfoCard = ({ infoKey, children }) => (
+                <div className="metric-card relative" onClick={() => setShowInfo(infoKey)}>
+                    <button className="absolute top-2 right-2 text-[10px] text-[var(--accent-blue)] opacity-50">ℹ️</button>
+                    {children}
+                </div>
+            );
+            
+            return (
+                <div className="h-full flex flex-col">
+                    <ViewHeader title="Statistiche" onRefresh={handleRefresh} isRefreshing={isRefreshing || isPulling} lastSync={lastSync} />
+                    <div ref={containerRef} className="flex-1 overflow-y-auto ptr-container" style={{ paddingBottom: 'calc(80px + var(--safe-bottom))' }}>
+                        <PullIndicator distance={pullDistance} isRefreshing={isPulling} />
+                        
+                        {showInfo && statsInfo[showInfo] && (
+                            <Modal onClose={() => setShowInfo(null)}>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <span className="text-2xl">{statsInfo[showInfo].icon}</span>
+                                    <h3 className="text-lg font-bold text-[var(--accent-green)]">{statsInfo[showInfo].title}</h3>
+                                </div>
+                                <p className="text-[var(--text-secondary)] text-sm">{statsInfo[showInfo].desc}</p>
+                            </Modal>
+                        )}
+                        
+                        <div className="max-w-4xl mx-auto p-4">
+                            <div className="glass p-3 mb-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <button onClick={() => setOffset(o => o - 1)} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[var(--bg-elevated)]">◀</button>
+                                    <div className="text-center">
+                                        <div className="font-bold">{getPeriodLabel()}</div>
+                                        <div className="text-[10px] text-[var(--text-muted)]">{p.days_with_data || 0} giorni con dati</div>
+                                    </div>
+                                    <button onClick={() => setOffset(o => Math.min(o + 1, 0))} disabled={offset >= 0} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[var(--bg-elevated)] disabled:opacity-30">▶</button>
+                                </div>
+                                <div className="flex justify-center gap-1">
+                                    {['day', 'week', 'month', 'year'].map(t => (
+                                        <button key={t} onClick={() => { setPeriod(t); setOffset(0); }}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${period === t ? 'bg-[var(--accent-green)] text-black' : 'hover:bg-[var(--bg-elevated)]'}`}>
+                                            {t === 'day' ? 'Giorno' : t === 'week' ? 'Settimana' : t === 'month' ? 'Mese' : 'Anno'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {loading ? <Loading /> : (
+                                <>
+                                    <div className="stats-grid mb-4">
+                                        <InfoCard infoKey="steps">
+                                            <div className="text-xl mb-1">👟</div>
+                                            <div className="text-xl font-bold text-[var(--accent-orange)]">{m.steps_total ? (m.steps_total / 1000).toFixed(1) + 'k' : '--'}</div>
+                                            <div className="text-[10px] text-[var(--text-muted)]">Passi</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="calories">
+                                            <div className="text-xl mb-1">🔥</div>
+                                            <div className="text-xl font-bold text-[var(--accent-red)]">{m.calories_total ? Math.round(m.calories_total).toLocaleString() : '--'}</div>
+                                            <div className="text-[10px] text-[var(--text-muted)]">Calorie</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="distance">
+                                            <div className="text-xl mb-1">📏</div>
+                                            <div className="text-xl font-bold text-[var(--accent-blue)]">{m.distance_km || '--'}</div>
+                                            <div className="text-[10px] text-[var(--text-muted)]">km</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="intensity">
+                                            <div className="text-xl mb-1">⏱️</div>
+                                            <div className="text-xl font-bold text-[var(--accent-purple)]">{(m.moderate_min || 0) + (m.vigorous_min || 0)}</div>
+                                            <div className="text-[10px] text-[var(--text-muted)]">Min intensi</div>
+                                        </InfoCard>
+                                    </div>
+                                    
+                                    <div className="stats-grid mb-4">
+                                        <InfoCard infoKey="sleep">
+                                            <div className="flex items-center gap-1 mb-1"><span className="text-lg">😴</span><span className="text-xs">Sonno</span></div>
+                                            <div className="text-xl font-bold text-[var(--accent-purple)]">{m.sleep_hours?.toFixed(1) || '--'}h</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="heart">
+                                            <div className="flex items-center gap-1 mb-1"><span className="text-lg">❤️</span><span className="text-xs">Cuore</span></div>
+                                            <div className="text-xl font-bold text-[var(--accent-red)]">{m.rhr || '--'} <span className="text-xs font-normal">bpm</span></div>
+                                            {m.hrv && <div className="text-[10px] text-[var(--text-secondary)]">HRV: {m.hrv}ms</div>}
+                                        </InfoCard>
+                                        <InfoCard infoKey="stress">
+                                            <div className="flex items-center gap-1 mb-1"><span className="text-lg">😤</span><span className="text-xs">Stress</span></div>
+                                            <div className="text-xl font-bold" style={{ color: m.stress_avg > 50 ? 'var(--accent-orange)' : 'var(--accent-green)' }}>{m.stress_avg || '--'}</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="recovery">
+                                            <div className="flex items-center gap-1 mb-1"><span className="text-lg">⚡</span><span className="text-xs">Recovery</span></div>
+                                            <div className="text-xl font-bold text-[var(--accent-green)]">{m.recovery || '--'}%</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="strain">
+                                            <div className="flex items-center gap-1 mb-1"><span className="text-lg">🔥</span><span className="text-xs">Strain</span></div>
+                                            <div className="text-xl font-bold text-[var(--accent-orange)]">{m.strain?.toFixed(1) || '--'}/21</div>
+                                        </InfoCard>
+                                        <InfoCard infoKey="bodyBattery">
+                                            <div className="flex items-center gap-1 mb-1"><span className="text-lg">🔋</span><span className="text-xs">Battery</span></div>
+                                            <div className="text-xl font-bold text-[var(--accent-cyan)]">{m.body_battery_low || '--'}-{m.body_battery_high || '--'}</div>
+                                        </InfoCard>
+                                    </div>
+                                    
+                                    {period === 'week' && (
+                                        <div className="glass p-4 mb-4">
+                                            <h3 className="text-xs font-semibold mb-3">Passi giornalieri</h3>
+                                            {!data?.daily || data.daily.length === 0 ? (
+                                                <div className="text-xs text-[var(--text-muted)] text-center py-4">
+                                                    Nessun dato giornaliero
+                                                    <div className="text-[10px] mt-2 opacity-50">Debug: {JSON.stringify(Object.keys(data || {}))}</div>
+                                                </div>
+                                            ) : (() => {
+                                                const maxSteps = Math.max(...data.daily.map(d => d.steps || 0), 1);
+                                                return (
+                                                    <div className="flex items-end justify-between gap-1 h-24">
+                                                        {data.daily.map((d, i) => {
+                                                            const steps = d.steps || 0;
+                                                            const pct = (steps / maxSteps) * 100;
+                                                            return (
+                                                                <div key={i} className="flex-1 flex flex-col items-center">
+                                                                    <div className="w-full rounded-t transition-all" 
+                                                                        style={{ 
+                                                                            height: `${Math.max(pct, steps > 0 ? 5 : 0)}%`,
+                                                                            background: steps >= 10000 ? 'var(--accent-green)' : steps >= 7500 ? 'var(--accent-cyan)' : 'var(--accent-orange)'
+                                                                        }}>
+                                                                    </div>
+                                                                    <div className="text-[9px] text-[var(--text-muted)] mt-1">{d.day}</div>
+                                                                    <div className="text-[8px] text-[var(--text-secondary)]">{steps > 0 ? (steps/1000).toFixed(1)+'k' : '-'}</div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    )}
+                                    
+                                    {data?.activities?.length > 0 && (
+                                        <div className="glass p-4 mb-4">
+                                            <h3 className="text-xs font-semibold mb-3">Attività ({data.activities.length})</h3>
+                                            <div className="space-y-2">
+                                                {data.activities.slice(0, 5).map((a, i) => (
+                                                    <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-[var(--bg-secondary)]">
+                                                        <span className="text-lg">{getActivityIcon(a.type)}</span>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-sm font-medium truncate">{a.name}</div>
+                                                            <div className="text-[10px] text-[var(--text-muted)]">{a.date}</div>
+                                                        </div>
+                                                        <div className="text-right text-sm">{a.duration_min}m</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="glass p-4">
+                                        <h3 className="text-xs font-semibold mb-3 text-center">Chiedi al coach</h3>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button onClick={() => handleAskCoachClick('sensei')} className="btn-primary py-3 rounded-xl text-sm">🥋 Sensei</button>
+                                            <button onClick={() => handleAskCoachClick('sakura')} className="btn-pink py-3 rounded-xl text-sm">🌸 Sakura</button>
+                                        </div>
+                                        <button 
+                                            onClick={onDeepAnalysis} 
+                                            className="w-full mt-3 py-3 rounded-xl text-sm font-medium bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 transition-all"
+                                        >
+                                            🔬 Dr. Data (Analisi Profonda)
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== CHAT VIEW ====================
+        
+        const ChatView = ({ coach, initialMessage, onMessageSent }) => {
+            const { token } = useApp();
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [ready, setReady] = useState(false);
+            const [isRecording, setIsRecording] = useState(false);
+            const [playingAudio, setPlayingAudio] = useState(false);
+            const [voiceInputPending, setVoiceInputPending] = useState(false);
+            const [pendingInitialMessage, setPendingInitialMessage] = useState(null);
+            
+            const chatRef = useRef(null);
+            const recognitionRef = useRef(null);
+            
+            const isSakura = coach === 'sakura';
+            const isLou = coach === 'lou';
+            const accent = isLou ? 'var(--accent-lou)' : (isSakura ? 'var(--accent-pink)' : 'var(--accent-green)');
+            const coachName = isLou ? 'Lou' : (isSakura ? 'Dr. Sakura' : 'Dr. Sensei');
+            const coachEmoji = isLou ? '🏋️‍♀️' : (isSakura ? '🌸' : '🥋');
+            const coachDesc = isLou ? 'Sculpting & Gym' : (isSakura ? 'Mente & Benessere' : 'Sport & Performance');
+            
+            useEffect(() => { if (initialMessage) { setPendingInitialMessage(initialMessage); onMessageSent?.(); } }, [initialMessage]);
+            useEffect(() => { setMessages([]); setReady(false); loadHistory(); }, [coach]);
+            useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [messages, loading]);
+            useEffect(() => { if (voiceInputPending && input.trim()) { setVoiceInputPending(false); send(); } else if (voiceInputPending) setVoiceInputPending(false); }, [voiceInputPending, input]);
+            
+            const loadHistory = async () => {
+                try {
+                    const res = await fetch(`${API}/api/chat/history?coach=${coach}&limit=50`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (res.ok) { const data = await res.json(); if (Array.isArray(data)) setMessages(data); }
+                } catch {}
+                setReady(true);
+            };
+            
+            const send = async (customMessage = null) => {
+                const text = customMessage || input.trim();
+                if (!text || loading) return;
+                setInput('');
+                setMessages(prev => [...prev, { role: 'user', content: text }]);
+                setLoading(true);
+                try {
+                    const res = await fetch(`${API}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ message: text, coach }) });
+                    const data = await res.json();
+                    setMessages(prev => [...prev, { role: 'assistant', content: data.response || data.error || 'Errore' }]);
+                } catch { setMessages(prev => [...prev, { role: 'assistant', content: 'Errore di connessione' }]); }
+                setLoading(false);
+            };
+            
+            useEffect(() => { if (pendingInitialMessage && ready && !loading) { send(pendingInitialMessage); setPendingInitialMessage(null); } }, [pendingInitialMessage, ready, loading]);
+            
+            const toggleRecording = () => {
+                if (isRecording) { recognitionRef.current?.stop(); setIsRecording(false); return; }
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SR) return;
+                const recognition = new SR();
+                recognition.lang = 'it-IT';
+                recognition.onresult = e => { setInput(e.results[0][0].transcript); setVoiceInputPending(true); };
+                recognition.onend = () => setIsRecording(false);
+                recognitionRef.current = recognition;
+                recognition.start();
+                setIsRecording(true);
+            };
+            
+            const playAudio = async (text) => {
+                if (playingAudio) return;
+                setPlayingAudio(true);
+                
+                // Rileva se è una meditazione (contiene pause)
+                const isMeditation = /\[PAUSA:\d+\]/.test(text);
+                
+                try {
+                    // Parsa il testo e trova le pause
+                    const pauseRegex = /\[PAUSA:(\d+)\]/g;
+                    const segments = [];
+                    let lastIndex = 0;
+                    let match;
+                    
+                    while ((match = pauseRegex.exec(text)) !== null) {
+                        // Testo prima della pausa
+                        const textBefore = text.slice(lastIndex, match.index).trim();
+                        if (textBefore) segments.push({ type: 'text', content: textBefore });
+                        // La pausa
+                        segments.push({ type: 'pause', seconds: parseInt(match[1]) });
+                        lastIndex = match.index + match[0].length;
+                    }
+                    // Testo rimanente
+                    const remaining = text.slice(lastIndex).trim();
+                    if (remaining) segments.push({ type: 'text', content: remaining });
+                    
+                    // Se non ci sono pause, riproduci tutto insieme
+                    if (segments.filter(s => s.type === 'pause').length === 0) {
+                        const res = await fetch(`${API}/api/tts`, { 
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+                            body: JSON.stringify({ 
+                                text: text.replace(/\[PAUSA:\d+\]/g, '').replace(/\*\*/g, ''), 
+                                coach,
+                                meditation: isMeditation 
+                            }) 
+                        });
+                        const data = await res.json();
+                        if (data.audio) {
+                            const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+                            audio.onended = () => setPlayingAudio(false);
+                            audio.play();
+                        } else setPlayingAudio(false);
+                        return;
+                    }
+                    
+                    // Riproduci segmenti con pause (modalità meditazione)
+                    const playSegment = async (index) => {
+                        if (index >= segments.length) {
+                            setPlayingAudio(false);
+                            return;
+                        }
+                        
+                        const segment = segments[index];
+                        if (segment.type === 'pause') {
+                            // Pausa silenziosa
+                            setTimeout(() => playSegment(index + 1), segment.seconds * 1000);
+                        } else {
+                            // Riproduci testo con voce meditazione (sussurrata)
+                            const res = await fetch(`${API}/api/tts`, { 
+                                method: 'POST', 
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+                                body: JSON.stringify({ 
+                                    text: segment.content.replace(/\*\*/g, ''), 
+                                    coach,
+                                    meditation: true 
+                                }) 
+                            });
+                            const data = await res.json();
+                            if (data.audio) {
+                                const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+                                audio.onended = () => playSegment(index + 1);
+                                audio.play();
+                            } else {
+                                playSegment(index + 1);
+                            }
+                        }
+                    };
+                    
+                    playSegment(0);
+                } catch (e) { 
+                    console.error('TTS error:', e);
+                    setPlayingAudio(false); 
+                }
+            };
+            
+            return (
+                <div className={`h-full flex flex-col ${isLou ? 'bg-gradient-lou' : (isSakura ? 'bg-gradient-sakura' : 'bg-gradient-sensei')}`}>
+                    <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--border)]">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-2xl" style={{ background: isSakura ? 'var(--accent-pink-dim)' : 'var(--accent-green-dim)' }}>{coachEmoji}</div>
+                            <div>
+                                <h2 className="font-bold" style={{ color: accent }}>{coachName}</h2>
+                                <p className="text-xs text-[var(--text-muted)]">{coachDesc}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+                        {!ready ? <Loading text="Caricamento..." /> : messages.length === 0 ? (
+                            <div className="h-full flex items-center justify-center">
+                                <div className="text-center max-w-xs">
+                                    <span className="text-5xl block mb-3">{coachEmoji}</span>
+                                    <h3 className="text-lg font-bold mb-2" style={{ color: accent }}>{coachName}</h3>
+                                    <p className="text-[var(--text-muted)] text-sm">{isLou ? 'Ciao bella! Pronta a scolpire quel fisico?' : (isSakura ? 'Ciao! Parliamo di mente, stress e benessere.' : 'Ciao! Il tuo coach per performance e longevità.')}</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="max-w-4xl mx-auto space-y-3">
+                                {messages.map((m, i) => (
+                                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} fade-in`}>
+                                        <div className={`chat-bubble ${m.role === 'user' ? 'chat-user' : `chat-ai ${coach}`}`}>
+                                            {m.role === 'assistant' && (
+                                                <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-[var(--border)]">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-lg">{coachEmoji}</span>
+                                                        <span className="font-semibold text-sm" style={{ color: accent }}>{coachName}</span>
+                                                    </div>
+                                                    <button onClick={() => playAudio(m.content)} disabled={playingAudio} className="w-7 h-7 flex items-center justify-center rounded-full text-sm hover:bg-[var(--bg-elevated)]">
+                                                        {playingAudio ? '🔉' : '🔊'}
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <div className="whitespace-pre-wrap text-[var(--text-secondary)]">{m.content}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {loading && (
+                                    <div className="flex justify-start fade-in">
+                                        <div className={`chat-bubble chat-ai ${coach}`}>
+                                            <div className="flex gap-2 py-1">
+                                                <div className="typing-dot" style={{ background: accent }} />
+                                                <div className="typing-dot" style={{ background: accent }} />
+                                                <div className="typing-dot" style={{ background: accent }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="flex-shrink-0 p-3 border-t border-[var(--border)] bg-[var(--bg-primary)]" style={{ paddingBottom: 'max(12px, calc(var(--safe-bottom) + 76px))' }}>
+                        <div className="max-w-4xl mx-auto flex gap-2">
+                            <button onClick={toggleRecording} className={`w-11 h-11 flex items-center justify-center rounded-xl text-lg flex-shrink-0 ${isRecording ? 'bg-[var(--accent-red)] animate-pulse' : 'glass-solid'}`}>
+                                {isRecording ? '⏹️' : '🎤'}
+                            </button>
+                            <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') send(); }}
+                                placeholder="Scrivi..." className={`input-modern flex-1 px-4 py-2 ${isSakura ? 'pink' : ''}`} disabled={loading || isRecording} />
+                            <button onClick={() => send()} disabled={loading || !input.trim()} className={`${isLou ? 'btn-lou' : (isSakura ? 'btn-pink' : 'btn-primary')} w-11 h-11 rounded-xl text-lg disabled:opacity-40 flex items-center justify-center`}>➤</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== TREND VIEW ====================
+        
+        const TrendView = () => {
+            const { token, lastSync, refresh, isRefreshing } = useApp();
+            const [period, setPeriod] = useState('90d');
+            const [activeChart, setActiveChart] = useState('bioAge');
+            const [data, setData] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const chartRef = useRef(null);
+            const canvasRef = useRef(null);
+            const containerRef = useRef(null);
+            
+            const periods = { 'today': { label: 'Oggi', days: 1, intraday: true }, '7d': { label: '7g', days: 7 }, '30d': { label: '30g', days: 30 }, '90d': { label: '3m', days: 90 }, '180d': { label: '6m', days: 180 }, '365d': { label: 'Anno', days: 365 } };
+            const configs = {
+                bioAge: { title: 'Bio Age', icon: '🧬', color: '#00f593', getData: d => d.bio_age },
+                sleep: { title: 'Sonno', icon: '😴', color: '#a855f7', getData: d => d.sleep_hours, refLine: 7.5 },
+                hrv: { title: 'HRV', icon: '💓', color: '#ff6eb4', getData: d => d.hrv },
+                rhr: { title: 'RHR', icon: '❤️', color: '#ff5757', getData: d => d.rhr, refLine: 60 },
+                steps: { title: 'Passi', icon: '👟', color: '#4da6ff', getData: d => d.steps, refLine: 10000 },
+                stress: { title: 'Stress', icon: '😤', color: '#ff9f43', getData: d => d.stress || d.value, refLine: 50 },
+                bodyBattery: { title: 'Battery', icon: '🔋', color: '#22d3ee', getData: d => d.body_battery_high || d.value }
+            };
+            
+            const intradayMetrics = ['stress', 'bodyBattery', 'rhr'];
+            const isIntraday = periods[period]?.intraday;
+            const config = configs[activeChart];
+            
+            const loadData = useCallback(async () => {
+                setLoading(true);
+                try {
+                    if (isIntraday) {
+                        const endpoint = activeChart === 'bodyBattery' ? 'body-battery' : activeChart === 'stress' ? 'stress' : 'heart-rate';
+                        const res = await fetch(`${API}/api/intraday/${endpoint}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                        if (res.ok) setData({ intraday: true, ...(await res.json()) });
+                    } else {
+                        const res = await fetch(`${API}/api/metrics/trend?days=${periods[period].days}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                        if (res.ok) setData({ intraday: false, ...(await res.json()) });
+                    }
+                } catch {}
+                setLoading(false);
+            }, [token, period, activeChart]);
+            
+            useEffect(() => { loadData(); }, [loadData, lastSync]);
+            useEffect(() => { if (isIntraday && !intradayMetrics.includes(activeChart)) setActiveChart('bodyBattery'); }, [period]);
+            
+            const handleRefresh = async () => { await refresh(); await loadData(); };
+            const { pullDistance, isRefreshing: isPulling } = usePullToRefresh(handleRefresh, containerRef);
+            
+            useEffect(() => {
+                if (!canvasRef.current || !data?.data?.length) return;
+                if (chartRef.current) chartRef.current.destroy();
+                
+                const ctx = canvasRef.current.getContext('2d');
+                const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+                gradient.addColorStop(0, config.color + '30');
+                gradient.addColorStop(1, config.color + '00');
+                
+                let labels, values;
+                if (data.intraday) {
+                    labels = data.data.map(d => d.time);
+                    values = data.data.map(d => d.value);
+                } else {
+                    labels = data.data.map(d => new Date(d.date).toLocaleDateString('it', periods[period].days <= 30 ? { day: '2-digit' } : { day: '2-digit', month: 'short' }));
+                    values = data.data.map(d => config.getData(d));
+                }
+                
+                const datasets = [{ data: values, borderColor: config.color, backgroundColor: gradient, fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 }];
+                if (config.refLine && !data.intraday) datasets.push({ data: values.map(() => config.refLine), borderColor: 'rgba(255,255,255,0.15)', borderDash: [5, 3], pointRadius: 0, borderWidth: 1, fill: false });
+                
+                chartRef.current = new Chart(ctx, {
+                    type: 'line', data: { labels, datasets },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(255,255,255,0.3)', maxTicksLimit: 6, font: { size: 9 } } }, y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 } } } } }
+                });
+                return () => chartRef.current?.destroy();
+            }, [data, activeChart, config, period]);
+            
+            const getStats = () => {
+                if (!data?.data?.length) return { avg: '--', min: '--', max: '--' };
+                const values = (data.intraday ? data.data.map(d => d.value) : data.data.map(d => config.getData(d))).filter(v => v != null);
+                if (!values.length) return { avg: '--', min: '--', max: '--' };
+                return { avg: (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1), min: Math.min(...values).toFixed(1), max: Math.max(...values).toFixed(1) };
+            };
+            const stats = getStats();
+            
+            return (
+                <div className="h-full flex flex-col">
+                    <ViewHeader title="Trend" onRefresh={handleRefresh} isRefreshing={isRefreshing || isPulling} lastSync={lastSync} />
+                    <div ref={containerRef} className="flex-1 overflow-y-auto ptr-container bg-gradient-sensei" style={{ paddingBottom: 'calc(80px + var(--safe-bottom))' }}>
+                        <PullIndicator distance={pullDistance} isRefreshing={isPulling} />
+                        
+                        <div className="max-w-4xl mx-auto p-4">
+                            <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3 scrollbar-hide">
+                                {Object.entries(periods).map(([key, p]) => (
+                                    <button key={key} onClick={() => setPeriod(key)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${period === key ? 'bg-[var(--accent-green)] text-black' : 'glass'}`}>
+                                        {p.label}
+                                    </button>
+                                ))}
+                            </div>
+                            
+                            <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
+                                {Object.entries(configs).map(([key, cfg]) => {
+                                    if (isIntraday && !intradayMetrics.includes(key)) return null;
+                                    return (
+                                        <button key={key} onClick={() => setActiveChart(key)}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full whitespace-nowrap text-sm ${activeChart === key ? 'text-black font-bold' : 'glass text-[var(--text-muted)]'}`}
+                                            style={activeChart === key ? { background: cfg.color } : {}}>
+                                            <span>{cfg.icon}</span><span className="text-xs">{cfg.title}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            
+                            <div className="glass-elevated p-4 mb-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="font-semibold text-sm" style={{ color: config.color }}>{config.icon} {config.title}</h3>
+                                    <span className="text-xs text-[var(--text-muted)]">{periods[period].label}</span>
+                                </div>
+                                {loading ? (
+                                    <div className="h-48 flex items-center justify-center"><div className="w-8 h-8 border-2 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin"></div></div>
+                                ) : !data?.data?.length ? (
+                                    <div className="h-48 flex items-center justify-center text-[var(--text-muted)] text-sm">Nessun dato</div>
+                                ) : (
+                                    <div className="h-48"><canvas ref={canvasRef}></canvas></div>
+                                )}
+                            </div>
+                            
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="glass p-3 text-center"><div className="text-[10px] text-[var(--text-muted)]">Min</div><div className="text-lg font-bold" style={{ color: config.color }}>{stats.min}</div></div>
+                                <div className="glass p-3 text-center"><div className="text-[10px] text-[var(--text-muted)]">Media</div><div className="text-lg font-bold">{stats.avg}</div></div>
+                                <div className="glass p-3 text-center"><div className="text-[10px] text-[var(--text-muted)]">Max</div><div className="text-lg font-bold text-[var(--accent-orange)]">{stats.max}</div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== FOOD VIEW ====================
+        
+        const FoodView = ({ onAskCoach, onDeepAnalysis }) => {
+            const { token, lastSync, refresh, isRefreshing } = useApp();
+            const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+            const [entries, setEntries] = useState([]);
+            const [summary, setSummary] = useState(null);
+            const [goals, setGoals] = useState({ calorie_goal: 2000, protein_goal: 120, carbs_goal: 250, fat_goal: 70 });
+            const [trend, setTrend] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [activeTab, setActiveTab] = useState('today'); // today, trend, goals
+            const [searchQuery, setSearchQuery] = useState('');
+            const [searchResults, setSearchResults] = useState([]);
+            const [searching, setSearching] = useState(false);
+            const [selectedFood, setSelectedFood] = useState(null);
+            const [mealType, setMealType] = useState('lunch');
+            const [servingSize, setServingSize] = useState(100);
+            const [showAddModal, setShowAddModal] = useState(false);
+            const [showGoalsModal, setShowGoalsModal] = useState(false);
+            const [editGoals, setEditGoals] = useState({});
+            const containerRef = useRef(null);
+            const searchTimeout = useRef(null);
+            
+            const loadData = async (dateStr) => {
+                const d = dateStr || selectedDate;
+                try {
+                    const [entriesRes, summaryRes, goalsRes, trendRes] = await Promise.all([
+                        fetch(`${API}/api/food?date=${d}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                        fetch(`${API}/api/food/summary?date=${d}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                        fetch(`${API}/api/food/goals`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                        fetch(`${API}/api/food/trend?days=7`, { headers: { 'Authorization': `Bearer ${token}` } })
+                    ]);
+                    if (entriesRes.ok) setEntries((await entriesRes.json()).entries || []);
+                    if (summaryRes.ok) setSummary(await summaryRes.json());
+                    if (goalsRes.ok) setGoals(await goalsRes.json());
+                    if (trendRes.ok) setTrend(await trendRes.json());
+                } catch (e) { console.error(e); }
+                setLoading(false);
+            };
+            
+            useEffect(() => { loadData(); }, []);
+            useEffect(() => { loadData(selectedDate); }, [selectedDate]);
+            
+            const changeDate = (days) => {
+                const d = new Date(selectedDate);
+                d.setDate(d.getDate() + days);
+                if (d <= new Date()) setSelectedDate(d.toISOString().split('T')[0]);
+            };
+            
+            const isToday = selectedDate === new Date().toISOString().split('T')[0];
+            
+            const searchFood = async (query) => {
+                if (!query || query.length < 2) { setSearchResults([]); return; }
+                setSearching(true);
+                try {
+                    const res = await fetch(`${API}/api/food/search?q=${encodeURIComponent(query)}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) setSearchResults((await res.json()).results || []);
+                } catch (e) { console.error(e); }
+                setSearching(false);
+            };
+            
+            const handleSearchChange = (e) => {
+                const q = e.target.value;
+                setSearchQuery(q);
+                if (searchTimeout.current) clearTimeout(searchTimeout.current);
+                searchTimeout.current = setTimeout(() => searchFood(q), 500);
+            };
+            
+            const selectFood = (food) => {
+                setSelectedFood(food);
+                setServingSize(food.serving_size || 100);
+                setSearchQuery('');
+                setSearchResults([]);
+            };
+            
+            const addFood = async () => {
+                if (!selectedFood) return;
+                const multiplier = servingSize / (selectedFood.serving_size || 100);
+                try {
+                    const res = await fetch(`${API}/api/food`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({
+                            date: selectedDate,
+                            food_name: selectedFood.name,
+                            brand: selectedFood.brand,
+                            barcode: selectedFood.barcode,
+                            meal_type: mealType,
+                            serving_size: servingSize,
+                            serving_unit: selectedFood.serving_unit || 'g',
+                            calories: Math.round(selectedFood.calories * multiplier),
+                            protein: selectedFood.protein ? Math.round(selectedFood.protein * multiplier * 10) / 10 : null,
+                            carbs: selectedFood.carbs ? Math.round(selectedFood.carbs * multiplier * 10) / 10 : null,
+                            fat: selectedFood.fat ? Math.round(selectedFood.fat * multiplier * 10) / 10 : null,
+                            source: selectedFood.source
+                        })
+                    });
+                    if (res.ok) { setSelectedFood(null); setShowAddModal(false); loadData(); }
+                } catch (e) { console.error(e); }
+            };
+            
+            const deleteEntry = async (id) => {
+                try {
+                    await fetch(`${API}/api/food/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                    loadData();
+                } catch (e) { console.error(e); }
+            };
+            
+            const saveGoals = async () => {
+                try {
+                    const res = await fetch(`${API}/api/food/goals`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify(editGoals)
+                    });
+                    if (res.ok) { setGoals(await res.json()); setShowGoalsModal(false); }
+                } catch (e) { console.error(e); }
+            };
+            
+            const mealIcons = { breakfast: '🌅', lunch: '☀️', dinner: '🌙', snack: '🍎' };
+            const mealLabels = { breakfast: 'Colazione', lunch: 'Pranzo', dinner: 'Cena', snack: 'Snack' };
+            
+            if (loading) return <Loading text="Caricamento..." />;
+            
+            const calorieProgress = Math.min(100, Math.round((summary?.nutrition?.calories || 0) / goals.calorie_goal * 100));
+            const proteinProgress = Math.min(100, Math.round((summary?.nutrition?.protein || 0) / goals.protein_goal * 100));
+            const carbsProgress = Math.min(100, Math.round((summary?.nutrition?.carbs || 0) / goals.carbs_goal * 100));
+            const fatProgress = Math.min(100, Math.round((summary?.nutrition?.fat || 0) / goals.fat_goal * 100));
+            
+            return (
+                <div className="h-full flex flex-col">
+                    <ViewHeader title="🍽️ Nutrizione" onRefresh={() => loadData()} isRefreshing={loading} lastSync={lastSync} />
+                    <div ref={containerRef} className="flex-1 overflow-y-auto bg-gradient-sensei" style={{ paddingBottom: 'calc(80px + var(--safe-bottom))' }}>
+                        <div className="max-w-4xl mx-auto p-4">
+                            
+                            {/* Date Picker */}
+                            <div className="flex items-center justify-between mb-4 glass-card rounded-2xl p-3">
+                                <button onClick={() => changeDate(-1)} className="p-2 hover:bg-[var(--bg-elevated)] rounded-lg">◀</button>
+                                <div className="text-center">
+                                    <div className="font-bold">{isToday ? 'Oggi' : new Date(selectedDate).toLocaleDateString('it', { weekday: 'long' })}</div>
+                                    <div className="text-sm text-[var(--text-muted)]">{new Date(selectedDate).toLocaleDateString('it', { day: 'numeric', month: 'short' })}</div>
+                                </div>
+                                <button onClick={() => changeDate(1)} disabled={isToday} className={`p-2 rounded-lg ${isToday ? 'opacity-30' : 'hover:bg-[var(--bg-elevated)]'}`}>▶</button>
+                            </div>
+                            
+                            {/* Tabs */}
+                            <div className="flex gap-2 mb-4">
+                                {[{id: 'today', label: '📊 Oggi'}, {id: 'trend', label: '📈 Trend'}, {id: 'goals', label: '🎯 Obiettivi'}].map(t => (
+                                    <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex-1 py-2 rounded-xl text-sm ${activeTab === t.id ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-elevated)]'}`}>{t.label}</button>
+                                ))}
+                            </div>
+                            
+                            {activeTab === 'today' && (
+                                <>
+                                    {/* Calorie Progress */}
+                                    <div className="glass-card p-4 rounded-2xl mb-4">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-sm">Calorie</span>
+                                            <span className="text-sm">{summary?.nutrition?.calories || 0} / {goals.calorie_goal}</span>
+                                        </div>
+                                        <div className="h-3 bg-[var(--bg-elevated)] rounded-full overflow-hidden">
+                                            <div className={`h-full transition-all ${calorieProgress > 100 ? 'bg-red-500' : calorieProgress > 80 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${calorieProgress}%` }}></div>
+                                        </div>
+                                        <div className="text-xs text-[var(--text-muted)] mt-1 text-right">{calorieProgress}%</div>
+                                    </div>
+                                    
+                                    {/* Macros Progress */}
+                                    <div className="grid grid-cols-3 gap-3 mb-4">
+                                        <div className="glass-card p-3 rounded-xl text-center">
+                                            <div className="text-lg font-bold text-blue-400">{summary?.nutrition?.protein || 0}g</div>
+                                            <div className="text-xs text-[var(--text-muted)]">Proteine</div>
+                                            <div className="h-1.5 bg-[var(--bg-elevated)] rounded-full mt-2 overflow-hidden">
+                                                <div className="h-full bg-blue-500" style={{ width: `${proteinProgress}%` }}></div>
+                                            </div>
+                                        </div>
+                                        <div className="glass-card p-3 rounded-xl text-center">
+                                            <div className="text-lg font-bold text-yellow-400">{summary?.nutrition?.carbs || 0}g</div>
+                                            <div className="text-xs text-[var(--text-muted)]">Carbo</div>
+                                            <div className="h-1.5 bg-[var(--bg-elevated)] rounded-full mt-2 overflow-hidden">
+                                                <div className="h-full bg-yellow-500" style={{ width: `${carbsProgress}%` }}></div>
+                                            </div>
+                                        </div>
+                                        <div className="glass-card p-3 rounded-xl text-center">
+                                            <div className="text-lg font-bold text-red-400">{summary?.nutrition?.fat || 0}g</div>
+                                            <div className="text-xs text-[var(--text-muted)]">Grassi</div>
+                                            <div className="h-1.5 bg-[var(--bg-elevated)] rounded-full mt-2 overflow-hidden">
+                                                <div className="h-full bg-red-500" style={{ width: `${fatProgress}%` }}></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Garmin Comparison */}
+                                    {summary?.garmin?.total_calories && (
+                                        <div className="glass-card p-4 rounded-2xl mb-4">
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <div className="text-xs text-[var(--text-muted)]">Bruciate (Garmin)</div>
+                                                    <div className="text-xl font-bold text-orange-400">{summary.garmin.total_calories} kcal</div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-xs text-[var(--text-muted)]">Bilancio</div>
+                                                    <div className={`text-xl font-bold ${summary.balance > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                        {summary.balance > 0 ? '+' : ''}{summary.balance} kcal
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Add Food Button */}
+                                    <button onClick={() => setShowAddModal(true)} className="w-full btn-primary py-4 rounded-2xl mb-4 text-lg">➕ Aggiungi Pasto</button>
+                                    
+                                    {/* Entries List */}
+                                    <div className="glass-card rounded-2xl overflow-hidden">
+                                        <div className="p-4 border-b border-[var(--border)] font-medium">Pasti del giorno</div>
+                                        {entries.length === 0 ? (
+                                            <div className="p-8 text-center text-[var(--text-muted)]">Nessun pasto registrato</div>
+                                        ) : (
+                                            <div className="divide-y divide-[var(--border)]">
+                                                {entries.map(e => (
+                                                    <div key={e.id} className="p-4 flex items-center gap-3">
+                                                        <span className="text-2xl">{mealIcons[e.meal_type] || '🍽️'}</span>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-medium truncate">{e.food_name}</div>
+                                                            <div className="text-xs text-[var(--text-muted)]">{e.serving_size}{e.serving_unit} • {mealLabels[e.meal_type]}</div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="font-bold">{e.calories}</div>
+                                                            <div className="text-xs text-[var(--text-muted)]">kcal</div>
+                                                        </div>
+                                                        <button onClick={() => deleteEntry(e.id)} className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg">🗑️</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                            
+                            {activeTab === 'trend' && trend && (
+                                <div className="space-y-4">
+                                    {/* Weekly Summary */}
+                                    <div className="glass-card p-4 rounded-2xl">
+                                        <div className="text-sm font-medium mb-3">Ultimi 7 giorni</div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <div className="text-2xl font-bold text-green-400">{trend.summary?.avg_consumed || 0}</div>
+                                                <div className="text-xs text-[var(--text-muted)]">kcal/giorno (media)</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-2xl font-bold text-orange-400">{trend.summary?.avg_burned || '--'}</div>
+                                                <div className="text-xs text-[var(--text-muted)]">bruciate/giorno</div>
+                                            </div>
+                                        </div>
+                                        <div className="text-xs text-[var(--text-muted)] mt-2">{trend.summary?.days_tracked} giorni tracciati su {trend.summary?.total_days}</div>
+                                    </div>
+                                    
+                                    {/* Daily Bars */}
+                                    <div className="glass-card p-4 rounded-2xl">
+                                        <div className="text-sm font-medium mb-3">Calorie giornaliere</div>
+                                        <div className="space-y-3">
+                                            {trend.trend?.map((day, i) => (
+                                                <div key={i} className="flex items-center gap-3">
+                                                    <div className="w-10 text-xs text-[var(--text-muted)]">{day.day}</div>
+                                                    <div className="flex-1 h-6 bg-[var(--bg-elevated)] rounded-lg overflow-hidden relative">
+                                                        <div className={`h-full ${day.consumed > goals.calorie_goal ? 'bg-red-500' : 'bg-green-500'}`} 
+                                                             style={{ width: `${Math.min(100, day.consumed / goals.calorie_goal * 100)}%` }}></div>
+                                                        <div className="absolute inset-0 flex items-center justify-center text-xs font-medium">
+                                                            {day.consumed || 0} kcal
+                                                        </div>
+                                                    </div>
+                                                    <div className="w-16 text-right text-xs">
+                                                        {day.balance !== null && (
+                                                            <span className={day.balance > 0 ? 'text-green-400' : 'text-red-400'}>
+                                                                {day.balance > 0 ? '+' : ''}{day.balance}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="mt-3 pt-3 border-t border-[var(--border)] flex justify-between text-xs text-[var(--text-muted)]">
+                                            <span>Obiettivo: {goals.calorie_goal} kcal</span>
+                                            <span className="text-green-400">● consumate</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {activeTab === 'goals' && (
+                                <div className="space-y-4">
+                                    <div className="glass-card p-4 rounded-2xl">
+                                        <div className="text-sm font-medium mb-4">I tuoi obiettivi giornalieri</div>
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center p-3 bg-[var(--bg-elevated)] rounded-xl">
+                                                <span>🔥 Calorie</span>
+                                                <span className="font-bold">{goals.calorie_goal} kcal</span>
+                                            </div>
+                                            <div className="flex justify-between items-center p-3 bg-[var(--bg-elevated)] rounded-xl">
+                                                <span>🥩 Proteine</span>
+                                                <span className="font-bold">{goals.protein_goal}g</span>
+                                            </div>
+                                            <div className="flex justify-between items-center p-3 bg-[var(--bg-elevated)] rounded-xl">
+                                                <span>🍞 Carboidrati</span>
+                                                <span className="font-bold">{goals.carbs_goal}g</span>
+                                            </div>
+                                            <div className="flex justify-between items-center p-3 bg-[var(--bg-elevated)] rounded-xl">
+                                                <span>🧈 Grassi</span>
+                                                <span className="font-bold">{goals.fat_goal}g</span>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => { setEditGoals(goals); setShowGoalsModal(true); }} className="w-full btn-primary py-3 rounded-xl mt-4">✏️ Modifica obiettivi</button>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Coach Analysis Buttons */}
+                            {(summary?.nutrition?.calories > 0 || summary?.yesterday?.calories > 0) && (
+                                <div className="glass-card p-4 rounded-2xl mt-4">
+                                    <div className="text-sm font-medium mb-3">💬 Chiedi ai Coach</div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <button onClick={() => onAskCoach('sensei', 'Analizza la mia alimentazione di oggi e dimmi se è adeguata per i miei allenamenti')} className="btn-primary py-3 rounded-xl text-sm">🥋 Sensei</button>
+                                        <button onClick={() => onAskCoach('sakura', 'Come sta andando la mia alimentazione? Noti qualche pattern emotivo?')} className="btn-pink py-3 rounded-xl text-sm">🌸 Sakura</button>
+                                        <button onClick={() => onDeepAnalysis()} className="bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl text-sm">🔬 Dr.Data</button>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <div className="mt-4 text-center text-xs text-[var(--text-muted)]">Dati: Open Food Facts</div>
+                        </div>
+                    </div>
+                    
+                    {/* Add Food Modal */}
+                    {showAddModal && (
+                        <div className="fixed inset-0 bg-black/80 flex items-end lg:items-center justify-center z-50" onClick={() => setShowAddModal(false)}>
+                            <div className="bg-[var(--bg-card)] w-full lg:w-[500px] lg:rounded-2xl rounded-t-3xl max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                                <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+                                    <h3 className="font-bold text-lg">Aggiungi Pasto</h3>
+                                    <button onClick={() => setShowAddModal(false)} className="p-2">✕</button>
+                                </div>
+                                <div className="p-4 overflow-y-auto" style={{ maxHeight: '70vh' }}>
+                                    <div className="mb-4">
+                                        <label className="text-sm text-[var(--text-muted)] mb-2 block">Tipo pasto</label>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {Object.entries(mealLabels).map(([key, label]) => (
+                                                <button key={key} onClick={() => setMealType(key)} className={`p-3 rounded-xl text-center ${mealType === key ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-elevated)]'}`}>
+                                                    <div className="text-xl">{mealIcons[key]}</div>
+                                                    <div className="text-xs mt-1">{label}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="mb-4">
+                                        <label className="text-sm text-[var(--text-muted)] mb-2 block">Cerca cibo</label>
+                                        <input type="text" value={searchQuery} onChange={handleSearchChange} placeholder="es: pasta, pizza, mela..." className="w-full p-3 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)]" />
+                                        {searching && <div className="p-4 text-center text-[var(--text-muted)]">Ricerca...</div>}
+                                        {searchResults.length > 0 && (
+                                            <div className="mt-2 bg-[var(--bg-elevated)] rounded-xl overflow-hidden max-h-60 overflow-y-auto">
+                                                {searchResults.map((food, i) => (
+                                                    <button key={i} onClick={() => selectFood(food)} className="w-full p-3 text-left hover:bg-[var(--bg-card)] border-b border-[var(--border)] last:border-0">
+                                                        <div className="font-medium">{food.name}</div>
+                                                        <div className="text-xs text-[var(--text-muted)]">{food.brand && `${food.brand} • `}{food.calories} kcal/100g{food.source === 'ai_estimate' && ' • 🤖 stima AI'}</div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {selectedFood && (
+                                        <div className="mb-4 p-4 bg-[var(--bg-elevated)] rounded-xl">
+                                            <div className="font-bold mb-2">{selectedFood.name}</div>
+                                            <div className="mb-3">
+                                                <label className="text-xs text-[var(--text-muted)]">Quantità (g)</label>
+                                                <input type="number" value={servingSize} onChange={e => setServingSize(Number(e.target.value))} className="w-full p-2 mt-1 bg-[var(--bg-card)] rounded-lg border border-[var(--border)]" />
+                                            </div>
+                                            <div className="grid grid-cols-4 gap-2 text-center text-sm">
+                                                <div><div className="font-bold text-green-400">{Math.round(selectedFood.calories * servingSize / 100)}</div><div className="text-xs text-[var(--text-muted)]">kcal</div></div>
+                                                <div><div className="font-bold text-blue-400">{Math.round((selectedFood.protein || 0) * servingSize / 100 * 10) / 10}</div><div className="text-xs text-[var(--text-muted)]">prot</div></div>
+                                                <div><div className="font-bold text-yellow-400">{Math.round((selectedFood.carbs || 0) * servingSize / 100 * 10) / 10}</div><div className="text-xs text-[var(--text-muted)]">carb</div></div>
+                                                <div><div className="font-bold text-red-400">{Math.round((selectedFood.fat || 0) * servingSize / 100 * 10) / 10}</div><div className="text-xs text-[var(--text-muted)]">fat</div></div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <button onClick={addFood} disabled={!selectedFood} className={`w-full py-4 rounded-xl font-bold ${selectedFood ? 'btn-primary' : 'bg-gray-600 text-gray-400'}`}>✓ Aggiungi</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Goals Modal */}
+                    {showGoalsModal && (
+                        <div className="fixed inset-0 bg-black/80 flex items-end lg:items-center justify-center z-50" onClick={() => setShowGoalsModal(false)}>
+                            <div className="bg-[var(--bg-card)] w-full lg:w-[400px] lg:rounded-2xl rounded-t-3xl" onClick={e => e.stopPropagation()}>
+                                <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+                                    <h3 className="font-bold text-lg">Modifica Obiettivi</h3>
+                                    <button onClick={() => setShowGoalsModal(false)} className="p-2">✕</button>
+                                </div>
+                                <div className="p-4 space-y-4">
+                                    <div>
+                                        <label className="text-sm text-[var(--text-muted)]">Calorie (kcal/giorno)</label>
+                                        <input type="number" value={editGoals.calorie_goal || ''} onChange={e => setEditGoals({...editGoals, calorie_goal: Number(e.target.value)})} className="w-full p-3 mt-1 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)]" />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm text-[var(--text-muted)]">Proteine (g/giorno)</label>
+                                        <input type="number" value={editGoals.protein_goal || ''} onChange={e => setEditGoals({...editGoals, protein_goal: Number(e.target.value)})} className="w-full p-3 mt-1 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)]" />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm text-[var(--text-muted)]">Carboidrati (g/giorno)</label>
+                                        <input type="number" value={editGoals.carbs_goal || ''} onChange={e => setEditGoals({...editGoals, carbs_goal: Number(e.target.value)})} className="w-full p-3 mt-1 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)]" />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm text-[var(--text-muted)]">Grassi (g/giorno)</label>
+                                        <input type="number" value={editGoals.fat_goal || ''} onChange={e => setEditGoals({...editGoals, fat_goal: Number(e.target.value)})} className="w-full p-3 mt-1 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)]" />
+                                    </div>
+                                    <button onClick={saveGoals} className="w-full btn-primary py-4 rounded-xl font-bold">💾 Salva</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+        
+        // ==================== LOU VIEW (Gym Tracking) ====================
+        
+        const LouView = () => {
+            const { token } = useApp();
+            const [activeTab, setActiveTab] = useState('today'); // today, program, stats, chat
+            const [profile, setProfile] = useState(null);
+            const [program, setProgram] = useState(null);
+            const [todayWorkout, setTodayWorkout] = useState(null);
+            const [stats, setStats] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [generating, setGenerating] = useState(false);
+            const [showSetup, setShowSetup] = useState(false);
+            const [setupData, setSetupData] = useState({
+                experience: 'beginner',
+                days_per_week: 3,
+                session_minutes: 60,
+                excluded_muscles: [],
+                priority_muscles: ['glutes', 'legs'],
+                primary_goal: 'toning'
+            });
+            const [loggingExercise, setLoggingExercise] = useState(null);
+            const [logData, setLogData] = useState({ weight: '', reps: [], rpe: 7, feedback: 'perfect' });
+            
+            const muscleGroups = [
+                { id: 'glutes', label: '🍑 Glutei', color: '#ff6eb4' },
+                { id: 'legs', label: '🦵 Gambe', color: '#4da6ff' },
+                { id: 'back', label: '🔙 Dorso', color: '#00f593' },
+                { id: 'shoulders', label: '💪 Spalle', color: '#ff9f43' },
+                { id: 'arms', label: '💪 Braccia', color: '#a855f7' },
+                { id: 'abs', label: '🎯 Addominali', color: '#22d3ee' }
+            ];
+            
+            const loadData = async () => {
+                try {
+                    const [profileRes, programRes, todayRes, statsRes] = await Promise.all([
+                        fetch(`${API}/api/gym/profile`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                        fetch(`${API}/api/gym/program`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                        fetch(`${API}/api/gym/today`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                        fetch(`${API}/api/gym/stats?days=30`, { headers: { 'Authorization': `Bearer ${token}` } })
+                    ]);
+                    
+                    if (profileRes.ok) {
+                        const data = await profileRes.json();
+                        setProfile(data);
+                        if (!data.setup_complete) setShowSetup(true);
+                    }
+                    if (programRes.ok) setProgram((await programRes.json()).program);
+                    if (todayRes.ok) setTodayWorkout(await todayRes.json());
+                    if (statsRes.ok) setStats(await statsRes.json());
+                } catch (e) { console.error(e); }
+                setLoading(false);
+            };
+            
+            useEffect(() => { loadData(); }, []);
+            
+            const saveProfile = async () => {
+                try {
+                    await fetch(`${API}/api/gym/profile`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ ...setupData, setup_complete: true })
+                    });
+                    setShowSetup(false);
+                    loadData();
+                } catch (e) { console.error(e); }
+            };
+            
+            const generateProgram = async () => {
+                setGenerating(true);
+                try {
+                    const res = await fetch(`${API}/api/gym/generate-program`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        alert(data.message || 'Programma creato!');
+                        loadData();
+                    } else {
+                        const err = await res.json();
+                        alert(err.error || 'Errore');
+                    }
+                } catch (e) { alert('Errore: ' + e.message); }
+                setGenerating(false);
+            };
+            
+            const logExercise = async () => {
+                if (!loggingExercise) return;
+                try {
+                    const res = await fetch(`${API}/api/gym/log`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({
+                            exercise_id: loggingExercise.id,
+                            exercise_name: loggingExercise.name,
+                            muscle_group: loggingExercise.muscle_group,
+                            weight: parseFloat(logData.weight) || 0,
+                            reps: logData.reps,
+                            rpe: logData.rpe,
+                            feedback: logData.feedback
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.is_pr) alert(data.pr_message);
+                    setLoggingExercise(null);
+                    setLogData({ weight: '', reps: [], rpe: 7, feedback: 'perfect' });
+                    loadData();
+                } catch (e) { console.error(e); }
+            };
+            
+            const toggleMuscle = (muscleId, list, setter) => {
+                if (list.includes(muscleId)) {
+                    setter(list.filter(m => m !== muscleId));
+                } else {
+                    setter([...list, muscleId]);
+                }
+            };
+            
+            if (loading) return <Loading text="Caricamento Lou..." />;
+            
+            // Setup Modal
+            if (showSetup) {
+                return (
+                    <div className="h-full flex flex-col bg-gradient-lou">
+                        <div className="p-4 border-b border-[var(--border)]">
+                            <h1 className="text-xl font-bold text-[var(--accent-lou)]">🏋️‍♀️ Setup Lou</h1>
+                            <p className="text-sm text-[var(--text-muted)]">Configura il tuo profilo palestra</p>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4" style={{ paddingBottom: 'calc(100px + var(--safe-bottom))' }}>
+                            <div className="max-w-lg mx-auto space-y-6">
+                                
+                                {/* Esperienza */}
+                                <div className="glass p-4 rounded-2xl">
+                                    <label className="text-sm font-medium mb-3 block">📊 Esperienza</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {['beginner', 'intermediate', 'advanced'].map(exp => (
+                                            <button key={exp} onClick={() => setSetupData({...setupData, experience: exp})}
+                                                className={`p-3 rounded-xl text-sm ${setupData.experience === exp ? 'bg-[var(--accent-lou)] text-white' : 'bg-[var(--bg-elevated)]'}`}>
+                                                {exp === 'beginner' ? '🌱 Inizio' : exp === 'intermediate' ? '💪 Intermedio' : '🔥 Avanzato'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                {/* Giorni */}
+                                <div className="glass p-4 rounded-2xl">
+                                    <label className="text-sm font-medium mb-3 block">📅 Giorni a settimana</label>
+                                    <div className="flex gap-2">
+                                        {[2, 3, 4, 5, 6].map(d => (
+                                            <button key={d} onClick={() => setSetupData({...setupData, days_per_week: d})}
+                                                className={`flex-1 p-3 rounded-xl text-lg font-bold ${setupData.days_per_week === d ? 'bg-[var(--accent-lou)] text-white' : 'bg-[var(--bg-elevated)]'}`}>
+                                                {d}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                {/* Durata */}
+                                <div className="glass p-4 rounded-2xl">
+                                    <label className="text-sm font-medium mb-3 block">⏱️ Durata sessione</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {[45, 60, 90].map(min => (
+                                            <button key={min} onClick={() => setSetupData({...setupData, session_minutes: min})}
+                                                className={`p-3 rounded-xl ${setupData.session_minutes === min ? 'bg-[var(--accent-lou)] text-white' : 'bg-[var(--bg-elevated)]'}`}>
+                                                {min} min
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                {/* Muscoli prioritari */}
+                                <div className="glass p-4 rounded-2xl">
+                                    <label className="text-sm font-medium mb-3 block">🎯 Muscoli prioritari</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {muscleGroups.map(m => (
+                                            <button key={m.id} 
+                                                onClick={() => setSetupData({...setupData, priority_muscles: setupData.priority_muscles.includes(m.id) ? setupData.priority_muscles.filter(x => x !== m.id) : [...setupData.priority_muscles, m.id]})}
+                                                className={`p-3 rounded-xl text-sm flex items-center gap-2 ${setupData.priority_muscles.includes(m.id) ? 'ring-2 ring-[var(--accent-lou)]' : ''}`}
+                                                style={{ background: setupData.priority_muscles.includes(m.id) ? m.color + '30' : 'var(--bg-elevated)' }}>
+                                                <span>{m.label}</span>
+                                                {setupData.priority_muscles.includes(m.id) && <span>✓</span>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                {/* Muscoli da escludere */}
+                                <div className="glass p-4 rounded-2xl">
+                                    <label className="text-sm font-medium mb-3 block">🚫 Escludi (opzionale)</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {muscleGroups.map(m => (
+                                            <button key={m.id}
+                                                onClick={() => setSetupData({...setupData, excluded_muscles: setupData.excluded_muscles.includes(m.id) ? setupData.excluded_muscles.filter(x => x !== m.id) : [...setupData.excluded_muscles, m.id]})}
+                                                className={`p-2 rounded-lg text-xs ${setupData.excluded_muscles.includes(m.id) ? 'bg-red-500/30 ring-1 ring-red-500' : 'bg-[var(--bg-elevated)]'}`}>
+                                                {m.label.split(' ')[0]}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                <button onClick={saveProfile} className="w-full btn-lou py-4 rounded-2xl text-lg font-bold">
+                                    💪 Inizia con Lou!
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+            
+            return (
+                <div className="h-full flex flex-col bg-gradient-lou">
+                    {/* Header */}
+                    <div className="p-4 border-b border-[var(--border)]">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h1 className="text-xl font-bold text-[var(--accent-lou)]">🏋️‍♀️ Lou</h1>
+                                <p className="text-xs text-[var(--text-muted)]">Sculpting Coach</p>
+                            </div>
+                            {stats && (
+                                <div className="text-right">
+                                    <div className="text-lg font-bold text-[var(--accent-lou)]">{stats.current_streak}🔥</div>
+                                    <div className="text-[10px] text-[var(--text-muted)]">streak</div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Tabs */}
+                        <div className="flex gap-2 mt-3">
+                            {[{id: 'today', label: '📅 Oggi'}, {id: 'program', label: '📋 Programma'}, {id: 'stats', label: '📊 Stats'}, {id: 'chat', label: '💬 Chat'}].map(t => (
+                                <button key={t.id} onClick={() => setActiveTab(t.id)}
+                                    className={`flex-1 py-2 rounded-xl text-sm font-medium ${activeTab === t.id ? 'bg-[var(--accent-lou)] text-white' : 'bg-[var(--bg-elevated)]'}`}>
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-4" style={{ paddingBottom: 'calc(100px + var(--safe-bottom))' }}>
+                        <div className="max-w-2xl mx-auto">
+                            
+                            {/* TODAY TAB */}
+                            {activeTab === 'today' && (
+                                <>
+                                    {!program ? (
+                                        <div className="glass p-6 rounded-2xl text-center">
+                                            <span className="text-5xl block mb-4">🏋️‍♀️</span>
+                                            <h3 className="text-lg font-bold mb-2">Nessun programma attivo</h3>
+                                            <p className="text-sm text-[var(--text-muted)] mb-4">Lou creerà un programma su misura per te!</p>
+                                            <button onClick={generateProgram} disabled={generating}
+                                                className="btn-lou px-6 py-3 rounded-xl font-bold">
+                                                {generating ? '🔄 Generazione...' : '✨ Genera Programma'}
+                                            </button>
+                                        </div>
+                                    ) : todayWorkout?.workout ? (
+                                        <div className="space-y-4">
+                                            {/* Motivation */}
+                                            {todayWorkout.motivation && (
+                                                <div className="glass p-4 rounded-2xl border-l-4 border-[var(--accent-lou)]">
+                                                    <p className="text-sm">{todayWorkout.motivation}</p>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Deload Warning */}
+                                            {todayWorkout.needs_deload && (
+                                                <div className="glass p-4 rounded-2xl border-l-4 border-orange-500 bg-orange-500/10">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xl">⚠️</span>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-orange-400">Deload consigliato!</p>
+                                                            <p className="text-xs text-[var(--text-muted)]">RPE medio {todayWorkout.avg_rpe_week} - Oggi focus tecnica, -20% peso</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Workout Header */}
+                                            <div className="glass p-4 rounded-2xl">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h2 className="text-lg font-bold">{todayWorkout.workout.name}</h2>
+                                                    <span className="text-sm text-[var(--text-muted)]">~{todayWorkout.workout.estimated_minutes}min</span>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    {todayWorkout.workout.muscle_groups?.map(mg => (
+                                                        <span key={mg} className="text-xs px-2 py-1 rounded-full bg-[var(--accent-lou-dim)] text-[var(--accent-lou)]">
+                                                            {muscleGroups.find(m => m.id === mg)?.label || mg}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Exercises */}
+                                            <div className="space-y-3">
+                                                {todayWorkout.workout.exercises?.map((ex, i) => {
+                                                    const trendEmoji = {'too_easy': '😴', 'too_hard': '😫', 'progressing': '📈', 'fatigued': '⚠️', 'stable': '➡️'}[ex.trend] || '';
+                                                    return (
+                                                    <div key={ex.id} className={`glass p-4 rounded-2xl ${ex.completed ? 'opacity-60' : ''}`}>
+                                                        <div className="flex items-start justify-between">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-lg font-bold">{i + 1}.</span>
+                                                                    <span className="font-medium">{ex.name}</span>
+                                                                    {ex.completed && <span className="text-green-400">✓</span>}
+                                                                    {trendEmoji && <span title={ex.trend}>{trendEmoji}</span>}
+                                                                </div>
+                                                                <div className="text-sm text-[var(--text-muted)] mt-1">
+                                                                    {ex.sets}×{ex.reps_min}-{ex.reps_max} | Rest {ex.rest_seconds}s | RPE {ex.rpe_target}
+                                                                </div>
+                                                                
+                                                                {/* Smart Weight Suggestion */}
+                                                                {ex.smart_weight ? (
+                                                                    <div className="mt-2 p-2 bg-[var(--accent-lou-dim)] rounded-lg">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="text-lg font-bold text-[var(--accent-lou)]">{ex.smart_weight}kg</span>
+                                                                            {ex.last_weight && ex.smart_weight !== ex.last_weight && (
+                                                                                <span className="text-xs text-[var(--text-muted)]">
+                                                                                    (era {ex.last_weight}kg)
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        {ex.smart_reason && (
+                                                                            <div className="text-xs text-[var(--accent-lou)] mt-1">{ex.smart_reason}</div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : ex.last_weight ? (
+                                                                    <div className="text-xs text-[var(--accent-lou)] mt-1">
+                                                                        Ultimo: {ex.last_weight}kg
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="text-xs text-[var(--text-muted)] mt-1 italic">
+                                                                        Prima volta! Inizia leggero 💪
+                                                                    </div>
+                                                                )}
+                                                                
+                                                                {ex.sessions_logged > 0 && (
+                                                                    <div className="text-[10px] text-[var(--text-muted)] mt-1">
+                                                                        {ex.sessions_logged} sessioni tracciate
+                                                                        {ex.weight_change > 0 && ` • +${ex.weight_change}kg totali 📈`}
+                                                                    </div>
+                                                                )}
+                                                                
+                                                                {ex.notes && <div className="text-xs text-[var(--text-muted)] mt-1 italic">{ex.notes}</div>}
+                                                            </div>
+                                                            {!ex.completed && (
+                                                                <button onClick={() => { setLoggingExercise(ex); setLogData({...logData, weight: ex.smart_weight || ex.last_weight || '', reps: Array(ex.sets).fill(ex.reps_min)}); }}
+                                                                    className="btn-lou px-4 py-2 rounded-xl text-sm">
+                                                                    Log
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="glass p-6 rounded-2xl text-center">
+                                            <span className="text-5xl block mb-4">🧘</span>
+                                            <h3 className="text-lg font-bold mb-2">{todayWorkout?.message || 'Giorno di riposo'}</h3>
+                                            {todayWorkout?.next_workout && (
+                                                <p className="text-sm text-[var(--text-muted)]">
+                                                    Prossimo: {todayWorkout.next_workout.name}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            
+                            {/* PROGRAM TAB */}
+                            {activeTab === 'program' && (
+                                <>
+                                    {!program ? (
+                                        <div className="glass p-6 rounded-2xl text-center">
+                                            <p className="text-[var(--text-muted)] mb-4">Nessun programma attivo</p>
+                                            <button onClick={generateProgram} disabled={generating} className="btn-lou px-6 py-3 rounded-xl">
+                                                {generating ? '🔄 Generazione...' : '✨ Genera Programma'}
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <div className="glass p-4 rounded-2xl">
+                                                <h2 className="text-lg font-bold mb-1">{program.name}</h2>
+                                                <div className="text-sm text-[var(--text-muted)]">
+                                                    {program.split_type} • Settimana {program.current_week}/{program.weeks_total}
+                                                </div>
+                                            </div>
+                                            
+                                            {program.days?.map((day, i) => (
+                                                <div key={day.id} className="glass p-4 rounded-2xl">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <h3 className="font-bold">{['', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'][day.day_of_week]} - {day.name}</h3>
+                                                        <span className="text-xs text-[var(--text-muted)]">{day.estimated_minutes}min</span>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        {day.exercises?.map((ex, j) => (
+                                                            <div key={ex.id} className="flex items-center justify-between p-2 bg-[var(--bg-elevated)] rounded-lg">
+                                                                <div>
+                                                                    <span className="text-sm font-medium">{ex.name}</span>
+                                                                    <span className="text-xs text-[var(--text-muted)] ml-2">{ex.equipment}</span>
+                                                                </div>
+                                                                <span className="text-sm">{ex.sets}×{ex.reps_min}-{ex.reps_max}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            
+                                            <button onClick={generateProgram} disabled={generating}
+                                                className="w-full btn-ghost py-3 rounded-xl text-sm">
+                                                🔄 Rigenera Programma
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            
+                            {/* STATS TAB */}
+                            {activeTab === 'stats' && stats && (
+                                <div className="space-y-4">
+                                    {/* Overview */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="glass p-4 rounded-2xl text-center">
+                                            <div className="text-2xl font-bold text-[var(--accent-lou)]">{stats.total_sessions}</div>
+                                            <div className="text-xs text-[var(--text-muted)]">Sessioni (30g)</div>
+                                        </div>
+                                        <div className="glass p-4 rounded-2xl text-center">
+                                            <div className="text-2xl font-bold text-[var(--accent-green)]">{stats.prs_count}</div>
+                                            <div className="text-xs text-[var(--text-muted)]">PR 🎉</div>
+                                        </div>
+                                        <div className="glass p-4 rounded-2xl text-center">
+                                            <div className="text-2xl font-bold text-[var(--accent-orange)]">{(stats.total_volume_kg/1000).toFixed(1)}k</div>
+                                            <div className="text-xs text-[var(--text-muted)]">kg Volume</div>
+                                        </div>
+                                        <div className="glass p-4 rounded-2xl text-center">
+                                            <div className="text-2xl font-bold text-[var(--accent-cyan)]">{stats.total_time_minutes}</div>
+                                            <div className="text-xs text-[var(--text-muted)]">Minuti</div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Volume by Muscle */}
+                                    {stats.volume_by_muscle && Object.keys(stats.volume_by_muscle).length > 0 && (
+                                        <div className="glass p-4 rounded-2xl">
+                                            <h3 className="font-bold mb-3">Volume per Muscolo</h3>
+                                            <div className="space-y-2">
+                                                {Object.entries(stats.volume_by_muscle).sort((a, b) => b[1] - a[1]).map(([muscle, vol]) => {
+                                                    const maxVol = Math.max(...Object.values(stats.volume_by_muscle));
+                                                    const pct = (vol / maxVol) * 100;
+                                                    const mg = muscleGroups.find(m => m.id === muscle);
+                                                    return (
+                                                        <div key={muscle}>
+                                                            <div className="flex justify-between text-sm mb-1">
+                                                                <span>{mg?.label || muscle}</span>
+                                                                <span>{(vol/1000).toFixed(1)}k kg</span>
+                                                            </div>
+                                                            <div className="h-2 bg-[var(--bg-elevated)] rounded-full overflow-hidden">
+                                                                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: mg?.color || 'var(--accent-lou)' }}></div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    <button onClick={() => setShowSetup(true)} className="w-full btn-ghost py-3 rounded-xl text-sm">
+                                        ⚙️ Modifica Profilo
+                                    </button>
+                                </div>
+                            )}
+                            
+                            {/* CHAT TAB */}
+                            {activeTab === 'chat' && (
+                                <div className="h-full -m-4" style={{height: 'calc(100vh - 180px)'}}>
+                                    <ChatView coach="lou" />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {/* Log Exercise Modal */}
+                    {loggingExercise && (
+                        <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50" onClick={() => setLoggingExercise(null)}>
+                            <div className="bg-[var(--bg-card)] w-full max-w-lg rounded-t-3xl p-6" onClick={e => e.stopPropagation()}>
+                                <h3 className="text-lg font-bold mb-4">{loggingExercise.name}</h3>
+                                
+                                {/* Weight */}
+                                <div className="mb-4">
+                                    <label className="text-sm text-[var(--text-muted)] mb-2 block">Peso (kg)</label>
+                                    <input type="number" value={logData.weight} onChange={e => setLogData({...logData, weight: e.target.value})}
+                                        className="w-full p-3 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] text-lg font-bold text-center"
+                                        placeholder={loggingExercise.last_weight ? `Ultimo: ${loggingExercise.last_weight}` : '0'} />
+                                </div>
+                                
+                                {/* Reps per set */}
+                                <div className="mb-4">
+                                    <label className="text-sm text-[var(--text-muted)] mb-2 block">Reps per set</label>
+                                    <div className="flex gap-2">
+                                        {Array(loggingExercise.sets).fill(0).map((_, i) => (
+                                            <input key={i} type="number" value={logData.reps[i] || ''}
+                                                onChange={e => {
+                                                    const newReps = [...logData.reps];
+                                                    newReps[i] = parseInt(e.target.value) || 0;
+                                                    setLogData({...logData, reps: newReps});
+                                                }}
+                                                className="flex-1 p-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)] text-center"
+                                                placeholder={loggingExercise.reps_min.toString()} />
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                {/* Feedback */}
+                                <div className="mb-4">
+                                    <label className="text-sm text-[var(--text-muted)] mb-2 block">Com'è stato?</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {[{id: 'too_hard', label: '😫 Duro', color: 'red'}, {id: 'perfect', label: '💪 Giusto', color: 'green'}, {id: 'too_easy', label: '😴 Facile', color: 'orange'}].map(f => (
+                                            <button key={f.id} onClick={() => setLogData({...logData, feedback: f.id})}
+                                                className={`p-3 rounded-xl text-sm ${logData.feedback === f.id ? `bg-${f.color}-500/30 ring-2 ring-${f.color}-500` : 'bg-[var(--bg-elevated)]'}`}>
+                                                {f.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                <button onClick={logExercise} className="w-full btn-lou py-4 rounded-xl font-bold">
+                                    ✓ Salva
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+        
+        // ==================== ACTIVITY VIEW ====================
+        
+        const ActivityView = () => {
+            const { token, lastSync, refresh, isRefreshing } = useApp();
+            const [activities, setActivities] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [commenting, setCommenting] = useState(null);
+            const [comments, setComments] = useState({});
+            const containerRef = useRef(null);
+            
+            const loadData = useCallback(async () => {
+                try {
+                    const res = await fetch(`${API}/api/activities?days=30`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (res.ok) setActivities(await res.json());
+                } catch {}
+                setLoading(false);
+            }, [token]);
+            
+            useEffect(() => { loadData(); }, [loadData, lastSync]);
+            
+            const handleRefresh = async () => { await refresh(); await loadData(); };
+            const { pullDistance, isRefreshing: isPulling } = usePullToRefresh(handleRefresh, containerRef);
+            
+            const getIcon = (type) => ({ running: '🏃', cycling: '🚴', swimming: '🏊', walking: '🚶', hiking: '🥾', strength_training: '💪', yoga: '🧘' }[type] || '⚡');
+            const formatDuration = (sec) => { if (!sec) return '--'; const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
+            
+            const getComment = async (activity) => {
+                setCommenting(activity.id);
+                try {
+                    const res = await fetch(`${API}/api/activity/${activity.id}/comment`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                    const data = await res.json();
+                    setComments(prev => ({ ...prev, [activity.id]: data.comment }));
+                } catch {}
+                setCommenting(null);
+            };
+            
+            return (
+                <div className="h-full flex flex-col">
+                    <ViewHeader title="Attività" onRefresh={handleRefresh} isRefreshing={isRefreshing || isPulling} lastSync={lastSync} />
+                    <div ref={containerRef} className="flex-1 overflow-y-auto ptr-container" style={{ paddingBottom: 'calc(80px + var(--safe-bottom))' }}>
+                        <PullIndicator distance={pullDistance} isRefreshing={isPulling} />
+                        
+                        <div className="max-w-4xl mx-auto p-4">
+                            {loading ? <Loading /> : activities.length === 0 ? (
+                                <div className="glass p-8 text-center"><span className="text-4xl block mb-3">🏃</span><p className="text-[var(--text-muted)]">Nessuna attività</p></div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {activities.map((a, i) => (
+                                        <div key={a.id || i} className="glass p-4">
+                                            <div className="flex items-start gap-3">
+                                                <span className="text-2xl">{getIcon(a.activity_type)}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h3 className="font-semibold text-sm truncate">{a.activity_name || a.activity_type || 'Attività'}</h3>
+                                                        <span className="text-[10px] text-[var(--text-muted)]">{a.start_time ? new Date(a.start_time).toLocaleDateString('it', { day: 'numeric', month: 'short' }) : ''}</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-4 gap-2 text-xs">
+                                                        <div><span className="text-[var(--text-muted)] block text-[10px]">Durata</span><span className="font-medium">{formatDuration(a.duration_seconds)}</span></div>
+                                                        <div><span className="text-[var(--text-muted)] block text-[10px]">Distanza</span><span className="font-medium">{a.distance_meters ? (a.distance_meters / 1000).toFixed(1) + 'km' : '--'}</span></div>
+                                                        <div><span className="text-[var(--text-muted)] block text-[10px]">Calorie</span><span className="font-medium">{a.calories || '--'}</span></div>
+                                                        <div><span className="text-[var(--text-muted)] block text-[10px]">HR</span><span className="font-medium">{a.avg_hr || '--'}</span></div>
+                                                    </div>
+                                                    {!comments[a.id] && <button onClick={() => getComment(a)} disabled={commenting === a.id} className="mt-2 text-[10px] text-[var(--accent-green)]">{commenting === a.id ? 'Analisi...' : '🤖 Commento AI'}</button>}
+                                                    {comments[a.id] && <div className="mt-2 p-2 rounded-lg bg-[var(--bg-elevated)] text-xs text-[var(--text-secondary)]">{comments[a.id]}</div>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== PROFILE VIEW ====================
+        
+        const ProfileView = ({ onLogout }) => {
+            const { token, user, setUser, refresh, isRefreshing, lastSync } = useApp();
+            const [form, setForm] = useState({ name: user?.name || '', birth_year: user?.birth_year || '' });
+            const [saving, setSaving] = useState(false);
+            const [syncing, setSyncing] = useState(false);
+            const [syncProgress, setSyncProgress] = useState('');
+            const [recalculating, setRecalculating] = useState(false);
+            const [recalcResult, setRecalcResult] = useState('');
+            const [debugData, setDebugData] = useState(null);
+            const containerRef = useRef(null);
+            
+            const { pullDistance, isRefreshing: isPulling } = usePullToRefresh(refresh, containerRef);
+            
+            const save = async () => {
+                setSaving(true);
+                try {
+                    const res = await fetch(`${API}/api/profile`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ name: form.name, birth_year: parseInt(form.birth_year) }) });
+                    if (res.ok) { const updated = { ...user, name: form.name, birth_year: parseInt(form.birth_year) }; localStorage.setItem('user', JSON.stringify(updated)); setUser(updated); }
+                } catch {}
+                setSaving(false);
+            };
+            
+            const syncYear = async () => {
+                setSyncing(true); setSyncProgress('Avvio...');
+                try {
+                    const res = await fetch(`${API}/api/sync/year`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                    setSyncProgress((await res.json()).message || 'Completato!');
+                    await refresh();
+                } catch { setSyncProgress('Errore'); }
+                setSyncing(false);
+            };
+            
+            const recalculate = async () => {
+                setRecalculating(true);
+                try {
+                    const res = await fetch(`${API}/api/recalculate`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                    setRecalcResult((await res.json()).message || 'Fatto!');
+                    await refresh();
+                } catch (e) { setRecalcResult('Errore'); }
+                setRecalculating(false);
+            };
+            
+            const loadDebug = async () => {
+                try { setDebugData(await (await fetch(`${API}/api/debug/bio`, { headers: { 'Authorization': `Bearer ${token}` } })).json()); } catch {}
+            };
+            
+            return (
+                <div className="h-full flex flex-col">
+                    <ViewHeader title="Profilo" onRefresh={refresh} isRefreshing={isRefreshing || isPulling} lastSync={lastSync} />
+                    <div ref={containerRef} className="flex-1 overflow-y-auto ptr-container" style={{ paddingBottom: 'calc(80px + var(--safe-bottom))' }}>
+                        <PullIndicator distance={pullDistance} isRefreshing={isPulling} />
+                        
+                        <div className="max-w-lg mx-auto p-4">
+                            <div className="glass p-5 mb-4">
+                                <h3 className="font-semibold text-sm mb-3">Informazioni</h3>
+                                <div className="space-y-3">
+                                    <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="input-modern w-full px-3 py-2 text-sm" placeholder="Nome" />
+                                    <input type="number" value={form.birth_year} onChange={e => setForm({ ...form, birth_year: e.target.value })} className="input-modern w-full px-3 py-2 text-sm" placeholder="Anno nascita" />
+                                    <button onClick={save} disabled={saving} className="btn-primary w-full py-3 text-sm">{saving ? 'Salvataggio...' : 'Salva'}</button>
+                                </div>
+                            </div>
+                            
+                            <div className="glass p-5 mb-4">
+                                <h3 className="font-semibold text-sm mb-2">Sync Completa</h3>
+                                <p className="text-[10px] text-[var(--text-muted)] mb-3">Sincronizza tutti i dati dell'anno da Garmin</p>
+                                <button onClick={syncYear} disabled={syncing} className="btn-primary w-full py-3 text-sm">{syncing ? '🔄 Sync...' : '📅 Sincronizza Anno'}</button>
+                                {syncProgress && <p className="text-xs text-center text-[var(--text-secondary)] mt-2">{syncProgress}</p>}
+                            </div>
+                            
+                            <div className="glass p-5 mb-4">
+                                <h3 className="font-semibold text-sm mb-2">Ricalcola Bio Age</h3>
+                                <button onClick={recalculate} disabled={recalculating} className="btn-primary w-full py-3 text-sm mb-2">{recalculating ? '🔄...' : '🧬 Ricalcola'}</button>
+                                {recalcResult && <p className="text-xs text-center text-[var(--accent-green)] mb-2">{recalcResult}</p>}
+                                <button onClick={loadDebug} className="btn-ghost w-full py-2 text-xs">🔍 Debug ultimi 5 giorni</button>
+                                {debugData && (
+                                    <div className="mt-3 p-3 rounded-lg bg-[var(--bg-secondary)] text-[10px] font-mono max-h-48 overflow-y-auto">
+                                        {debugData.map((d, i) => (
+                                            <div key={i} className="mb-2 pb-2 border-b border-[var(--border)] last:border-0">
+                                                <div className="text-[var(--accent-green)] font-bold">{d.date}</div>
+                                                <div>Sonno: {d.sleep_hours}h → <span className={d.bio_age_sleep_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_sleep_impact}</span></div>
+                                                <div>RHR: {d.resting_hr} → <span className={d.bio_age_rhr_impact < 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{d.bio_age_rhr_impact}</span></div>
+                                                <div className="font-bold mt-1">Bio Age: {d.biological_age}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <button onClick={onLogout} className="btn-danger w-full py-3 text-sm">Logout</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // ==================== AUTH PAGES ====================
+        
+        const LandingPage = ({ onNavigate }) => (
+            <div className="h-full flex items-center justify-center p-6 bg-gradient-hero">
+                <div className="text-center max-w-md slide-up">
+                    <div className="flex gap-4 justify-center mb-6">
+                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl glow-green" style={{ background: 'var(--accent-green-dim)' }}>🥋</div>
+                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl glow-pink" style={{ background: 'var(--accent-pink-dim)' }}>🌸</div>
+                    </div>
+                    <h1 className="text-4xl font-bold font-display mb-2 gradient-text">SENSEI</h1>
+                    <p className="text-lg text-[var(--text-secondary)] mb-1">Performance Lab</p>
+                    <p className="text-sm text-[var(--text-muted)] mb-8">AI coach per fitness, salute e longevità</p>
+                    <div className="space-y-3">
+                        <button onClick={() => onNavigate('login')} className="btn-primary w-full py-4 text-lg">Accedi</button>
+                        <button onClick={() => onNavigate('register')} className="btn-ghost w-full py-4">Crea Account</button>
+                    </div>
+                </div>
+            </div>
+        );
+        
+        const LoginPage = ({ onNavigate, onLogin }) => {
+            const [form, setForm] = useState({ email: '', password: '' });
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+            
+            const submit = async (e) => {
+                e.preventDefault(); setLoading(true); setError('');
+                try {
+                    const res = await fetch(`${API}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+                    const data = await res.json();
+                    if (data.token) { localStorage.setItem('token', data.token); localStorage.setItem('user', JSON.stringify(data.user)); onLogin(data); }
+                    else setError(data.error || 'Login fallito');
+                } catch { setError('Errore di connessione'); }
+                setLoading(false);
+            };
+            
+            return (
+                <div className="h-full flex items-center justify-center p-6 bg-gradient-hero">
+                    <form onSubmit={submit} className="w-full max-w-sm slide-up">
+                        <div className="text-center mb-6"><div className="text-4xl mb-3">🥋</div><h1 className="text-2xl font-bold font-display gradient-text">Bentornato</h1></div>
+                        {error && <div className="glass border-[var(--accent-red)] p-3 mb-4 text-[var(--accent-red)] text-sm text-center">{error}</div>}
+                        <div className="space-y-3 mb-5">
+                            <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Email" required />
+                            <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Password" required />
+                        </div>
+                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 mb-4">{loading ? 'Accesso...' : 'Accedi'}</button>
+                        <p className="text-center text-sm text-[var(--text-muted)]">Non hai un account? <button type="button" onClick={() => onNavigate('register')} className="text-[var(--accent-green)]">Registrati</button></p>
+                    </form>
+                </div>
+            );
+        };
+        
+        const RegisterPage = ({ onNavigate }) => {
+            const [form, setForm] = useState({ email: '', password: '', name: '', birth_year: '' });
+            const [error, setError] = useState('');
+            const [success, setSuccess] = useState(false);
+            const [loading, setLoading] = useState(false);
+            
+            const submit = async (e) => {
+                e.preventDefault();
+                if (!form.birth_year) { setError('Anno nascita richiesto'); return; }
+                setLoading(true); setError('');
+                try {
+                    const res = await fetch(`${API}/api/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, birth_year: parseInt(form.birth_year) }) });
+                    const data = await res.json();
+                    if (data.user_id) setSuccess(true);
+                    else setError(data.error || 'Errore');
+                } catch { setError('Errore di connessione'); }
+                setLoading(false);
+            };
+            
+            if (success) return (
+                <div className="h-full flex items-center justify-center p-6 bg-gradient-hero">
+                    <div className="text-center glass-elevated p-10 scale-in">
+                        <div className="text-5xl mb-4">🎉</div>
+                        <h2 className="text-2xl font-bold text-[var(--accent-green)] mb-4">Account Creato!</h2>
+                        <button onClick={() => onNavigate('login')} className="btn-primary px-8 py-3">Accedi</button>
+                    </div>
+                </div>
+            );
+            
+            return (
+                <div className="h-full flex items-center justify-center p-6 bg-gradient-hero">
+                    <form onSubmit={submit} className="w-full max-w-sm slide-up">
+                        <div className="text-center mb-6"><div className="text-4xl mb-3">🥋</div><h1 className="text-2xl font-bold font-display gradient-text">Registrazione</h1></div>
+                        {error && <div className="glass border-[var(--accent-red)] p-3 mb-4 text-[var(--accent-red)] text-sm text-center">{error}</div>}
+                        <div className="space-y-3 mb-5">
+                            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Nome" />
+                            <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Email" required />
+                            <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Password (min 6)" required minLength="6" />
+                            <input type="number" value={form.birth_year} onChange={e => setForm({ ...form, birth_year: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Anno nascita *" required />
+                        </div>
+                        <button type="submit" disabled={loading} className="btn-primary w-full py-4 mb-4">{loading ? 'Registrazione...' : 'Crea Account'}</button>
+                        <p className="text-center text-sm text-[var(--text-muted)]">Hai un account? <button type="button" onClick={() => onNavigate('login')} className="text-[var(--accent-green)]">Accedi</button></p>
+                    </form>
+                </div>
+            );
+        };
+        
+        const SetupPage = ({ token, onComplete }) => {
+            const [garmin, setGarmin] = useState({ email: '', password: '' });
+            const [error, setError] = useState('');
+            const [step, setStep] = useState(1);
+            const [loading, setLoading] = useState(false);
+            
+            const connect = async (e) => {
+                e.preventDefault(); setLoading(true); setError('');
+                try {
+                    const res = await fetch(`${API}/api/garmin/connect`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ garmin_email: garmin.email, garmin_password: garmin.password }) });
+                    const data = await res.json();
+                    if (data.message?.includes('collegato')) {
+                        setStep(2);
+                        await fetch(`${API}/api/sync`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ days_back: 90 }) });
+                        setStep(3);
+                        setTimeout(onComplete, 1500);
+                    } else setError(data.error || 'Errore');
+                } catch { setError('Errore connessione'); }
+                setLoading(false);
+            };
+            
+            if (step >= 2) return (
+                <div className="h-full flex items-center justify-center bg-gradient-hero">
+                    <div className="text-center glass-elevated p-10 scale-in">
+                        {step === 2 ? (<><div className="w-14 h-14 mx-auto mb-4 border-4 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin"></div><h3 className="text-xl font-bold">Sincronizzazione...</h3></>) : (<><div className="text-5xl mb-4">✓</div><h3 className="text-xl font-bold text-[var(--accent-green)]">Pronto!</h3></>)}
+                    </div>
+                </div>
+            );
+            
+            return (
+                <div className="h-full flex items-center justify-center p-6 bg-gradient-hero">
+                    <form onSubmit={connect} className="w-full max-w-sm slide-up">
+                        <div className="text-center mb-6"><div className="text-4xl mb-3">⌚</div><h1 className="text-2xl font-bold font-display">Connetti Garmin</h1></div>
+                        {error && <div className="glass border-[var(--accent-red)] p-3 mb-4 text-[var(--accent-red)] text-sm text-center">{error}</div>}
+                        <div className="glass p-3 mb-4 text-xs text-[var(--text-muted)] flex items-center gap-2"><span>🔒</span> Credenziali criptate</div>
+                        <div className="space-y-3 mb-5">
+                            <input type="email" value={garmin.email} onChange={e => setGarmin({ ...garmin, email: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Email Garmin" required />
+                            <input type="password" value={garmin.password} onChange={e => setGarmin({ ...garmin, password: e.target.value })} className="input-modern w-full px-4 py-3" placeholder="Password Garmin" required />
+                        </div>
+                        <button type="submit" disabled={loading} className="btn-primary w-full py-4">{loading ? 'Connessione...' : 'Connetti'}</button>
+                    </form>
+                </div>
+            );
+        };
+        
+        // ==================== DASHBOARD ====================
+        
+        const Dashboard = ({ token, user, onLogout, onUserUpdate }) => {
+            const [tab, setTab] = useState('data');
+            const [lastSync, setLastSync] = useState(Date.now());
+            const [isRefreshing, setIsRefreshing] = useState(false);
+            const [initialMessage, setInitialMessage] = useState(null);
+            const [appReady, setAppReady] = useState(false);
+            const [deepAnalysis, setDeepAnalysis] = useState({ show: false, loading: false, result: null, error: null });
+            
+            // Auto-sync on mount
+            useEffect(() => {
+                const init = async () => {
+                    try {
+                        // Sync latest data on app open
+                        await fetch(`${API}/api/sync`, { 
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+                            body: JSON.stringify({ days_back: 7 }) 
+                        });
+                        setLastSync(Date.now());
+                    } catch {}
+                    setAppReady(true);
+                };
+                init();
+            }, [token]);
+            
+            const refresh = useCallback(async () => {
+                setIsRefreshing(true);
+                try {
+                    await fetch(`${API}/api/sync`, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+                        body: JSON.stringify({ days_back: 7 }) 
+                    });
+                    setLastSync(Date.now());
+                } catch {}
+                setIsRefreshing(false);
+            }, [token]);
+            
+            const handleAskCoach = (coach, message) => { setInitialMessage(message); setTab(coach); };
+            
+            const handleDeepAnalysis = async () => {
+                setDeepAnalysis({ show: true, loading: true, result: null, error: null });
+                try {
+                    const res = await fetch(`${API}/api/deep-analysis`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        setDeepAnalysis({ show: true, loading: false, result: data, error: null });
+                    } else {
+                        setDeepAnalysis({ show: true, loading: false, result: null, error: data.error || 'Errore durante l\'analisi' });
+                    }
+                } catch (e) {
+                    setDeepAnalysis({ show: true, loading: false, result: null, error: 'Errore di connessione' });
+                }
+            };
+            
+            const contextValue = { token, user, setUser: onUserUpdate, lastSync, refresh, isRefreshing };
+            
+            if (!appReady) return <Loading text="Sincronizzazione Garmin..." />;
+            
+            const navItems = [
+                { id: 'data', icon: '📊', label: 'Home' },
+                { id: 'stats', icon: '📅', label: 'Stats' },
+                { id: 'food', icon: '🍽️', label: 'Food' },
+                { id: 'sensei', icon: '🥋', label: 'Sensei', accent: 'sensei' },
+                { id: 'sakura', icon: '🌸', label: 'Sakura', accent: 'sakura' },
+                { id: 'lou', icon: '🏋️‍♀️', label: 'Lou', accent: 'lou' },
+                { id: 'trend', icon: '📈', label: 'Trend' },
+                { id: 'activities', icon: '🏃', label: 'Attività' },
+                { id: 'profile', icon: '⚙️', label: 'Profilo' }
+            ];
+            
+            const mobileNav = ['data', 'food', 'sensei', 'sakura', 'lou', 'profile'];
+            
+            return (
+                <AppContext.Provider value={contextValue}>
+                    <div className="h-full flex flex-col lg:flex-row">
+                        {/* Desktop Sidebar */}
+                        <nav className="desktop-only sidebar w-56 flex flex-col flex-shrink-0">
+                            <div className="p-5 border-b border-[var(--border)]">
+                                <h1 className="text-lg font-bold font-display gradient-text">SENSEI</h1>
+                                <div className="sync-status mt-1">
+                                    <span className={`sync-dot ${Date.now() - lastSync > 3600000 ? 'stale' : ''}`}></span>
+                                    {new Date(lastSync).toLocaleTimeString('it', { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                            </div>
+                            <div className="flex-1 p-3 space-y-1 overflow-y-auto">
+                                {navItems.map(item => (
+                                    <button key={item.id} onClick={() => setTab(item.id)} className={`nav-item-desktop w-full ${tab === item.id ? `active ${item.accent || ''}` : ''}`}>
+                                        <span className="text-lg">{item.icon}</span><span className="text-sm">{item.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="p-3 border-t border-[var(--border)]">
+                                <button onClick={refresh} disabled={isRefreshing} className="nav-item-desktop w-full">
+                                    <span className={`text-lg ${isRefreshing ? 'animate-spin' : ''}`}>🔄</span>
+                                    <span className="text-sm">{isRefreshing ? 'Sync...' : 'Sincronizza'}</span>
+                                </button>
+                            </div>
+                        </nav>
+                        
+                        {/* Content */}
+                        <main className="flex-1 overflow-hidden min-h-0">
+                            {tab === 'data' && <DataView onAskCoach={handleAskCoach} onDeepAnalysis={handleDeepAnalysis} />}
+                            {tab === 'stats' && <StatsView onAskCoach={handleAskCoach} onDeepAnalysis={handleDeepAnalysis} />}
+                            {tab === 'food' && <FoodView onAskCoach={handleAskCoach} onDeepAnalysis={handleDeepAnalysis} />}
+                            {tab === 'sensei' && <ChatView coach="sensei" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
+                            {tab === 'sakura' && <ChatView coach="sakura" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
+                            {tab === 'lou' && <LouView />}
+                            {tab === 'trend' && <TrendView />}
+                            {tab === 'activities' && <ActivityView />}
+                            {tab === 'profile' && <ProfileView onLogout={onLogout} />}
+                        </main>
+                        
+                        {/* Mobile Bottom Nav */}
+                        <nav className="mobile-only bottom-nav">
+                            <div className="h-full flex items-center justify-start px-1 overflow-x-auto scrollbar-hide gap-1">
+                                {mobileNav.map(id => {
+                                    const item = navItems.find(n => n.id === id);
+                                    return (
+                                        <button key={id} onClick={() => setTab(id)} className={`nav-item-mobile ${tab === id ? `active ${item.accent || ''}` : ''}`}>
+                                            <span className="nav-icon">{item.icon}</span>
+                                            <span className="nav-label">{item.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </nav>
+                        
+                        {/* Deep Analysis Modal */}
+                        {deepAnalysis.show && (
+                            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                                <div className="glass w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col rounded-2xl">
+                                    <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+                                        <h2 className="text-lg font-bold flex items-center gap-2">
+                                            <span>🔬</span> Dr. Data - Analisi Pattern
+                                        </h2>
+                                        <button 
+                                            onClick={() => setDeepAnalysis({ show: false, loading: false, result: null, error: null })}
+                                            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                                        >✕</button>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto p-4">
+                                        {deepAnalysis.loading && (
+                                            <div className="flex flex-col items-center justify-center py-12">
+                                                <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                                                <p className="text-[var(--text-secondary)]">GPT-5 sta analizzando i tuoi dati...</p>
+                                                <p className="text-xs text-[var(--text-secondary)] mt-1">Questo può richiedere 30-60 secondi</p>
+                                            </div>
+                                        )}
+                                        {deepAnalysis.error && (
+                                            <div className="text-red-400 text-center py-8">
+                                                <p className="text-4xl mb-2">⚠️</p>
+                                                <p>{deepAnalysis.error}</p>
+                                            </div>
+                                        )}
+                                        {deepAnalysis.result && (
+                                            <div className="space-y-4">
+                                                <div className="text-xs text-[var(--text-secondary)] flex gap-4">
+                                                    <span>📊 {deepAnalysis.result.days_analyzed} giorni</span>
+                                                    <span>🏃 {deepAnalysis.result.activities_analyzed} attività</span>
+                                                    <span>🤖 {deepAnalysis.result.model}</span>
+                                                </div>
+                                                <div className="prose prose-invert prose-sm max-w-none">
+                                                    <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                                                        {deepAnalysis.result.analysis || <span className="text-yellow-400">⚠️ Analisi vuota. Riprova.</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </AppContext.Provider>
+            );
+        };
+        
+        // ==================== APP ====================
+        
+        const App = () => {
+            const [page, setPage] = useState('loading');
+            const [token, setToken] = useState(null);
+            const [user, setUser] = useState(null);
+            
+            // Simple startup - just check localStorage
+            useEffect(() => {
+                const storedToken = localStorage.getItem('token');
+                const storedUser = localStorage.getItem('user');
+                
+                if (storedToken && storedUser) {
+                    try {
+                        const userData = JSON.parse(storedUser);
+                        setToken(storedToken);
+                        setUser(userData);
+                        setPage(userData.garmin_connected ? 'dashboard' : 'setup');
+                    } catch {
+                        setPage('landing');
+                    }
+                } else {
+                    setPage('landing');
+                }
+            }, []);
+            
+            const handleLogin = (data) => {
+                setToken(data.token);
+                setUser(data.user);
+                setPage(data.user.garmin_connected ? 'dashboard' : 'setup');
+            };
+            
+            const handleLogout = () => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                setToken(null);
+                setUser(null);
+                setPage('landing');
+            };
+            
+            const handleSetupComplete = () => {
+                const u = { ...user, garmin_connected: true };
+                setUser(u);
+                localStorage.setItem('user', JSON.stringify(u));
+                setPage('dashboard');
+            };
+            
+            if (page === 'loading') {
+                return (
+                    <div className="h-full flex items-center justify-center bg-gradient-hero">
+                        <div className="text-center">
+                            <div className="text-5xl mb-4">🥋</div>
+                            <h1 className="text-2xl font-bold font-display gradient-text mb-2">SENSEI</h1>
+                            <div className="w-8 h-8 mx-auto border-2 border-[var(--border)] border-t-[var(--accent-green)] rounded-full animate-spin"></div>
+                        </div>
+                    </div>
+                );
+            }
+            
+            return (
+                <div className="h-full">
+                    {page === 'landing' && <LandingPage onNavigate={setPage} />}
+                    {page === 'login' && <LoginPage onNavigate={setPage} onLogin={handleLogin} />}
+                    {page === 'register' && <RegisterPage onNavigate={setPage} />}
+                    {page === 'setup' && <SetupPage token={token} onComplete={handleSetupComplete} />}
+                    {page === 'dashboard' && <Dashboard token={token} user={user} onLogout={handleLogout} onUserUpdate={setUser} />}
+                </div>
+            );
+        };
+        
+        // Mount app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+        
+        // Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            });
+        }
+    </script>
+</body>
+</html>
+<!-- Updated Wed Dec 10 11:51:30 UTC 2025 -->

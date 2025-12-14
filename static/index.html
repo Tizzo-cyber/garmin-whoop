@@ -1897,6 +1897,19 @@
                                                 </div>
                                             )}
                                             
+                                            {/* Deload Warning */}
+                                            {todayWorkout.needs_deload && (
+                                                <div className="glass p-4 rounded-2xl border-l-4 border-orange-500 bg-orange-500/10">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xl">⚠️</span>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-orange-400">Deload consigliato!</p>
+                                                            <p className="text-xs text-[var(--text-muted)]">RPE medio {todayWorkout.avg_rpe_week} - Oggi focus tecnica, -20% peso</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
                                             {/* Workout Header */}
                                             <div className="glass p-4 rounded-2xl">
                                                 <div className="flex items-center justify-between mb-2">
@@ -1914,7 +1927,9 @@
                                             
                                             {/* Exercises */}
                                             <div className="space-y-3">
-                                                {todayWorkout.workout.exercises?.map((ex, i) => (
+                                                {todayWorkout.workout.exercises?.map((ex, i) => {
+                                                    const trendEmoji = {'too_easy': '😴', 'too_hard': '😫', 'progressing': '📈', 'fatigued': '⚠️', 'stable': '➡️'}[ex.trend] || '';
+                                                    return (
                                                     <div key={ex.id} className={`glass p-4 rounded-2xl ${ex.completed ? 'opacity-60' : ''}`}>
                                                         <div className="flex items-start justify-between">
                                                             <div className="flex-1">
@@ -1922,26 +1937,56 @@
                                                                     <span className="text-lg font-bold">{i + 1}.</span>
                                                                     <span className="font-medium">{ex.name}</span>
                                                                     {ex.completed && <span className="text-green-400">✓</span>}
+                                                                    {trendEmoji && <span title={ex.trend}>{trendEmoji}</span>}
                                                                 </div>
                                                                 <div className="text-sm text-[var(--text-muted)] mt-1">
                                                                     {ex.sets}×{ex.reps_min}-{ex.reps_max} | Rest {ex.rest_seconds}s | RPE {ex.rpe_target}
                                                                 </div>
-                                                                {ex.last_weight && (
+                                                                
+                                                                {/* Smart Weight Suggestion */}
+                                                                {ex.smart_weight ? (
+                                                                    <div className="mt-2 p-2 bg-[var(--accent-lou-dim)] rounded-lg">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="text-lg font-bold text-[var(--accent-lou)]">{ex.smart_weight}kg</span>
+                                                                            {ex.last_weight && ex.smart_weight !== ex.last_weight && (
+                                                                                <span className="text-xs text-[var(--text-muted)]">
+                                                                                    (era {ex.last_weight}kg)
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        {ex.smart_reason && (
+                                                                            <div className="text-xs text-[var(--accent-lou)] mt-1">{ex.smart_reason}</div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : ex.last_weight ? (
                                                                     <div className="text-xs text-[var(--accent-lou)] mt-1">
                                                                         Ultimo: {ex.last_weight}kg
                                                                     </div>
+                                                                ) : (
+                                                                    <div className="text-xs text-[var(--text-muted)] mt-1 italic">
+                                                                        Prima volta! Inizia leggero 💪
+                                                                    </div>
                                                                 )}
+                                                                
+                                                                {ex.sessions_logged > 0 && (
+                                                                    <div className="text-[10px] text-[var(--text-muted)] mt-1">
+                                                                        {ex.sessions_logged} sessioni tracciate
+                                                                        {ex.weight_change > 0 && ` • +${ex.weight_change}kg totali 📈`}
+                                                                    </div>
+                                                                )}
+                                                                
                                                                 {ex.notes && <div className="text-xs text-[var(--text-muted)] mt-1 italic">{ex.notes}</div>}
                                                             </div>
                                                             {!ex.completed && (
-                                                                <button onClick={() => { setLoggingExercise(ex); setLogData({...logData, weight: ex.last_weight || '', reps: Array(ex.sets).fill(ex.reps_min)}); }}
+                                                                <button onClick={() => { setLoggingExercise(ex); setLogData({...logData, weight: ex.smart_weight || ex.last_weight || '', reps: Array(ex.sets).fill(ex.reps_min)}); }}
                                                                     className="btn-lou px-4 py-2 rounded-xl text-sm">
                                                                     Log
                                                                 </button>
                                                             )}
                                                         </div>
                                                     </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     ) : (

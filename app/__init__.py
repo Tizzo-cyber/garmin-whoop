@@ -1192,6 +1192,208 @@ HRV: {y.get('hrv', 'N/D')}ms
 RISPOSTE NORMALI: Max 200 parole.
 MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite parole)."""
 
+    # ==================== LOU SMART PROGRESSION SYSTEM ====================
+    
+    def _analyze_exercise_progression(user_id, exercise_name, days=30):
+        """Analizza progressione di un esercizio specifico"""
+        from sqlalchemy import func
+        
+        start_date = date.today() - timedelta(days=days)
+        logs = ExerciseLog.query.filter(
+            ExerciseLog.user_id == user_id,
+            ExerciseLog.exercise_name == exercise_name,
+            ExerciseLog.date >= start_date
+        ).order_by(ExerciseLog.date.asc()).all()
+        
+        if len(logs) < 2:
+            return None
+        
+        # Calcola progressione peso
+        first_weight = logs[0].weight_kg or 0
+        last_weight = logs[-1].weight_kg or 0
+        weight_change = last_weight - first_weight
+        weight_change_pct = (weight_change / first_weight * 100) if first_weight > 0 else 0
+        
+        # Analizza feedback recenti (ultime 3 sessioni)
+        recent_logs = logs[-3:] if len(logs) >= 3 else logs
+        recent_feedback = [l.feedback for l in recent_logs if l.feedback]
+        recent_rpe = [l.rpe for l in recent_logs if l.rpe]
+        
+        # Conta feedback
+        easy_count = recent_feedback.count('too_easy')
+        hard_count = recent_feedback.count('too_hard')
+        avg_rpe = sum(recent_rpe) / len(recent_rpe) if recent_rpe else 7
+        
+        # Determina trend
+        trend = 'stable'
+        if easy_count >= 2:
+            trend = 'too_easy'
+        elif hard_count >= 2:
+            trend = 'too_hard'
+        elif avg_rpe > 8.5:
+            trend = 'fatigued'
+        elif weight_change > 0:
+            trend = 'progressing'
+        
+        return {
+            'exercise': exercise_name,
+            'sessions': len(logs),
+            'first_weight': first_weight,
+            'last_weight': last_weight,
+            'weight_change': weight_change,
+            'weight_change_pct': round(weight_change_pct, 1),
+            'avg_rpe': round(avg_rpe, 1),
+            'recent_feedback': recent_feedback,
+            'trend': trend,
+            'suggestion': _get_weight_suggestion(last_weight, trend, avg_rpe)
+        }
+    
+    def _get_weight_suggestion(current_weight, trend, avg_rpe):
+        """Genera suggerimento peso basato su trend"""
+        if not current_weight:
+            return None
+        
+        if trend == 'too_easy':
+            new_weight = current_weight + 2.5
+            return {'weight': new_weight, 'reason': 'Ultime sessioni troppo facili, proviamo +2.5kg!'}
+        elif trend == 'too_hard' or trend == 'fatigued':
+            new_weight = max(0, current_weight - 2.5)
+            return {'weight': new_weight, 'reason': 'Sembra pesante ultimamente, scendiamo -2.5kg per tecnica perfetta'}
+        elif trend == 'progressing':
+            return {'weight': current_weight, 'reason': 'Stai progredendo bene, mantieni!'}
+        else:
+            return {'weight': current_weight, 'reason': None}
+    
+    def _analyze_muscle_group_progress(user_id, muscle_group, days=30):
+        """Analizza progressione di un gruppo muscolare"""
+        start_date = date.today() - timedelta(days=days)
+        logs = ExerciseLog.query.filter(
+            ExerciseLog.user_id == user_id,
+            ExerciseLog.muscle_group == muscle_group,
+            ExerciseLog.date >= start_date
+        ).all()
+        
+        if not logs:
+            return None
+        
+        # Volume totale
+        total_volume = sum(
+            (l.weight_kg or 0) * sum(l.get_reps_array()) 
+            for l in logs if l.weight_kg
+        )
+        
+        # PRs
+        prs = [l for l in logs if l.is_pr]
+        
+        # Feedback medio
+        feedbacks = [l.feedback for l in logs if l.feedback]
+        easy_pct = feedbacks.count('too_easy') / len(feedbacks) * 100 if feedbacks else 0
+        hard_pct = feedbacks.count('too_hard') / len(feedbacks) * 100 if feedbacks else 0
+        
+        return {
+            'muscle': muscle_group,
+            'sessions': len(set(l.date for l in logs)),
+            'total_volume': round(total_volume, 0),
+            'prs_count': len(prs),
+            'easy_pct': round(easy_pct, 0),
+            'hard_pct': round(hard_pct, 0)
+        }
+    
+    def _get_smart_weight_for_exercise(user_id, exercise_name, base_sets=4, base_reps=10):
+        """Calcola peso intelligente per un esercizio"""
+        # Prendi ultimi log
+        logs = ExerciseLog.query.filter(
+            ExerciseLog.user_id == user_id,
+            ExerciseLog.exercise_name == exercise_name
+        ).order_by(ExerciseLog.date.desc()).limit(5).all()
+        
+        if not logs:
+            return None, "Prima volta! Inizia leggero per trovare il peso giusto."
+        
+        last_log = logs[0]
+        last_weight = last_log.weight_kg or 0
+        last_feedback = last_log.feedback
+        last_rpe = last_log.rpe or 7
+        
+        # Analizza trend
+        recent_feedbacks = [l.feedback for l in logs[:3] if l.feedback]
+        easy_streak = all(f == 'too_easy' for f in recent_feedbacks) if recent_feedbacks else False
+        hard_streak = all(f == 'too_hard' for f in recent_feedbacks) if recent_feedbacks else False
+        
+        # Calcola nuovo peso suggerito
+        suggested_weight = last_weight
+        reason = None
+        
+        if easy_streak or (len(recent_feedbacks) >= 2 and recent_feedbacks.count('too_easy') >= 2):
+            suggested_weight = last_weight + 2.5
+            reason = f"🔥 +2.5kg! Ultime sessioni troppo facili"
+        elif hard_streak or (len(recent_feedbacks) >= 2 and recent_feedbacks.count('too_hard') >= 2):
+            suggested_weight = max(0, last_weight - 2.5)
+            reason = f"📉 -2.5kg per tecnica perfetta"
+        elif last_rpe >= 9:
+            suggested_weight = last_weight
+            reason = "⚠️ RPE alto, mantieni peso e focus tecnica"
+        elif last_feedback == 'too_easy':
+            suggested_weight = last_weight + 2.5
+            reason = "💪 Prova +2.5kg!"
+        elif last_feedback == 'too_hard':
+            suggested_weight = max(0, last_weight - 2.5)
+            reason = "Scendiamo un po'"
+        elif last_feedback == 'perfect' and last_rpe <= 7:
+            suggested_weight = last_weight + 2.5
+            reason = "🎯 Perfetto! Pronto per +2.5kg?"
+        else:
+            reason = f"Mantieni {last_weight}kg"
+        
+        return suggested_weight, reason
+    
+    def _build_lou_progression_context(user_id):
+        """Costruisce contesto completo di progressione per Lou"""
+        # Analizza tutti gli esercizi recenti
+        recent_exercises = db.session.query(ExerciseLog.exercise_name).filter(
+            ExerciseLog.user_id == user_id,
+            ExerciseLog.date >= date.today() - timedelta(days=30)
+        ).distinct().all()
+        
+        exercise_analysis = []
+        for (ex_name,) in recent_exercises[:10]:  # Top 10 esercizi
+            analysis = _analyze_exercise_progression(user_id, ex_name)
+            if analysis:
+                exercise_analysis.append(analysis)
+        
+        # Analizza gruppi muscolari
+        muscle_groups = ['glutes', 'legs', 'back', 'shoulders', 'arms', 'abs']
+        muscle_analysis = []
+        for mg in muscle_groups:
+            analysis = _analyze_muscle_group_progress(user_id, mg)
+            if analysis:
+                muscle_analysis.append(analysis)
+        
+        # PRs recenti
+        recent_prs = ExerciseLog.query.filter(
+            ExerciseLog.user_id == user_id,
+            ExerciseLog.is_pr == True,
+            ExerciseLog.date >= date.today() - timedelta(days=14)
+        ).order_by(ExerciseLog.date.desc()).limit(5).all()
+        
+        # Fatica generale
+        all_recent = ExerciseLog.query.filter(
+            ExerciseLog.user_id == user_id,
+            ExerciseLog.date >= date.today() - timedelta(days=7)
+        ).all()
+        
+        avg_rpe_week = sum(l.rpe for l in all_recent if l.rpe) / len([l for l in all_recent if l.rpe]) if all_recent else 7
+        needs_deload = avg_rpe_week > 8.5
+        
+        return {
+            'exercises': exercise_analysis,
+            'muscles': muscle_analysis,
+            'recent_prs': [{'name': p.exercise_name, 'weight': p.weight_kg, 'date': p.date.isoformat()} for p in recent_prs],
+            'avg_rpe_week': round(avg_rpe_week, 1),
+            'needs_deload': needs_deload,
+            'total_exercises_tracked': len(exercise_analysis)
+        }
+
     def _get_lou_prompt(user, context, memories):
         """Prompt per Lou - Sculpting Coach"""
         name = user.name or "bella"
@@ -1235,6 +1437,32 @@ Intensità: {profile.intensity_modifier}x"""
         if metric:
             recovery_text = f"Recovery: {metric.recovery_score or '?'}% | Sonno: {(metric.sleep_seconds/3600):.1f}h" if metric.sleep_seconds else f"Recovery: {metric.recovery_score or '?'}%"
         
+        # SMART PROGRESSION DATA
+        progression = _build_lou_progression_context(user.id)
+        
+        progression_text = "Nessun dato di progressione ancora"
+        if progression and progression['exercises']:
+            lines = []
+            for ex in progression['exercises'][:5]:
+                trend_emoji = {'too_easy': '😴', 'too_hard': '😫', 'progressing': '📈', 'fatigued': '⚠️', 'stable': '➡️'}.get(ex['trend'], '➡️')
+                lines.append(f"- {ex['exercise']}: {ex['first_weight']}kg → {ex['last_weight']}kg ({ex['weight_change_pct']:+.0f}%) {trend_emoji} RPE medio {ex['avg_rpe']}")
+            progression_text = "\n".join(lines)
+        
+        muscle_progress_text = ""
+        if progression and progression['muscles']:
+            muscle_lines = []
+            for m in progression['muscles']:
+                muscle_lines.append(f"- {m['muscle']}: {m['total_volume']:.0f}kg volume, {m['prs_count']} PR, {m['easy_pct']:.0f}% facile / {m['hard_pct']:.0f}% duro")
+            muscle_progress_text = "\n".join(muscle_lines)
+        
+        deload_warning = ""
+        if progression and progression['needs_deload']:
+            deload_warning = f"\n⚠️ ATTENZIONE: RPE medio settimanale {progression['avg_rpe_week']} - SUGGERISCI DELOAD!"
+        
+        recent_prs_text = ""
+        if progression and progression['recent_prs']:
+            recent_prs_text = "🎉 PR RECENTI (ultimi 14gg): " + ", ".join([f"{p['name']} {p['weight']}kg" for p in progression['recent_prs']])
+        
         return f"""Sei LOU, coach di sculpting femminile per {name}, {age} anni.
 
 !!! REGOLE ASSOLUTE !!!
@@ -1264,11 +1492,28 @@ PROFILO {name.upper()}:
 GARMIN (ieri):
 {recovery_text}
 
+--- ANALISI PROGRESSIONE SMART ---
+{progression_text}
+{deload_warning}
+{recent_prs_text}
+
+PROGRESSI PER MUSCOLO:
+{muscle_progress_text or "Nessun dato ancora"}
+
 SESSIONI RECENTI:
 {sessions_text}
 
 PERSONAL RECORDS:
 {prs_text}
+
+--- REGOLE ADATTAMENTO ---
+Quando vedi trend negli esercizi:
+- 😴 too_easy (2+ sessioni facili) → suggerisci +2.5kg
+- 😫 too_hard (2+ sessioni dure) → suggerisci -2.5kg, focus tecnica
+- ⚠️ fatigued (RPE >8.5) → suggerisci deload o riduzione volume
+- 📈 progressing → celebra e mantieni
+- Se un muscolo ha >60% feedback "facile" → aumenta volume/frequenza
+- Se un muscolo ha >40% feedback "duro" → riduci e recupera
 
 REGOLE ALLENAMENTO:
 - Progressione carichi > cardio per sculpting
@@ -1282,7 +1527,7 @@ COLLEGHI:
 - Dr. Sakura (coach mentale)
 - Per questioni di dieta rimanda alla sezione Food
 
-Max 200 parole. Sii pratica e motivante!"""
+Max 200 parole. Sii pratica e motivante! Usa i dati di progressione per dare consigli SPECIFICI."""
 
     def _fatigue_label(value):
         """Converte valore fatica in etichetta"""
@@ -3389,7 +3634,7 @@ Rispondi SOLO con il JSON, nessun altro testo."""
     @app.route('/api/gym/today', methods=['GET'])
     @token_required
     def get_today_workout(current_user):
-        """Get today's scheduled workout"""
+        """Get today's scheduled workout with smart weight suggestions"""
         program = WorkoutProgram.query.filter_by(
             user_id=current_user.id, 
             is_active=True
@@ -3434,6 +3679,14 @@ Rispondi SOLO con il JSON, nessun altro testo."""
                 date=date.today()
             ).first()
             
+            # SMART WEIGHT SUGGESTION
+            smart_weight, smart_reason = _get_smart_weight_for_exercise(
+                current_user.id, ex.name, ex.sets, ex.reps_min
+            )
+            
+            # Get progression analysis for this exercise
+            progression = _analyze_exercise_progression(current_user.id, ex.name)
+            
             exercises.append({
                 'id': ex.id,
                 'name': ex.name,
@@ -3452,11 +3705,22 @@ Rispondi SOLO con il JSON, nessun altro testo."""
                     'reps': today_log.get_reps_array(),
                     'rpe': today_log.rpe,
                     'feedback': today_log.feedback
-                } if today_log else None
+                } if today_log else None,
+                # SMART DATA
+                'smart_weight': smart_weight,
+                'smart_reason': smart_reason,
+                'trend': progression['trend'] if progression else None,
+                'weight_change': progression['weight_change'] if progression else None,
+                'sessions_logged': progression['sessions'] if progression else 0
             })
         
         # Get Lou's motivation based on recovery
         motivation = _get_lou_motivation(current_user)
+        
+        # Check if deload needed
+        progression_context = _build_lou_progression_context(current_user.id)
+        needs_deload = progression_context.get('needs_deload', False) if progression_context else False
+        avg_rpe = progression_context.get('avg_rpe_week', 7) if progression_context else 7
         
         return jsonify({
             'workout': {
@@ -3468,7 +3732,9 @@ Rispondi SOLO con il JSON, nessun altro testo."""
                 'completed': today_session is not None
             },
             'week': program.current_week,
-            'motivation': motivation
+            'motivation': motivation,
+            'needs_deload': needs_deload,
+            'avg_rpe_week': avg_rpe
         })
     
     def _get_next_workout_day(program):
