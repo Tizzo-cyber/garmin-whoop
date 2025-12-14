@@ -1007,7 +1007,11 @@
                 <div className={`h-full flex flex-col ${isLou ? 'bg-gradient-lou' : (isSakura ? 'bg-gradient-sakura' : 'bg-gradient-sensei')}`}>
                     <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--border)]">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-2xl" style={{ background: isSakura ? 'var(--accent-pink-dim)' : 'var(--accent-green-dim)' }}>{coachEmoji}</div>
+                            {isLou ? (
+                                <img src="/static/lou.jpg" alt="Lou" className="w-10 h-10 rounded-full object-cover" />
+                            ) : (
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-2xl" style={{ background: isSakura ? 'var(--accent-pink-dim)' : 'var(--accent-green-dim)' }}>{coachEmoji}</div>
+                            )}
                             <div>
                                 <h2 className="font-bold" style={{ color: accent }}>{coachName}</h2>
                                 <p className="text-xs text-[var(--text-muted)]">{coachDesc}</p>
@@ -1019,7 +1023,11 @@
                         {!ready ? <Loading text="Caricamento..." /> : messages.length === 0 ? (
                             <div className="h-full flex items-center justify-center">
                                 <div className="text-center max-w-xs">
-                                    <span className="text-5xl block mb-3">{coachEmoji}</span>
+                                    {isLou ? (
+                                        <img src="/static/lou.jpg" alt="Lou" className="w-20 h-20 rounded-full object-cover mx-auto mb-3" />
+                                    ) : (
+                                        <span className="text-5xl block mb-3">{coachEmoji}</span>
+                                    )}
                                     <h3 className="text-lg font-bold mb-2" style={{ color: accent }}>{coachName}</h3>
                                     <p className="text-[var(--text-muted)] text-sm">{isLou ? 'Ciao bella! Pronta a scolpire quel fisico?' : (isSakura ? 'Ciao! Parliamo di mente, stress e benessere.' : 'Ciao! Il tuo coach per performance e longevità.')}</p>
                                 </div>
@@ -1032,7 +1040,11 @@
                                             {m.role === 'assistant' && (
                                                 <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-[var(--border)]">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-lg">{coachEmoji}</span>
+                                                        {isLou ? (
+                                                            <img src="/static/lou.jpg" alt="Lou" className="w-6 h-6 rounded-full object-cover" />
+                                                        ) : (
+                                                            <span className="text-lg">{coachEmoji}</span>
+                                                        )}
                                                         <span className="font-semibold text-sm" style={{ color: accent }}>{coachName}</span>
                                                     </div>
                                                     <button onClick={() => playAudio(m.content)} disabled={playingAudio} className="w-7 h-7 flex items-center justify-center rounded-full text-sm hover:bg-[var(--bg-elevated)]">
@@ -1657,6 +1669,10 @@
             });
             const [loggingExercise, setLoggingExercise] = useState(null);
             const [logData, setLogData] = useState({ weight: '', reps: [], rpe: 7, feedback: 'perfect' });
+            const [showReschedule, setShowReschedule] = useState(false);
+            
+            // Lou Avatar
+            const louAvatar = "/static/lou.jpg";
             
             const muscleGroups = [
                 { id: 'glutes', label: '🍑 Glutei', color: '#ff6eb4' },
@@ -1666,6 +1682,22 @@
                 { id: 'arms', label: '💪 Braccia', color: '#a855f7' },
                 { id: 'abs', label: '🎯 Addominali', color: '#22d3ee' }
             ];
+            
+            const dayNames = ['', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+            
+            const rescheduleWorkout = async (newDay) => {
+                try {
+                    const res = await fetch(`${API}/api/gym/reschedule`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ workout_day_id: todayWorkout.workout.day_id, new_day: newDay })
+                    });
+                    if (res.ok) {
+                        setShowReschedule(false);
+                        loadData();
+                    }
+                } catch (err) { console.error(err); }
+            };
             
             const loadData = async () => {
                 try {
@@ -1914,7 +1946,12 @@
                                             <div className="glass p-4 rounded-2xl">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <h2 className="text-lg font-bold">{todayWorkout.workout.name}</h2>
-                                                    <span className="text-sm text-[var(--text-muted)]">~{todayWorkout.workout.estimated_minutes}min</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm text-[var(--text-muted)]">~{todayWorkout.workout.estimated_minutes}min</span>
+                                                        <button onClick={() => setShowReschedule(true)} className="text-xs px-2 py-1 rounded-lg bg-[var(--bg-elevated)] hover:bg-[var(--accent-lou-dim)]" title="Sposta giorno">
+                                                            📅
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <div className="flex gap-2">
                                                     {todayWorkout.workout.muscle_groups?.map(mg => (
@@ -2145,6 +2182,30 @@
                                     </div>
                                 </div>
                                 
+                                {/* RPE Slider */}
+                                <div className="mb-4">
+                                    <label className="text-sm text-[var(--text-muted)] mb-2 block">
+                                        RPE (Fatica percepita): <span className="font-bold text-[var(--accent-lou)]">{logData.rpe}</span>
+                                    </label>
+                                    <input type="range" min="1" max="10" value={logData.rpe} 
+                                        onChange={e => setLogData({...logData, rpe: parseInt(e.target.value)})}
+                                        className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-[var(--accent-lou)]"
+                                        style={{ background: `linear-gradient(to right, var(--accent-lou) ${(logData.rpe - 1) * 11.1}%, var(--bg-elevated) ${(logData.rpe - 1) * 11.1}%)` }} />
+                                    <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">
+                                        <span>😴 Facile</span>
+                                        <span>💪 Medio</span>
+                                        <span>💀 Max</span>
+                                    </div>
+                                    <div className="text-xs text-center mt-2 text-[var(--text-muted)]">
+                                        {logData.rpe <= 3 && "Potevi farne molte altre"}
+                                        {logData.rpe >= 4 && logData.rpe <= 5 && "Ne avevi ancora 4-5 nel serbatoio"}
+                                        {logData.rpe >= 6 && logData.rpe <= 7 && "Impegnativo, 2-3 reps in più max"}
+                                        {logData.rpe === 8 && "Duro, forse 1-2 reps in più"}
+                                        {logData.rpe === 9 && "Quasi al limite!"}
+                                        {logData.rpe === 10 && "Cedimento totale 💀"}
+                                    </div>
+                                </div>
+                                
                                 {/* Feedback */}
                                 <div className="mb-4">
                                     <label className="text-sm text-[var(--text-muted)] mb-2 block">Com'è stato?</label>
@@ -2160,6 +2221,36 @@
                                 
                                 <button onClick={logExercise} className="w-full btn-lou py-4 rounded-xl font-bold">
                                     ✓ Salva
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Reschedule Modal */}
+                    {showReschedule && todayWorkout?.workout && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowReschedule(false)}>
+                            <div className="glass p-6 rounded-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <img src={louAvatar} alt="Lou" className="w-12 h-12 rounded-full object-cover" />
+                                    <div>
+                                        <h3 className="font-bold">Sposta Allenamento</h3>
+                                        <p className="text-xs text-[var(--text-muted)]">{todayWorkout.workout.name}</p>
+                                    </div>
+                                </div>
+                                
+                                <p className="text-sm text-[var(--text-muted)] mb-4">Non riesci oggi? Nessun problema, scegli un altro giorno!</p>
+                                
+                                <div className="grid grid-cols-7 gap-1 mb-4">
+                                    {[1,2,3,4,5,6,7].map(day => (
+                                        <button key={day} onClick={() => rescheduleWorkout(day)}
+                                            className={`p-2 rounded-lg text-center text-sm ${day === new Date().getDay() || day === 7 && new Date().getDay() === 0 ? 'bg-[var(--accent-lou)] text-white' : 'bg-[var(--bg-elevated)] hover:bg-[var(--accent-lou-dim)]'}`}>
+                                            {dayNames[day]}
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                <button onClick={() => setShowReschedule(false)} className="w-full py-2 text-sm text-[var(--text-muted)]">
+                                    Annulla
                                 </button>
                             </div>
                         </div>

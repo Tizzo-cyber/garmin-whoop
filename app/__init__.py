@@ -3775,6 +3775,50 @@ Rispondi SOLO con il JSON, nessun altro testo."""
         else:
             return "Pronta a scolpire quel fisico? Let's go! 🍑"
     
+    @app.route('/api/gym/reschedule', methods=['POST'])
+    @token_required
+    def reschedule_workout(current_user):
+        """Reschedule a workout to a different day"""
+        data = request.get_json()
+        
+        workout_day_id = data.get('workout_day_id')
+        new_day = data.get('new_day')  # 1-7 (Mon-Sun)
+        
+        if not workout_day_id or not new_day:
+            return jsonify({'error': 'Missing workout_day_id or new_day'}), 400
+        
+        if new_day < 1 or new_day > 7:
+            return jsonify({'error': 'new_day must be 1-7'}), 400
+        
+        workout_day = WorkoutDay.query.get(workout_day_id)
+        if not workout_day:
+            return jsonify({'error': 'Workout day not found'}), 404
+        
+        # Check user owns this program
+        program = WorkoutProgram.query.get(workout_day.program_id)
+        if not program or program.user_id != current_user.id:
+            return jsonify({'error': 'Not authorized'}), 403
+        
+        # Check if new_day already has a workout
+        existing = WorkoutDay.query.filter_by(
+            program_id=program.id,
+            day_of_week=new_day
+        ).first()
+        
+        if existing and existing.id != workout_day_id:
+            # Swap the days
+            old_day = workout_day.day_of_week
+            existing.day_of_week = old_day
+        
+        workout_day.day_of_week = new_day
+        db.session.commit()
+        
+        day_names = ['', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica']
+        return jsonify({
+            'success': True,
+            'message': f'Allenamento spostato a {day_names[new_day]}!'
+        })
+    
     @app.route('/api/gym/log', methods=['POST'])
     @token_required
     def log_exercise(current_user):
