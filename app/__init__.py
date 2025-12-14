@@ -16,7 +16,7 @@ import json
 import requests
 
 from config import Config
-from app.models import db, User, DailyMetric, Activity, SyncLog, ChatMessage, UserMemory, FatigueLog, WeeklyCheck, FoodEntry
+from app.models import db, User, DailyMetric, Activity, SyncLog, ChatMessage, UserMemory, FatigueLog, WeeklyCheck, FoodEntry, GymProfile, WorkoutProgram, WorkoutDay, ProgramExercise, ExerciseLog, WorkoutSession, GymWeeklyReport
 from app.garmin_sync import GarminSyncService
 
 
@@ -1192,6 +1192,98 @@ HRV: {y.get('hrv', 'N/D')}ms
 RISPOSTE NORMALI: Max 200 parole.
 MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite parole)."""
 
+    def _get_lou_prompt(user, context, memories):
+        """Prompt per Lou - Sculpting Coach"""
+        name = user.name or "bella"
+        age = user.get_real_age()
+        
+        # Get gym profile
+        profile = GymProfile.query.filter_by(user_id=user.id).first()
+        
+        # Get recent workout data
+        recent_sessions = WorkoutSession.query.filter_by(user_id=user.id).order_by(WorkoutSession.date.desc()).limit(5).all()
+        recent_logs = ExerciseLog.query.filter_by(user_id=user.id).order_by(ExerciseLog.date.desc()).limit(10).all()
+        
+        # Get PRs
+        prs = ExerciseLog.query.filter_by(user_id=user.id, is_pr=True).order_by(ExerciseLog.date.desc()).limit(5).all()
+        
+        # Format workout history
+        sessions_text = "Nessuna sessione recente"
+        if recent_sessions:
+            sessions_text = "\n".join([
+                f"- {s.date}: {s.total_volume or 0:.0f}kg volume, RPE {s.overall_rpe or '?'}, {s.feeling or '?'}"
+                for s in recent_sessions
+            ])
+        
+        prs_text = "Nessun PR registrato"
+        if prs:
+            prs_text = "\n".join([f"- {p.exercise_name}: {p.weight_kg}kg ({p.date})" for p in prs])
+        
+        profile_text = "Non configurato"
+        if profile:
+            profile_text = f"""Esperienza: {profile.experience}
+Giorni/settimana: {profile.days_per_week}
+Priorità: {', '.join(profile.get_priority_muscles())}
+Esclusi: {', '.join(profile.get_excluded_muscles()) or 'nessuno'}
+Intensità: {profile.intensity_modifier}x"""
+        
+        # Recovery from Garmin
+        yesterday = date.today() - timedelta(days=1)
+        metric = DailyMetric.query.filter_by(user_id=user.id, date=yesterday).first()
+        
+        recovery_text = "Non disponibile"
+        if metric:
+            recovery_text = f"Recovery: {metric.recovery_score or '?'}% | Sonno: {(metric.sleep_seconds/3600):.1f}h" if metric.sleep_seconds else f"Recovery: {metric.recovery_score or '?'}%"
+        
+        return f"""Sei LOU, coach di sculpting femminile per {name}, {age} anni.
+
+!!! REGOLE ASSOLUTE !!!
+- MAI markdown (##, **, -, elenchi)
+- MAI inventare dati
+- Scrivi come parleresti davvero
+- Sei energica, diretta, come una sorella maggiore che sprona
+
+PERSONALITÀ:
+- Chiama {name} per nome, usa "bella" come intercalare
+- Celebra OGNI progresso, anche piccolo
+- Focus su FORZA e FORMA, mai sul peso corporeo
+- Conosci la scienza ma parli semplice
+- Usi emoji con moderazione (🍑💪🔥)
+
+EXPERTISE:
+- Glutei: hip thrust, glute bridge, kickback, abductor
+- Gambe: squat, leg press, affondi, stacchi rumeni
+- Dorso: lat machine, rematore, pull-down
+- Spalle: lateral raise, shoulder press, face pull
+- Braccia: curl, tricep pushdown, dips
+- Core: plank, crunch, leg raise
+
+PROFILO {name.upper()}:
+{profile_text}
+
+GARMIN (ieri):
+{recovery_text}
+
+SESSIONI RECENTI:
+{sessions_text}
+
+PERSONAL RECORDS:
+{prs_text}
+
+REGOLE ALLENAMENTO:
+- Progressione carichi > cardio per sculpting
+- Rep range 8-15 per ipertrofia
+- Rest 60-90s metabolico, 2-3min forza
+- Deload ogni 4-6 settimane
+- Se recovery < 50%, suggerisci sessione leggera
+
+COLLEGHI:
+- Dr. Sensei (coach sportivo generale)
+- Dr. Sakura (coach mentale)
+- Per questioni di dieta rimanda alla sezione Food
+
+Max 200 parole. Sii pratica e motivante!"""
+
     def _fatigue_label(value):
         """Converte valore fatica in etichetta"""
         if value <= 2: return "fresco"
@@ -1821,7 +1913,12 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
             history = []
         
         try:
-            system_prompt = _get_sakura_prompt(current_user, context, memories) if coach == 'sakura' else _get_sensei_prompt(current_user, context, memories)
+            if coach == 'sakura':
+                system_prompt = _get_sakura_prompt(current_user, context, memories)
+            elif coach == 'lou':
+                system_prompt = _get_lou_prompt(current_user, context, memories)
+            else:
+                system_prompt = _get_sensei_prompt(current_user, context, memories)
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -2379,6 +2476,15 @@ Pronunciation: Soft, breathy Italian; elongate vowels sensually, let words flow 
 Breathing: Audible soft breaths between sentences, creating intimacy.
 Pauses: Long, pregnant pauses after each instruction; let silence embrace the listener.
 Style: ASMR-like whisper, gentle and mesmerizing, almost hypnotic."""
+        elif coach == 'lou':
+            # Lou - energica e motivante
+            voice = 'coral'
+            instructions = """Voice Affect: Energetic, confident, empowering; like a supportive big sister.
+Tone: Upbeat, motivating, direct; convey genuine enthusiasm and encouragement.
+Pacing: Dynamic, natural, with emphasis on key words; energetic but not rushed.
+Emotion: Excited, supportive, celebrating; express genuine pride in the listener's progress.
+Pronunciation: Clear, punchy Italian articulation; emphasize action words.
+Pauses: Brief pauses before important advice, building anticipation."""
         else:
             # Sakura normale
             voice = 'nova'
@@ -3021,6 +3127,748 @@ Rispondi SOLO con JSON, niente altro:
             'history': by_date,
             'dates': sorted(by_date.keys(), reverse=True)
         })
+    
+    # ========== LOU - SCULPTING COACH ==========
+    
+    @app.route('/api/gym/profile', methods=['GET'])
+    @token_required
+    def get_gym_profile(current_user):
+        """Get user's gym profile"""
+        profile = GymProfile.query.filter_by(user_id=current_user.id).first()
+        if not profile:
+            return jsonify({
+                'setup_complete': False,
+                'profile': None
+            })
+        
+        return jsonify({
+            'setup_complete': profile.setup_complete,
+            'profile': {
+                'experience': profile.experience,
+                'days_per_week': profile.days_per_week,
+                'session_minutes': profile.session_minutes,
+                'excluded_muscles': profile.get_excluded_muscles(),
+                'priority_muscles': profile.get_priority_muscles(),
+                'equipment': profile.get_equipment(),
+                'intensity_modifier': profile.intensity_modifier,
+                'primary_goal': profile.primary_goal
+            }
+        })
+    
+    @app.route('/api/gym/profile', methods=['POST'])
+    @token_required
+    def save_gym_profile(current_user):
+        """Save or update gym profile"""
+        data = request.get_json()
+        
+        profile = GymProfile.query.filter_by(user_id=current_user.id).first()
+        if not profile:
+            profile = GymProfile(user_id=current_user.id)
+            db.session.add(profile)
+        
+        if 'experience' in data:
+            profile.experience = data['experience']
+        if 'days_per_week' in data:
+            profile.days_per_week = data['days_per_week']
+        if 'session_minutes' in data:
+            profile.session_minutes = data['session_minutes']
+        if 'excluded_muscles' in data:
+            profile.set_excluded_muscles(data['excluded_muscles'])
+        if 'priority_muscles' in data:
+            profile.set_priority_muscles(data['priority_muscles'])
+        if 'equipment' in data:
+            profile.equipment = json.dumps(data['equipment'])
+        if 'intensity_modifier' in data:
+            profile.intensity_modifier = data['intensity_modifier']
+        if 'primary_goal' in data:
+            profile.primary_goal = data['primary_goal']
+        if 'setup_complete' in data:
+            profile.setup_complete = data['setup_complete']
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Profilo salvato'})
+    
+    @app.route('/api/gym/generate-program', methods=['POST'])
+    @token_required
+    def generate_gym_program(current_user):
+        """Generate workout program with Lou AI"""
+        if not openai_client:
+            return jsonify({'error': 'OpenAI non configurato'}), 500
+        
+        profile = GymProfile.query.filter_by(user_id=current_user.id).first()
+        if not profile:
+            return jsonify({'error': 'Prima configura il profilo'}), 400
+        
+        try:
+            # Build prompt for Lou
+            prompt = f"""Sei LOU, coach di sculpting femminile. Genera un programma di allenamento.
+
+PROFILO UTENTE:
+- Nome: {current_user.name or 'Utente'}
+- Esperienza: {profile.experience}
+- Giorni disponibili: {profile.days_per_week}/settimana
+- Durata sessione: {profile.session_minutes} minuti
+- Muscoli prioritari: {', '.join(profile.get_priority_muscles())}
+- Muscoli da escludere: {', '.join(profile.get_excluded_muscles()) or 'nessuno'}
+- Obiettivo: {profile.primary_goal}
+- Equipaggiamento: {', '.join(profile.get_equipment())}
+
+REGOLE:
+- Focus su glutei, gambe, e muscoli richiesti
+- 3-5 esercizi per sessione
+- Rep range 8-15 per ipertrofia
+- Includi progressione carichi
+- NO muscoli esclusi
+
+Genera un programma JSON con questa struttura ESATTA:
+{{
+  "name": "Nome programma",
+  "split_type": "tipo split",
+  "weeks_total": 6,
+  "days": [
+    {{
+      "day_of_week": 1,
+      "name": "Nome giorno",
+      "muscle_groups": ["glutes", "quads"],
+      "exercises": [
+        {{
+          "name": "Hip Thrust",
+          "muscle_group": "glutes",
+          "equipment": "barbell",
+          "sets": 4,
+          "reps_min": 10,
+          "reps_max": 12,
+          "rest_seconds": 90,
+          "rpe_target": 7,
+          "notes": "Squeeze al top"
+        }}
+      ]
+    }}
+  ]
+}}
+
+Rispondi SOLO con il JSON, nessun altro testo."""
+
+            response = openai_client.chat.completions.create(
+                model="gpt-4.1",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=3000,
+                temperature=0.7
+            )
+            
+            ai_text = response.choices[0].message.content.strip()
+            
+            # Extract JSON
+            import re
+            json_match = re.search(r'\{[\s\S]*\}', ai_text)
+            if not json_match:
+                return jsonify({'error': 'Errore generazione programma'}), 500
+            
+            program_data = json.loads(json_match.group())
+            
+            # Deactivate old programs
+            WorkoutProgram.query.filter_by(user_id=current_user.id, is_active=True).update({'is_active': False})
+            
+            # Create new program
+            program = WorkoutProgram(
+                user_id=current_user.id,
+                name=program_data.get('name', 'Programma Lou'),
+                split_type=program_data.get('split_type', 'Custom'),
+                weeks_total=program_data.get('weeks_total', 6),
+                current_week=1,
+                is_active=True,
+                created_by_ai=True,
+                started_at=datetime.utcnow()
+            )
+            db.session.add(program)
+            db.session.flush()
+            
+            # Create workout days
+            for i, day_data in enumerate(program_data.get('days', [])):
+                day = WorkoutDay(
+                    program_id=program.id,
+                    day_of_week=day_data.get('day_of_week', i + 1),
+                    name=day_data.get('name', f'Giorno {i+1}'),
+                    muscle_groups=json.dumps(day_data.get('muscle_groups', [])),
+                    estimated_minutes=profile.session_minutes,
+                    order=i
+                )
+                db.session.add(day)
+                db.session.flush()
+                
+                # Create exercises
+                for j, ex_data in enumerate(day_data.get('exercises', [])):
+                    exercise = ProgramExercise(
+                        workout_day_id=day.id,
+                        order=j,
+                        name=ex_data.get('name', 'Esercizio'),
+                        muscle_group=ex_data.get('muscle_group'),
+                        equipment=ex_data.get('equipment'),
+                        sets=ex_data.get('sets', 4),
+                        reps_min=ex_data.get('reps_min', 8),
+                        reps_max=ex_data.get('reps_max', 12),
+                        rest_seconds=ex_data.get('rest_seconds', 90),
+                        rpe_target=ex_data.get('rpe_target', 7),
+                        notes=ex_data.get('notes', '')
+                    )
+                    db.session.add(exercise)
+            
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'program_id': program.id,
+                'message': f'Programma "{program.name}" creato!'
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
+    
+    @app.route('/api/gym/program', methods=['GET'])
+    @token_required
+    def get_gym_program(current_user):
+        """Get active workout program"""
+        program = WorkoutProgram.query.filter_by(
+            user_id=current_user.id, 
+            is_active=True
+        ).first()
+        
+        if not program:
+            return jsonify({'program': None})
+        
+        days = []
+        for day in program.days.order_by(WorkoutDay.order):
+            exercises = []
+            for ex in day.exercises.order_by(ProgramExercise.order):
+                # Get last logged weight for this exercise
+                last_log = ExerciseLog.query.filter_by(
+                    user_id=current_user.id,
+                    exercise_name=ex.name
+                ).order_by(ExerciseLog.date.desc()).first()
+                
+                exercises.append({
+                    'id': ex.id,
+                    'name': ex.name,
+                    'muscle_group': ex.muscle_group,
+                    'equipment': ex.equipment,
+                    'sets': ex.sets,
+                    'reps_min': ex.reps_min,
+                    'reps_max': ex.reps_max,
+                    'rest_seconds': ex.rest_seconds,
+                    'rpe_target': ex.rpe_target,
+                    'notes': ex.notes,
+                    'suggested_weight': ex.suggested_weight,
+                    'last_weight': last_log.weight_kg if last_log else None,
+                    'last_reps': last_log.get_reps_array() if last_log else None
+                })
+            
+            days.append({
+                'id': day.id,
+                'day_of_week': day.day_of_week,
+                'name': day.name,
+                'muscle_groups': day.get_muscle_groups(),
+                'estimated_minutes': day.estimated_minutes,
+                'exercises': exercises
+            })
+        
+        return jsonify({
+            'program': {
+                'id': program.id,
+                'name': program.name,
+                'split_type': program.split_type,
+                'weeks_total': program.weeks_total,
+                'current_week': program.current_week,
+                'started_at': program.started_at.isoformat() if program.started_at else None,
+                'days': days
+            }
+        })
+    
+    @app.route('/api/gym/today', methods=['GET'])
+    @token_required
+    def get_today_workout(current_user):
+        """Get today's scheduled workout"""
+        program = WorkoutProgram.query.filter_by(
+            user_id=current_user.id, 
+            is_active=True
+        ).first()
+        
+        if not program:
+            return jsonify({'workout': None, 'message': 'Nessun programma attivo'})
+        
+        # Get today's day of week (1=Monday, 7=Sunday)
+        today_dow = date.today().isoweekday()
+        
+        # Find matching workout day
+        workout_day = WorkoutDay.query.filter_by(
+            program_id=program.id,
+            day_of_week=today_dow
+        ).first()
+        
+        if not workout_day:
+            return jsonify({
+                'workout': None, 
+                'message': 'Oggi è giorno di riposo 🧘',
+                'next_workout': _get_next_workout_day(program)
+            })
+        
+        # Check if already completed today
+        today_session = WorkoutSession.query.filter_by(
+            user_id=current_user.id,
+            date=date.today()
+        ).first()
+        
+        exercises = []
+        for ex in workout_day.exercises.order_by(ProgramExercise.order):
+            last_log = ExerciseLog.query.filter_by(
+                user_id=current_user.id,
+                exercise_name=ex.name
+            ).order_by(ExerciseLog.date.desc()).first()
+            
+            # Today's log if exists
+            today_log = ExerciseLog.query.filter_by(
+                user_id=current_user.id,
+                exercise_id=ex.id,
+                date=date.today()
+            ).first()
+            
+            exercises.append({
+                'id': ex.id,
+                'name': ex.name,
+                'muscle_group': ex.muscle_group,
+                'equipment': ex.equipment,
+                'sets': ex.sets,
+                'reps_min': ex.reps_min,
+                'reps_max': ex.reps_max,
+                'rest_seconds': ex.rest_seconds,
+                'rpe_target': ex.rpe_target,
+                'notes': ex.notes,
+                'last_weight': last_log.weight_kg if last_log else None,
+                'completed': today_log is not None,
+                'today_log': {
+                    'weight': today_log.weight_kg,
+                    'reps': today_log.get_reps_array(),
+                    'rpe': today_log.rpe,
+                    'feedback': today_log.feedback
+                } if today_log else None
+            })
+        
+        # Get Lou's motivation based on recovery
+        motivation = _get_lou_motivation(current_user)
+        
+        return jsonify({
+            'workout': {
+                'day_id': workout_day.id,
+                'name': workout_day.name,
+                'muscle_groups': workout_day.get_muscle_groups(),
+                'estimated_minutes': workout_day.estimated_minutes,
+                'exercises': exercises,
+                'completed': today_session is not None
+            },
+            'week': program.current_week,
+            'motivation': motivation
+        })
+    
+    def _get_next_workout_day(program):
+        """Find next scheduled workout day"""
+        today_dow = date.today().isoweekday()
+        days = WorkoutDay.query.filter_by(program_id=program.id).order_by(WorkoutDay.day_of_week).all()
+        
+        for day in days:
+            if day.day_of_week > today_dow:
+                return {'name': day.name, 'day_of_week': day.day_of_week}
+        
+        # Wrap to next week
+        if days:
+            return {'name': days[0].name, 'day_of_week': days[0].day_of_week}
+        return None
+    
+    def _get_lou_motivation(user):
+        """Generate Lou's motivation message based on context"""
+        # Get recovery data
+        yesterday = date.today() - timedelta(days=1)
+        metric = DailyMetric.query.filter_by(user_id=user.id, date=yesterday).first()
+        
+        # Get last workout
+        last_session = WorkoutSession.query.filter_by(user_id=user.id).order_by(WorkoutSession.date.desc()).first()
+        days_since = (date.today() - last_session.date).days if last_session else 999
+        
+        recovery = metric.recovery_score if metric else None
+        sleep = metric.sleep_seconds / 3600 if metric and metric.sleep_seconds else None
+        
+        if days_since >= 3:
+            return "Ehi bella! Mi sei mancata 💪 Torniamo a spaccare?"
+        elif recovery and recovery >= 70:
+            return f"Recovery al {recovery}%! Sei carica, oggi si spinge! 🔥"
+        elif recovery and recovery < 50:
+            return "Vedo che sei un po' scarica... Focus tecnica oggi, niente PR 💜"
+        elif sleep and sleep < 6:
+            return f"Solo {sleep:.1f}h di sonno? Ascolta il corpo, oggi andiamo soft 🌙"
+        else:
+            return "Pronta a scolpire quel fisico? Let's go! 🍑"
+    
+    @app.route('/api/gym/log', methods=['POST'])
+    @token_required
+    def log_exercise(current_user):
+        """Log a completed exercise"""
+        data = request.get_json()
+        
+        exercise_id = data.get('exercise_id')
+        exercise_name = data.get('exercise_name')
+        weight = data.get('weight')
+        reps = data.get('reps', [])  # array of reps per set
+        rpe = data.get('rpe')
+        feedback = data.get('feedback')  # too_easy, perfect, too_hard
+        
+        if not exercise_name:
+            return jsonify({'error': 'Nome esercizio richiesto'}), 400
+        
+        # Check for PR
+        is_pr = False
+        last_best = ExerciseLog.query.filter_by(
+            user_id=current_user.id,
+            exercise_name=exercise_name
+        ).order_by(ExerciseLog.weight_kg.desc()).first()
+        
+        if weight and last_best and weight > last_best.weight_kg:
+            is_pr = True
+        elif weight and not last_best:
+            is_pr = True
+        
+        # Get exercise for muscle group
+        muscle_group = data.get('muscle_group')
+        if exercise_id:
+            ex = ProgramExercise.query.get(exercise_id)
+            if ex:
+                muscle_group = ex.muscle_group
+        
+        log = ExerciseLog(
+            user_id=current_user.id,
+            exercise_id=exercise_id,
+            date=date.today(),
+            exercise_name=exercise_name,
+            muscle_group=muscle_group,
+            sets_completed=len(reps),
+            weight_kg=weight,
+            rpe=rpe,
+            feedback=feedback,
+            is_pr=is_pr
+        )
+        log.set_reps_array(reps)
+        
+        db.session.add(log)
+        
+        # Update suggested weight based on feedback
+        if exercise_id and feedback:
+            ex = ProgramExercise.query.get(exercise_id)
+            if ex and weight:
+                if feedback == 'too_easy':
+                    ex.suggested_weight = weight + 2.5
+                elif feedback == 'too_hard':
+                    ex.suggested_weight = max(0, weight - 2.5)
+                else:
+                    ex.suggested_weight = weight
+        
+        db.session.commit()
+        
+        response = {
+            'success': True,
+            'log_id': log.id,
+            'is_pr': is_pr
+        }
+        
+        if is_pr:
+            response['pr_message'] = f"🎉 NUOVO PR! {exercise_name}: {weight}kg!"
+        
+        return jsonify(response)
+    
+    @app.route('/api/gym/complete-session', methods=['POST'])
+    @token_required
+    def complete_workout_session(current_user):
+        """Complete a workout session"""
+        data = request.get_json()
+        
+        workout_day_id = data.get('workout_day_id')
+        duration_minutes = data.get('duration_minutes')
+        overall_rpe = data.get('overall_rpe')
+        feeling = data.get('feeling')  # great, good, okay, tired, exhausted
+        notes = data.get('notes')
+        
+        # Calculate total volume
+        today_logs = ExerciseLog.query.filter_by(
+            user_id=current_user.id,
+            date=date.today()
+        ).all()
+        
+        total_volume = 0
+        prs = []
+        for log in today_logs:
+            if log.weight_kg and log.reps_per_set:
+                reps = log.get_reps_array()
+                total_volume += log.weight_kg * sum(reps)
+            if log.is_pr:
+                prs.append(f"{log.exercise_name} {log.weight_kg}kg")
+        
+        # Generate Lou comment
+        lou_comment = _generate_lou_session_comment(current_user, total_volume, prs, feeling, overall_rpe)
+        
+        session = WorkoutSession(
+            user_id=current_user.id,
+            workout_day_id=workout_day_id,
+            date=date.today(),
+            duration_minutes=duration_minutes,
+            total_volume=total_volume,
+            overall_rpe=overall_rpe,
+            feeling=feeling,
+            notes=notes,
+            lou_comment=lou_comment,
+            prs_achieved=json.dumps(prs) if prs else None
+        )
+        
+        db.session.add(session)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'session_id': session.id,
+            'total_volume': total_volume,
+            'prs': prs,
+            'lou_comment': lou_comment
+        })
+    
+    def _generate_lou_session_comment(user, volume, prs, feeling, rpe):
+        """Generate Lou's post-session comment"""
+        if prs:
+            return f"YESSS! {len(prs)} PR oggi! 🎉 {', '.join(prs)}. Sei una macchina! 💪🔥"
+        elif feeling in ['great', 'good'] and rpe and rpe >= 7:
+            return f"Ottima sessione! {volume:.0f}kg di volume totale. Il corpo risponde bene, continua così! 🍑"
+        elif feeling in ['tired', 'exhausted']:
+            return "Hai dato tutto, ma ascolta il corpo. Domani recupero e stretching! 💜"
+        else:
+            return f"Sessione completata! {volume:.0f}kg totali. Ogni allenamento ti avvicina all'obiettivo! 💪"
+    
+    @app.route('/api/gym/intensity', methods=['POST'])
+    @token_required
+    def adjust_intensity(current_user):
+        """Adjust global intensity modifier"""
+        data = request.get_json()
+        modifier = data.get('intensity_modifier', 1.0)
+        
+        # Clamp between 0.6 and 1.3
+        modifier = max(0.6, min(1.3, modifier))
+        
+        profile = GymProfile.query.filter_by(user_id=current_user.id).first()
+        if profile:
+            profile.intensity_modifier = modifier
+            db.session.commit()
+        
+        labels = {
+            0.6: 'Molto leggero',
+            0.7: 'Leggero', 
+            0.8: 'Moderato',
+            0.9: 'Normale -',
+            1.0: 'Normale',
+            1.1: 'Spinta',
+            1.2: 'Beast Mode',
+            1.3: 'Massacro'
+        }
+        
+        closest_label = labels.get(round(modifier, 1), 'Normale')
+        
+        return jsonify({
+            'success': True,
+            'intensity_modifier': modifier,
+            'label': closest_label
+        })
+    
+    @app.route('/api/gym/stats', methods=['GET'])
+    @token_required
+    def get_gym_stats(current_user):
+        """Get workout statistics"""
+        days = request.args.get('days', 30, type=int)
+        start_date = date.today() - timedelta(days=days)
+        
+        # Sessions
+        sessions = WorkoutSession.query.filter(
+            WorkoutSession.user_id == current_user.id,
+            WorkoutSession.date >= start_date
+        ).all()
+        
+        # Exercise logs
+        logs = ExerciseLog.query.filter(
+            ExerciseLog.user_id == current_user.id,
+            ExerciseLog.date >= start_date
+        ).all()
+        
+        # Calculate stats
+        total_sessions = len(sessions)
+        total_volume = sum(s.total_volume or 0 for s in sessions)
+        total_time = sum(s.duration_minutes or 0 for s in sessions)
+        prs_count = len([l for l in logs if l.is_pr])
+        
+        # Volume by muscle group
+        volume_by_muscle = {}
+        for log in logs:
+            if log.muscle_group and log.weight_kg:
+                reps = sum(log.get_reps_array()) if log.reps_per_set else 0
+                vol = log.weight_kg * reps
+                volume_by_muscle[log.muscle_group] = volume_by_muscle.get(log.muscle_group, 0) + vol
+        
+        # Streak
+        streak = 0
+        check_date = date.today()
+        while True:
+            has_session = WorkoutSession.query.filter_by(
+                user_id=current_user.id,
+                date=check_date
+            ).first()
+            if has_session:
+                streak += 1
+                check_date -= timedelta(days=1)
+            else:
+                break
+        
+        return jsonify({
+            'period_days': days,
+            'total_sessions': total_sessions,
+            'total_volume_kg': round(total_volume, 1),
+            'total_time_minutes': total_time,
+            'prs_count': prs_count,
+            'avg_session_volume': round(total_volume / total_sessions, 1) if total_sessions else 0,
+            'volume_by_muscle': volume_by_muscle,
+            'current_streak': streak
+        })
+    
+    @app.route('/api/gym/weekly-report', methods=['GET'])
+    @token_required
+    def get_gym_weekly_report(current_user):
+        """Get or generate weekly report"""
+        # Get current week boundaries
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())
+        week_end = week_start + timedelta(days=6)
+        
+        # Check if report exists
+        report = GymWeeklyReport.query.filter_by(
+            user_id=current_user.id,
+            week_start=week_start
+        ).first()
+        
+        if not report:
+            # Generate report
+            report = _generate_weekly_report(current_user, week_start, week_end)
+        
+        return jsonify({
+            'week_start': week_start.isoformat(),
+            'week_end': week_end.isoformat(),
+            'sessions_planned': report.sessions_planned,
+            'sessions_completed': report.sessions_completed,
+            'total_volume_kg': report.total_volume_kg,
+            'total_duration_min': report.total_duration_min,
+            'prs': json.loads(report.prs_achieved) if report.prs_achieved else [],
+            'avg_rpe': report.avg_rpe,
+            'muscle_progress': json.loads(report.muscle_progress) if report.muscle_progress else {},
+            'lou_message': report.lou_message,
+            'user_choice': report.user_choice
+        })
+    
+    def _generate_weekly_report(user, week_start, week_end):
+        """Generate weekly report with Lou's analysis"""
+        # Get sessions this week
+        sessions = WorkoutSession.query.filter(
+            WorkoutSession.user_id == user.id,
+            WorkoutSession.date >= week_start,
+            WorkoutSession.date <= week_end
+        ).all()
+        
+        # Get program for planned sessions
+        program = WorkoutProgram.query.filter_by(user_id=user.id, is_active=True).first()
+        planned = len(program.days.all()) if program else 0
+        
+        # Calculate stats
+        completed = len(sessions)
+        total_volume = sum(s.total_volume or 0 for s in sessions)
+        total_duration = sum(s.duration_minutes or 0 for s in sessions)
+        avg_rpe = sum(s.overall_rpe or 0 for s in sessions) / completed if completed else 0
+        
+        # PRs this week
+        logs = ExerciseLog.query.filter(
+            ExerciseLog.user_id == user.id,
+            ExerciseLog.date >= week_start,
+            ExerciseLog.date <= week_end,
+            ExerciseLog.is_pr == True
+        ).all()
+        prs = [f"{l.exercise_name} {l.weight_kg}kg" for l in logs]
+        
+        # Generate Lou message
+        if completed == 0:
+            lou_message = "Nessun allenamento questa settimana... Va tutto bene? Sono qui se vuoi parlarne 💜"
+        elif completed >= planned:
+            if prs:
+                lou_message = f"SETTIMANA PERFETTA! {completed}/{planned} sessioni + {len(prs)} PR! Sei una bestia! 🔥🍑"
+            else:
+                lou_message = f"Tutti gli allenamenti completati! {completed}/{planned}. La costanza paga, continua così! 💪"
+        elif completed >= planned * 0.5:
+            lou_message = f"{completed}/{planned} sessioni - buon lavoro! La prossima settimana puntiamo al 100%? 🎯"
+        else:
+            lou_message = f"Solo {completed}/{planned} questa settimana. Ricorda: anche poco è meglio di niente. Ce la facciamo! 💜"
+        
+        if avg_rpe > 8.5:
+            lou_message += "\n⚠️ RPE alto - considera un deload la prossima settimana."
+        
+        report = GymWeeklyReport(
+            user_id=user.id,
+            program_id=program.id if program else None,
+            week_number=program.current_week if program else 1,
+            week_start=week_start,
+            week_end=week_end,
+            sessions_planned=planned,
+            sessions_completed=completed,
+            total_volume_kg=total_volume,
+            total_duration_min=total_duration,
+            prs_achieved=json.dumps(prs),
+            avg_rpe=round(avg_rpe, 1),
+            lou_message=lou_message
+        )
+        
+        db.session.add(report)
+        db.session.commit()
+        
+        return report
+    
+    @app.route('/api/gym/weekly-report/choice', methods=['POST'])
+    @token_required
+    def set_weekly_choice(current_user):
+        """Set user's choice for next week"""
+        data = request.get_json()
+        choice = data.get('choice')  # push, maintain, deload
+        
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())
+        
+        report = GymWeeklyReport.query.filter_by(
+            user_id=current_user.id,
+            week_start=week_start
+        ).first()
+        
+        if report:
+            report.user_choice = choice
+            
+            # Adjust intensity based on choice
+            profile = GymProfile.query.filter_by(user_id=current_user.id).first()
+            if profile:
+                if choice == 'push':
+                    profile.intensity_modifier = min(1.2, profile.intensity_modifier + 0.1)
+                elif choice == 'deload':
+                    profile.intensity_modifier = 0.7
+                else:
+                    profile.intensity_modifier = 1.0
+            
+            db.session.commit()
+        
+        return jsonify({'success': True, 'choice': choice})
     
     return app
 

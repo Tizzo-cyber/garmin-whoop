@@ -328,3 +328,268 @@ class FoodEntry(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     user = db.relationship('User', backref=db.backref('food_entries', lazy='dynamic'))
+
+
+# ==================== LOU - SCULPTING COACH ====================
+
+class GymProfile(db.Model):
+    """Profilo palestra utente per Lou"""
+    __tablename__ = 'gym_profiles'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
+    
+    # Livello esperienza
+    experience = db.Column(db.String(20), default='beginner')  # beginner, intermediate, advanced
+    
+    # Disponibilità
+    days_per_week = db.Column(db.Integer, default=3)  # 3-6
+    session_minutes = db.Column(db.Integer, default=60)  # 45, 60, 90
+    
+    # Muscoli da escludere (JSON array: ["abs", "shoulders"])
+    excluded_muscles = db.Column(db.Text, default='[]')
+    
+    # Muscoli prioritari (JSON array: ["glutes", "legs"])
+    priority_muscles = db.Column(db.Text, default='["glutes", "legs"]')
+    
+    # Equipaggiamento disponibile (JSON array)
+    equipment = db.Column(db.Text, default='["barbell", "dumbbells", "cables", "machines"]')
+    
+    # Modificatore intensità globale (0.6 = relax, 1.0 = normale, 1.2 = beast)
+    intensity_modifier = db.Column(db.Float, default=1.0)
+    
+    # Obiettivo principale
+    primary_goal = db.Column(db.String(50), default='toning')  # toning, strength, hypertrophy
+    
+    # Setup completato?
+    setup_complete = db.Column(db.Boolean, default=False)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    user = db.relationship('User', backref=db.backref('gym_profile', uselist=False))
+    
+    def get_excluded_muscles(self):
+        import json
+        return json.loads(self.excluded_muscles) if self.excluded_muscles else []
+    
+    def set_excluded_muscles(self, muscles):
+        import json
+        self.excluded_muscles = json.dumps(muscles)
+    
+    def get_priority_muscles(self):
+        import json
+        return json.loads(self.priority_muscles) if self.priority_muscles else []
+    
+    def set_priority_muscles(self, muscles):
+        import json
+        self.priority_muscles = json.dumps(muscles)
+    
+    def get_equipment(self):
+        import json
+        return json.loads(self.equipment) if self.equipment else []
+
+
+class WorkoutProgram(db.Model):
+    """Programma di allenamento generato da Lou"""
+    __tablename__ = 'workout_programs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    
+    name = db.Column(db.String(100), nullable=False)  # "Programma Glutei Focus"
+    description = db.Column(db.Text)
+    
+    # Tipo split
+    split_type = db.Column(db.String(50))  # PPL, Upper-Lower, Bro, FullBody
+    
+    # Durata e progressione
+    weeks_total = db.Column(db.Integer, default=6)
+    current_week = db.Column(db.Integer, default=1)
+    
+    # Stato
+    is_active = db.Column(db.Boolean, default=True)
+    created_by_ai = db.Column(db.Boolean, default=True)
+    
+    # Timestamps
+    started_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship('User', backref=db.backref('workout_programs', lazy='dynamic'))
+    days = db.relationship('WorkoutDay', backref='program', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class WorkoutDay(db.Model):
+    """Giorno di allenamento nel programma"""
+    __tablename__ = 'workout_days'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    program_id = db.Column(db.Integer, db.ForeignKey('workout_programs.id'), nullable=False)
+    
+    # Giorno della settimana (1=Lunedì, 7=Domenica)
+    day_of_week = db.Column(db.Integer, nullable=False)
+    
+    # Nome e descrizione
+    name = db.Column(db.String(100), nullable=False)  # "Leg Day 🦵"
+    
+    # Muscoli target (JSON array)
+    muscle_groups = db.Column(db.Text)  # ["glutes", "quads", "hamstrings"]
+    
+    # Durata stimata in minuti
+    estimated_minutes = db.Column(db.Integer, default=60)
+    
+    # Ordine nel programma
+    order = db.Column(db.Integer, default=0)
+    
+    exercises = db.relationship('ProgramExercise', backref='workout_day', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def get_muscle_groups(self):
+        import json
+        return json.loads(self.muscle_groups) if self.muscle_groups else []
+
+
+class ProgramExercise(db.Model):
+    """Esercizio nel programma"""
+    __tablename__ = 'program_exercises'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    workout_day_id = db.Column(db.Integer, db.ForeignKey('workout_days.id'), nullable=False)
+    
+    # Ordine nell'allenamento
+    order = db.Column(db.Integer, nullable=False)
+    
+    # Info esercizio
+    name = db.Column(db.String(100), nullable=False)  # "Hip Thrust"
+    muscle_group = db.Column(db.String(50))  # glutes, quads, back, shoulders, arms, abs
+    equipment = db.Column(db.String(50))  # barbell, dumbbells, cables, bodyweight, machine
+    
+    # Parametri
+    sets = db.Column(db.Integer, default=4)
+    reps_min = db.Column(db.Integer, default=8)
+    reps_max = db.Column(db.Integer, default=12)
+    rest_seconds = db.Column(db.Integer, default=90)
+    
+    # RPE target (Rate of Perceived Exertion)
+    rpe_target = db.Column(db.Integer, default=7)  # 1-10
+    
+    # Note tecniche
+    notes = db.Column(db.Text)
+    video_url = db.Column(db.String(500))
+    
+    # Peso suggerito (calcolato da storico)
+    suggested_weight = db.Column(db.Float)
+
+
+class ExerciseLog(db.Model):
+    """Log di un esercizio completato"""
+    __tablename__ = 'exercise_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    exercise_id = db.Column(db.Integer, db.ForeignKey('program_exercises.id'))
+    
+    # Data e ora
+    date = db.Column(db.Date, nullable=False)
+    
+    # Nome esercizio (anche per esercizi fuori programma)
+    exercise_name = db.Column(db.String(100), nullable=False)
+    muscle_group = db.Column(db.String(50))
+    
+    # Risultati
+    sets_completed = db.Column(db.Integer)
+    reps_per_set = db.Column(db.Text)  # JSON array: [12, 12, 10, 8]
+    weight_kg = db.Column(db.Float)
+    
+    # Feedback
+    rpe = db.Column(db.Integer)  # 1-10 Rate of Perceived Exertion
+    feedback = db.Column(db.String(20))  # too_easy, perfect, too_hard
+    
+    # PR (Personal Record)?
+    is_pr = db.Column(db.Boolean, default=False)
+    
+    # Note
+    notes = db.Column(db.Text)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship('User', backref=db.backref('exercise_logs', lazy='dynamic'))
+    
+    def get_reps_array(self):
+        import json
+        return json.loads(self.reps_per_set) if self.reps_per_set else []
+    
+    def set_reps_array(self, reps):
+        import json
+        self.reps_per_set = json.dumps(reps)
+
+
+class WorkoutSession(db.Model):
+    """Sessione di allenamento completata"""
+    __tablename__ = 'workout_sessions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    workout_day_id = db.Column(db.Integer, db.ForeignKey('workout_days.id'))
+    
+    date = db.Column(db.Date, nullable=False)
+    
+    # Durata effettiva
+    duration_minutes = db.Column(db.Integer)
+    
+    # Volume totale (kg × reps)
+    total_volume = db.Column(db.Float)
+    
+    # Feedback generale
+    overall_rpe = db.Column(db.Integer)  # 1-10
+    feeling = db.Column(db.String(20))  # great, good, okay, tired, exhausted
+    
+    # Note
+    notes = db.Column(db.Text)
+    lou_comment = db.Column(db.Text)  # Commento generato da Lou
+    
+    # PRs in questa sessione (JSON array)
+    prs_achieved = db.Column(db.Text)  # ["Hip Thrust 65kg", "Squat 50kg"]
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship('User', backref=db.backref('workout_sessions', lazy='dynamic'))
+
+
+class GymWeeklyReport(db.Model):
+    """Report settimanale generato da Lou"""
+    __tablename__ = 'gym_weekly_reports'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    program_id = db.Column(db.Integer, db.ForeignKey('workout_programs.id'))
+    
+    # Settimana
+    week_number = db.Column(db.Integer, nullable=False)
+    week_start = db.Column(db.Date, nullable=False)
+    week_end = db.Column(db.Date, nullable=False)
+    
+    # Statistiche
+    sessions_planned = db.Column(db.Integer)
+    sessions_completed = db.Column(db.Integer)
+    total_volume_kg = db.Column(db.Float)
+    total_duration_min = db.Column(db.Integer)
+    
+    # PRs della settimana
+    prs_achieved = db.Column(db.Text)  # JSON array
+    
+    # Medie
+    avg_rpe = db.Column(db.Float)
+    
+    # Progressi per muscolo (JSON)
+    muscle_progress = db.Column(db.Text)  # {"glutes": +5%, "legs": +3%}
+    
+    # Messaggio di Lou
+    lou_message = db.Column(db.Text)
+    
+    # Scelta utente per prossima settimana
+    user_choice = db.Column(db.String(20))  # push, maintain, deload
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship('User', backref=db.backref('gym_weekly_reports', lazy='dynamic'))

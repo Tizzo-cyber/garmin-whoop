@@ -23,7 +23,7 @@
             --bg-base: #050508; --bg-primary: #0a0a0f; --bg-secondary: #0f1015; --bg-card: rgba(18,18,24,0.7); --bg-card-solid: #121218; --bg-elevated: rgba(28,28,38,0.6);
             --border: rgba(255,255,255,0.06); --border-light: rgba(255,255,255,0.1);
             --text-primary: #fff; --text-secondary: rgba(255,255,255,0.7); --text-muted: rgba(255,255,255,0.4);
-            --accent-green: #00f593; --accent-green-dim: rgba(0,245,147,0.12); --accent-pink: #ff6eb4; --accent-pink-dim: rgba(255,110,180,0.12);
+            --accent-green: #00f593; --accent-green-dim: rgba(0,245,147,0.12); --accent-pink: #ff6eb4; --accent-pink-dim: rgba(255,110,180,0.12); --accent-lou: #a855f7; --accent-lou-dim: rgba(168,85,247,0.12);
             --accent-blue: #4da6ff; --accent-purple: #a855f7; --accent-orange: #ff9f43; --accent-red: #ff5757; --accent-cyan: #22d3ee;
             --safe-bottom: env(safe-area-inset-bottom, 0px); --nav-height: 72px;
         }
@@ -46,6 +46,7 @@
         .btn-primary:active { transform: scale(0.98); }
         .btn-primary:disabled { opacity: 0.5; transform: none; }
         .btn-pink { background: linear-gradient(135deg, var(--accent-pink), #e055a0); color: #000; font-weight: 700; border-radius: 16px; }
+        .btn-lou { background: linear-gradient(135deg, var(--accent-lou), #9333ea); color: #fff; font-weight: 700; border-radius: 16px; }
         .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); border-radius: 14px; transition: all 0.2s; }
         .btn-ghost:hover { border-color: var(--border-light); background: rgba(255,255,255,0.03); }
         .btn-danger { background: rgba(255,87,87,0.1); border: 1px solid var(--accent-red); color: var(--accent-red); border-radius: 14px; }
@@ -60,6 +61,7 @@
         .chat-ai { background: var(--bg-card-solid); border: 1px solid var(--border); border-radius: 6px 20px 20px 20px; }
         .chat-ai.sensei { border-left: 3px solid var(--accent-green); background: linear-gradient(135deg, rgba(0,245,147,0.04), var(--bg-card-solid)); }
         .chat-ai.sakura { border-left: 3px solid var(--accent-pink); background: linear-gradient(135deg, rgba(255,110,180,0.04), var(--bg-card-solid)); }
+        .chat-ai.lou { border-left: 3px solid var(--accent-lou); background: linear-gradient(135deg, rgba(168,85,247,0.04), var(--bg-card-solid)); }
         .chat-user { background: linear-gradient(135deg, rgba(77,166,255,0.15), rgba(77,166,255,0.05)); border: 1px solid rgba(77,166,255,0.2); border-radius: 20px 20px 6px 20px; }
         
         .typing-dot { width: 8px; height: 8px; border-radius: 50%; animation: pulse 1.4s infinite ease-in-out; }
@@ -71,6 +73,7 @@
         .nav-item-mobile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 12px; border-radius: 12px; transition: all 0.2s; color: var(--text-muted); min-width: 56px; flex-shrink: 0; }
         .nav-item-mobile.active { color: var(--accent-green); }
         .nav-item-mobile.active.sakura { color: var(--accent-pink); }
+        .nav-item-mobile.active.lou { color: var(--accent-lou); }
         .nav-item-mobile .nav-icon { font-size: 22px; }
         .nav-item-mobile .nav-label { font-size: 9px; font-weight: 500; }
         
@@ -79,6 +82,7 @@
         .nav-item-desktop:hover { background: rgba(255,255,255,0.03); color: var(--text-secondary); }
         .nav-item-desktop.active { background: var(--accent-green-dim); color: var(--accent-green); }
         .nav-item-desktop.active.sakura { background: var(--accent-pink-dim); color: var(--accent-pink); }
+        .nav-item-desktop.active.lou { background: var(--accent-lou-dim); color: var(--accent-lou); }
         
         .metric-card { background: var(--bg-card-solid); border: 1px solid var(--border); border-radius: 16px; padding: 16px; transition: all 0.3s; cursor: pointer; position: relative; }
         .metric-card:hover { border-color: var(--border-light); transform: translateY(-2px); }
@@ -104,6 +108,7 @@
         .bg-gradient-hero { background: radial-gradient(ellipse 100% 80% at 50% -20%, rgba(0,245,147,0.12) 0%, transparent 50%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(255,110,180,0.06) 0%, transparent 50%), var(--bg-base); }
         .bg-gradient-sensei { background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0,245,147,0.06) 0%, transparent 50%); }
         .bg-gradient-sakura { background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255,110,180,0.06) 0%, transparent 50%); }
+        .bg-gradient-lou { background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(168,85,247,0.06) 0%, transparent 50%); }
         
         .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         @media (min-width: 640px) { .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; } }
@@ -864,9 +869,11 @@
             const recognitionRef = useRef(null);
             
             const isSakura = coach === 'sakura';
-            const accent = isSakura ? 'var(--accent-pink)' : 'var(--accent-green)';
-            const coachName = isSakura ? 'Dr. Sakura' : 'Dr. Sensei';
-            const coachEmoji = isSakura ? '🌸' : '🥋';
+            const isLou = coach === 'lou';
+            const accent = isLou ? 'var(--accent-lou)' : (isSakura ? 'var(--accent-pink)' : 'var(--accent-green)');
+            const coachName = isLou ? 'Lou' : (isSakura ? 'Dr. Sakura' : 'Dr. Sensei');
+            const coachEmoji = isLou ? '🏋️‍♀️' : (isSakura ? '🌸' : '🥋');
+            const coachDesc = isLou ? 'Sculpting & Gym' : (isSakura ? 'Mente & Benessere' : 'Sport & Performance');
             
             useEffect(() => { if (initialMessage) { setPendingInitialMessage(initialMessage); onMessageSent?.(); } }, [initialMessage]);
             useEffect(() => { setMessages([]); setReady(false); loadHistory(); }, [coach]);
@@ -997,13 +1004,13 @@
             };
             
             return (
-                <div className={`h-full flex flex-col ${isSakura ? 'bg-gradient-sakura' : 'bg-gradient-sensei'}`}>
+                <div className={`h-full flex flex-col ${isLou ? 'bg-gradient-lou' : (isSakura ? 'bg-gradient-sakura' : 'bg-gradient-sensei')}`}>
                     <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--border)]">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full flex items-center justify-center text-2xl" style={{ background: isSakura ? 'var(--accent-pink-dim)' : 'var(--accent-green-dim)' }}>{coachEmoji}</div>
                             <div>
                                 <h2 className="font-bold" style={{ color: accent }}>{coachName}</h2>
-                                <p className="text-xs text-[var(--text-muted)]">{isSakura ? 'Mente & Benessere' : 'Sport & Performance'}</p>
+                                <p className="text-xs text-[var(--text-muted)]">{coachDesc}</p>
                             </div>
                         </div>
                     </div>
@@ -1014,7 +1021,7 @@
                                 <div className="text-center max-w-xs">
                                     <span className="text-5xl block mb-3">{coachEmoji}</span>
                                     <h3 className="text-lg font-bold mb-2" style={{ color: accent }}>{coachName}</h3>
-                                    <p className="text-[var(--text-muted)] text-sm">{isSakura ? 'Ciao! Parliamo di mente, stress e benessere.' : 'Ciao! Il tuo coach per performance e longevità.'}</p>
+                                    <p className="text-[var(--text-muted)] text-sm">{isLou ? 'Ciao bella! Pronta a scolpire quel fisico?' : (isSakura ? 'Ciao! Parliamo di mente, stress e benessere.' : 'Ciao! Il tuo coach per performance e longevità.')}</p>
                                 </div>
                             </div>
                         ) : (
@@ -1059,7 +1066,7 @@
                             </button>
                             <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') send(); }}
                                 placeholder="Scrivi..." className={`input-modern flex-1 px-4 py-2 ${isSakura ? 'pink' : ''}`} disabled={loading || isRecording} />
-                            <button onClick={() => send()} disabled={loading || !input.trim()} className={`${isSakura ? 'btn-pink' : 'btn-primary'} w-11 h-11 rounded-xl text-lg disabled:opacity-40 flex items-center justify-center`}>➤</button>
+                            <button onClick={() => send()} disabled={loading || !input.trim()} className={`${isLou ? 'btn-lou' : (isSakura ? 'btn-pink' : 'btn-primary')} w-11 h-11 rounded-xl text-lg disabled:opacity-40 flex items-center justify-center`}>➤</button>
                         </div>
                     </div>
                 </div>
@@ -2015,12 +2022,13 @@
                 { id: 'food', icon: '🍽️', label: 'Food' },
                 { id: 'sensei', icon: '🥋', label: 'Sensei', accent: 'sensei' },
                 { id: 'sakura', icon: '🌸', label: 'Sakura', accent: 'sakura' },
+                { id: 'lou', icon: '🏋️‍♀️', label: 'Lou', accent: 'lou' },
                 { id: 'trend', icon: '📈', label: 'Trend' },
                 { id: 'activities', icon: '🏃', label: 'Attività' },
                 { id: 'profile', icon: '⚙️', label: 'Profilo' }
             ];
             
-            const mobileNav = ['data', 'stats', 'food', 'sensei', 'sakura', 'trend', 'activities', 'profile'];
+            const mobileNav = ['data', 'food', 'sensei', 'sakura', 'lou', 'profile'];
             
             return (
                 <AppContext.Provider value={contextValue}>
@@ -2056,6 +2064,7 @@
                             {tab === 'food' && <FoodView onAskCoach={handleAskCoach} onDeepAnalysis={handleDeepAnalysis} />}
                             {tab === 'sensei' && <ChatView coach="sensei" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
                             {tab === 'sakura' && <ChatView coach="sakura" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
+                            {tab === 'lou' && <ChatView coach="lou" initialMessage={initialMessage} onMessageSent={() => setInitialMessage(null)} />}
                             {tab === 'trend' && <TrendView />}
                             {tab === 'activities' && <ActivityView />}
                             {tab === 'profile' && <ProfileView onLogout={onLogout} />}
