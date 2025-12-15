@@ -3541,8 +3541,34 @@ Rispondi SOLO con JSON, niente altro:
                 history_lines = [f"- {ex.exercise_name}: max {ex.max_weight}kg, media {ex.avg_weight:.1f}kg" for ex in recent_exercises[:15]]
                 history_text = "\n".join(history_lines)
             
-            # Get periodization type
-            periodization = getattr(profile, 'periodization_type', 'simple')
+            # Get periodization type (defensive - column may not exist)
+            try:
+                periodization = getattr(profile, 'periodization_type', 'simple') or 'simple'
+            except Exception:
+                periodization = 'simple'
+            
+            # Build periodization instructions
+            periodization_instructions = ""
+            if periodization == 'dup':
+                periodization_instructions = """
+=== DUP (Daily Undulating Periodization) ===
+OGNI GIORNO deve avere un FOCUS DIVERSO:
+
+GIORNO 1: FORZA - Rep: 4-6, RPE: 8-9, Rest: 2-3 min
+GIORNO 2: IPERTROFIA - Rep: 8-12, RPE: 7-8, Rest: 90 sec
+GIORNO 3: METABOLICO - Rep: 15-20, RPE: 7, Rest: 45 sec
+GIORNO 4+: alterna i focus
+
+Aggiungi "day_type": "strength"/"hypertrophy"/"metabolic" per ogni giorno.
+"""
+            elif periodization == 'weekly':
+                periodization_instructions = """
+=== ONDULATA SETTIMANALE (6 settimane) ===
+SETTIMANE 1-2: ACCUMULO - Rep: 12-15, RPE: 6-7
+SETTIMANE 3-4: INTENSIFICAZIONE - Rep: 8-10, RPE: 7-8  
+SETTIMANA 5: PEAK - Rep: 5-8, RPE: 8-9
+SETTIMANA 6: DELOAD - Rep: 12-15, RPE: 5-6, -40% peso
+"""
             
             # Build prompt for Lou
             prompt = f"""Sei LOU, coach di sculpting femminile ELITE. Genera un programma di allenamento basato sulla SCIENZA più recente.
@@ -3560,67 +3586,7 @@ PROFILO UTENTE:
 
 STORICO PESI (usa questi come base per suggested_weight):
 {history_text}
-
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  PERIODIZZAZIONE - TIPO: {periodization.upper()}
-╚══════════════════════════════════════════════════════════════════════════════╝
-
-{"" if periodization == 'simple' else '''
-=== DUP (Daily Undulating Periodization) ===
-Se periodization = "dup", OGNI GIORNO deve avere un FOCUS DIVERSO:
-
-GIORNO 1: 🔴 FORZA
-- Rep range: 4-6
-- RPE target: 8-9  
-- Rest: 2-3 minuti
-- Focus: pesi pesanti, tecnica perfetta
-
-GIORNO 2: 💪 IPERTROFIA
-- Rep range: 8-12
-- RPE target: 7-8
-- Rest: 90 secondi
-- Focus: tempo sotto tensione, connessione mente-muscolo
-
-GIORNO 3: 🔥 METABOLICO/PUMP
-- Rep range: 15-20
-- RPE target: 7
-- Rest: 45-60 secondi
-- Focus: pump massimo, bruciore muscolare
-
-GIORNO 4+ (se disponibili): alterna i focus
-
-IMPORTANTE per DUP:
-- Stesso esercizio può apparire in giorni diversi con rep/peso diversi
-- Es: Hip Thrust Lunedì 4x6 pesante, Hip Thrust Giovedì 3x15 leggero
-- Aggiungi "day_type": "strength"/"hypertrophy"/"metabolic" per ogni giorno
-''' if periodization == 'dup' else '''
-=== ONDULATA SETTIMANALE ===
-Se periodization = "weekly", il programma segue un ciclo di 6 settimane:
-
-SETTIMANE 1-2: 🟢 ACCUMULO (Volume alto)
-- Rep range: 12-15
-- RPE: 6-7
-- Focus: costruire base, tecnica, volume alto
-
-SETTIMANE 3-4: 🟡 INTENSIFICAZIONE  
-- Rep range: 8-10
-- RPE: 7-8
-- Focus: aumentare pesi, volume medio
-
-SETTIMANA 5: 🔴 PEAK
-- Rep range: 5-8
-- RPE: 8-9
-- Focus: pesi massimi, volume basso
-
-SETTIMANA 6: ⚪ DELOAD
-- Rep range: 12-15
-- RPE: 5-6
-- Focus: recupero attivo, -40% peso
-
-IMPORTANTE per ONDULATA:
-- Aggiungi "week_phases" al programma con istruzioni per ogni fase
-- Il peso suggerito è per la settimana corrente
-'''}
+{periodization_instructions}
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  METODOLOGIA SCIENTIFICA - FONTI: Renaissance Periodization (Dr. Mike       ║
@@ -3912,13 +3878,24 @@ Rispondi SOLO con il JSON, nessun altro testo."""
             
             ai_text = response.choices[0].message.content.strip()
             
+            # Debug: check if response looks like JSON
+            if ai_text.startswith('<'):
+                print(f"[ERROR] OpenAI returned HTML: {ai_text[:200]}")
+                return jsonify({'error': 'Errore API OpenAI, riprova'}), 500
+            
             # Extract JSON
             import re
             json_match = re.search(r'\{[\s\S]*\}', ai_text)
             if not json_match:
-                return jsonify({'error': 'Errore generazione programma'}), 500
+                print(f"[ERROR] No JSON found in: {ai_text[:500]}")
+                return jsonify({'error': 'Errore generazione programma, riprova'}), 500
             
-            program_data = json.loads(json_match.group())
+            try:
+                program_data = json.loads(json_match.group())
+            except json.JSONDecodeError as je:
+                print(f"[ERROR] JSON decode error: {je}")
+                print(f"[ERROR] Text was: {json_match.group()[:500]}")
+                return jsonify({'error': 'Errore parsing programma, riprova'}), 500
             
             # Deactivate old programs
             WorkoutProgram.query.filter_by(user_id=current_user.id, is_active=True).update({'is_active': False})
