@@ -1669,7 +1669,9 @@
                 // Cycle tracking (Dr. Stacy Sims)
                 track_cycle: false,
                 cycle_length: 28,
-                last_period_start: ''
+                last_period_start: '',
+                // Periodization
+                periodization_type: 'simple'
             });
             const [loggingExercise, setLoggingExercise] = useState(null);
             const [logData, setLogData] = useState({ weight: '', reps: [], rpe: 7, feedback: 'perfect' });
@@ -1731,7 +1733,8 @@
                                 primary_goal: data.profile.primary_goal || 'toning',
                                 track_cycle: data.profile.track_cycle || false,
                                 cycle_length: data.profile.cycle_length || 28,
-                                last_period_start: data.profile.last_period_start || ''
+                                last_period_start: data.profile.last_period_start || '',
+                                periodization_type: data.profile.periodization_type || 'simple'
                             }));
                         }
                     }
@@ -1887,6 +1890,43 @@
                                             </button>
                                         ))}
                                     </div>
+                                </div>
+                                
+                                {/* Periodization Type */}
+                                <div className="glass p-4 rounded-2xl">
+                                    <label className="text-sm font-medium mb-3 block">📊 Periodizzazione</label>
+                                    <div className="space-y-2">
+                                        {[
+                                            { id: 'simple', label: '🎯 Semplice', desc: 'Solo feedback (+2.5kg/-2.5kg)' },
+                                            { id: 'dup', label: '⚡ DUP', desc: 'Forza/Ipertrofia/Metabolico ogni giorno' },
+                                            { id: 'weekly', label: '📈 Ondulata', desc: 'Ciclo 6 sett: Accumulo→Peak→Deload' }
+                                        ].map(p => (
+                                            <button key={p.id} onClick={() => setSetupData({...setupData, periodization_type: p.id})}
+                                                className={`w-full p-3 rounded-xl text-left ${setupData.periodization_type === p.id ? 'bg-[var(--accent-lou)] text-white' : 'bg-[var(--bg-elevated)]'}`}>
+                                                <div className="font-medium">{p.label}</div>
+                                                <div className={`text-xs ${setupData.periodization_type === p.id ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>{p.desc}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    
+                                    {setupData.periodization_type === 'dup' && (
+                                        <div className="mt-3 p-3 bg-[var(--bg-elevated)] rounded-lg text-xs space-y-1">
+                                            <p className="font-medium">DUP = Daily Undulating Periodization</p>
+                                            <p>🔴 Giorno Forza: 4-6 rep, pesi pesanti</p>
+                                            <p>💪 Giorno Ipertrofia: 8-12 rep, pump</p>
+                                            <p>🔥 Giorno Metabolico: 15-20 rep, bruciore</p>
+                                        </div>
+                                    )}
+                                    
+                                    {setupData.periodization_type === 'weekly' && (
+                                        <div className="mt-3 p-3 bg-[var(--bg-elevated)] rounded-lg text-xs space-y-1">
+                                            <p className="font-medium">Ciclo 6 Settimane</p>
+                                            <p>🟢 Sett 1-2: Accumulo (volume alto)</p>
+                                            <p>🟡 Sett 3-4: Intensificazione (pesi su)</p>
+                                            <p>🔴 Sett 5: Peak (massimali)</p>
+                                            <p>⚪ Sett 6: Deload (recupero)</p>
+                                        </div>
+                                    )}
                                 </div>
                                 
                                 {/* Cycle Tracking - Dr. Stacy Sims */}

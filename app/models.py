@@ -367,6 +367,9 @@ class GymProfile(db.Model):
     cycle_length = db.Column(db.Integer, default=28)  # Lunghezza ciclo (21-35 giorni)
     last_period_start = db.Column(db.Date, nullable=True)  # Ultimo giorno 1
     
+    # === PERIODIZZAZIONE ===
+    periodization_type = db.Column(db.String(20), default='simple')  # simple, dup, undulating
+    
     # Setup completato?
     setup_complete = db.Column(db.Boolean, default=False)
     

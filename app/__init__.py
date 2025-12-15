@@ -50,6 +50,8 @@ def create_app():
                 "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS track_cycle BOOLEAN DEFAULT FALSE",
                 "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS cycle_length INTEGER DEFAULT 28",
                 "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS last_period_start DATE",
+                # Periodization
+                "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS periodization_type VARCHAR(20) DEFAULT 'simple'",
             ]
             for sql in migrations:
                 try:
@@ -1439,12 +1441,21 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
             prs_text = "\n".join([f"- {p.exercise_name}: {p.weight_kg}kg ({p.date})" for p in prs])
         
         profile_text = "Non configurato"
+        periodization_text = "simple"
         if profile:
+            periodization_text = getattr(profile, 'periodization_type', 'simple')
+            period_desc = {
+                'simple': 'Semplice (solo feedback)',
+                'dup': 'DUP - Daily Undulating (Forza/Ipertrofia/Metabolico ogni giorno diverso)',
+                'weekly': 'Ondulata Settimanale (Accumulo→Intensificazione→Peak→Deload)'
+            }.get(periodization_text, 'Semplice')
+            
             profile_text = f"""Esperienza: {profile.experience}
 Giorni/settimana: {profile.days_per_week}
 Priorità: {', '.join(profile.get_priority_muscles())}
 Esclusi: {', '.join(profile.get_excluded_muscles()) or 'nessuno'}
-Intensità: {profile.intensity_modifier}x"""
+Intensità: {profile.intensity_modifier}x
+PERIODIZZAZIONE: {period_desc}"""
         
         # Recovery from Garmin
         yesterday = date.today() - timedelta(days=1)
@@ -1480,6 +1491,35 @@ Intensità: {profile.intensity_modifier}x"""
         if progression and progression['recent_prs']:
             recent_prs_text = "🎉 PR RECENTI (ultimi 14gg): " + ", ".join([f"{p['name']} {p['weight']}kg" for p in progression['recent_prs']])
         
+        # Periodization-specific instructions
+        periodization_instructions = ""
+        if periodization_text == 'dup':
+            periodization_instructions = """
+--- PERIODIZZAZIONE DUP (Daily Undulating) ---
+L'utente usa DUP! Ogni giorno ha focus diverso:
+🔴 FORZA: 4-6 rep, pesi pesanti, rest lungo
+💪 IPERTROFIA: 8-12 rep, peso medio, tempo sotto tensione  
+🔥 METABOLICO: 15-20 rep, peso leggero, pump massimo
+
+Quando parli di allenamento:
+- Specifica che tipo di giorno è oggi
+- Se è giorno FORZA, spingi per pesi più alti
+- Se è giorno METABOLICO, focus sul sentire il muscolo
+- Ricorda: stesso esercizio può avere rep diverse in giorni diversi!"""
+        elif periodization_text == 'weekly':
+            periodization_instructions = """
+--- PERIODIZZAZIONE ONDULATA SETTIMANALE ---
+L'utente usa ciclo di 6 settimane:
+🟢 Settimane 1-2: ACCUMULO (volume alto, 12-15 rep, RPE 6-7)
+🟡 Settimane 3-4: INTENSIFICAZIONE (volume medio, 8-10 rep, RPE 7-8)
+🔴 Settimana 5: PEAK (volume basso, 5-8 rep, RPE 8-9)
+⚪ Settimana 6: DELOAD (recupero, -40% peso, RPE 5-6)
+
+Quando parli di allenamento:
+- Considera in che settimana è del ciclo
+- Se è settimana deload, NON spingere per PR!
+- Se è settimana peak, celebra i carichi pesanti"""
+        
         return f"""Sei LOU, coach di sculpting femminile per {name}, {age} anni.
 
 !!! REGOLE ASSOLUTE !!!
@@ -1505,6 +1545,7 @@ EXPERTISE:
 
 PROFILO {name.upper()}:
 {profile_text}
+{periodization_instructions}
 
 GARMIN (ieri):
 {recovery_text}
@@ -3422,7 +3463,9 @@ Rispondi SOLO con JSON, niente altro:
                 # Cycle tracking
                 'track_cycle': getattr(profile, 'track_cycle', False),
                 'cycle_length': getattr(profile, 'cycle_length', 28),
-                'last_period_start': profile.last_period_start.isoformat() if getattr(profile, 'last_period_start', None) else None
+                'last_period_start': profile.last_period_start.isoformat() if getattr(profile, 'last_period_start', None) else None,
+                # Periodization
+                'periodization_type': getattr(profile, 'periodization_type', 'simple')
             }
         })
     
@@ -3465,6 +3508,10 @@ Rispondi SOLO con JSON, niente altro:
             from datetime import datetime
             profile.last_period_start = datetime.strptime(data['last_period_start'], '%Y-%m-%d').date()
         
+        # Periodization type
+        if 'periodization_type' in data:
+            profile.periodization_type = data['periodization_type']
+        
         db.session.commit()
         return jsonify({'success': True, 'message': 'Profilo salvato'})
     
@@ -3494,6 +3541,9 @@ Rispondi SOLO con JSON, niente altro:
                 history_lines = [f"- {ex.exercise_name}: max {ex.max_weight}kg, media {ex.avg_weight:.1f}kg" for ex in recent_exercises[:15]]
                 history_text = "\n".join(history_lines)
             
+            # Get periodization type
+            periodization = getattr(profile, 'periodization_type', 'simple')
+            
             # Build prompt for Lou
             prompt = f"""Sei LOU, coach di sculpting femminile ELITE. Genera un programma di allenamento basato sulla SCIENZA più recente.
 
@@ -3506,9 +3556,71 @@ PROFILO UTENTE:
 - Muscoli da escludere: {', '.join(profile.get_excluded_muscles()) or 'nessuno'}
 - Obiettivo: {profile.primary_goal}
 - Equipaggiamento: {', '.join(profile.get_equipment())}
+- PERIODIZZAZIONE: {periodization}
 
 STORICO PESI (usa questi come base per suggested_weight):
 {history_text}
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  PERIODIZZAZIONE - TIPO: {periodization.upper()}
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+{"" if periodization == 'simple' else '''
+=== DUP (Daily Undulating Periodization) ===
+Se periodization = "dup", OGNI GIORNO deve avere un FOCUS DIVERSO:
+
+GIORNO 1: 🔴 FORZA
+- Rep range: 4-6
+- RPE target: 8-9  
+- Rest: 2-3 minuti
+- Focus: pesi pesanti, tecnica perfetta
+
+GIORNO 2: 💪 IPERTROFIA
+- Rep range: 8-12
+- RPE target: 7-8
+- Rest: 90 secondi
+- Focus: tempo sotto tensione, connessione mente-muscolo
+
+GIORNO 3: 🔥 METABOLICO/PUMP
+- Rep range: 15-20
+- RPE target: 7
+- Rest: 45-60 secondi
+- Focus: pump massimo, bruciore muscolare
+
+GIORNO 4+ (se disponibili): alterna i focus
+
+IMPORTANTE per DUP:
+- Stesso esercizio può apparire in giorni diversi con rep/peso diversi
+- Es: Hip Thrust Lunedì 4x6 pesante, Hip Thrust Giovedì 3x15 leggero
+- Aggiungi "day_type": "strength"/"hypertrophy"/"metabolic" per ogni giorno
+''' if periodization == 'dup' else '''
+=== ONDULATA SETTIMANALE ===
+Se periodization = "weekly", il programma segue un ciclo di 6 settimane:
+
+SETTIMANE 1-2: 🟢 ACCUMULO (Volume alto)
+- Rep range: 12-15
+- RPE: 6-7
+- Focus: costruire base, tecnica, volume alto
+
+SETTIMANE 3-4: 🟡 INTENSIFICAZIONE  
+- Rep range: 8-10
+- RPE: 7-8
+- Focus: aumentare pesi, volume medio
+
+SETTIMANA 5: 🔴 PEAK
+- Rep range: 5-8
+- RPE: 8-9
+- Focus: pesi massimi, volume basso
+
+SETTIMANA 6: ⚪ DELOAD
+- Rep range: 12-15
+- RPE: 5-6
+- Focus: recupero attivo, -40% peso
+
+IMPORTANTE per ONDULATA:
+- Aggiungi "week_phases" al programma con istruzioni per ogni fase
+- Il peso suggerito è per la settimana corrente
+'''}
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  METODOLOGIA SCIENTIFICA - FONTI: Renaissance Periodization (Dr. Mike       ║
