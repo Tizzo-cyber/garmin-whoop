@@ -2401,24 +2401,28 @@
                                                                 {/* Smart Weight Suggestion with DUP status */}
                                                                 {ex.smart_weight ? (
                                                                     <div className={`mt-2 p-2 rounded-lg ${
-                                                                        ex.progress_info?.status === 'increase' ? 'bg-green-500/20 border border-green-500/30' :
+                                                                        ex.progress_info?.status === 'increase_weight' ? 'bg-green-500/20 border border-green-500/30' :
+                                                                        ex.progress_info?.status === 'increase_reps' ? 'bg-blue-500/20 border border-blue-500/30' :
                                                                         ex.progress_info?.status === 'deload' ? 'bg-orange-500/20 border border-orange-500/30' :
                                                                         'bg-[var(--accent-lou-dim)]'
                                                                     }`}>
                                                                         <div className="flex items-center gap-2">
                                                                             <span className={`text-lg font-bold ${
-                                                                                ex.progress_info?.status === 'increase' ? 'text-green-400' :
+                                                                                ex.progress_info?.status === 'increase_weight' ? 'text-green-400' :
+                                                                                ex.progress_info?.status === 'increase_reps' ? 'text-blue-400' :
                                                                                 ex.progress_info?.status === 'deload' ? 'text-orange-400' :
                                                                                 'text-[var(--accent-lou)]'
                                                                             }`}>
                                                                                 {ex.smart_weight}kg
                                                                             </span>
-                                                                            {ex.progress_info?.status === 'increase' && <span className="text-green-400">📈</span>}
+                                                                            {ex.progress_info?.status === 'increase_weight' && <span className="text-green-400">📈 +peso</span>}
+                                                                            {ex.progress_info?.status === 'increase_reps' && <span className="text-blue-400">📊 +rep</span>}
                                                                             {ex.progress_info?.status === 'deload' && <span className="text-orange-400">⚠️</span>}
                                                                         </div>
                                                                         {ex.smart_reason && (
                                                                             <div className={`text-xs mt-1 ${
-                                                                                ex.progress_info?.status === 'increase' ? 'text-green-400' :
+                                                                                ex.progress_info?.status === 'increase_weight' ? 'text-green-400' :
+                                                                                ex.progress_info?.status === 'increase_reps' ? 'text-blue-400' :
                                                                                 ex.progress_info?.status === 'deload' ? 'text-orange-400' :
                                                                                 'text-[var(--accent-lou)]'
                                                                             }`}>{ex.smart_reason}</div>

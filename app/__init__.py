@@ -1319,47 +1319,64 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
     # ========== DUP CONFIGURATION ==========
     DUP_CONFIG = {
         'strength': {
-            'reps_min': 3, 'reps_max': 5, 'sets': 4,
-            'rpe_target': 8, 'rest_seconds': 180,
-            'label': '🔴 Forza', 'description': 'Pesante! 3-5 rep, focus potenza'
+            'reps_min': 3, 'reps_max': 5, 
+            'sets_min': 3, 'sets_max': 5, 'sets_default': 4,
+            'rpe_target': 8,  # RIR 2
+            'rest_seconds': 180,
+            'tolerance': 0,  # Nessuna tolleranza per forza - devi fare TUTTE le rep
+            'label': '🔴 Forza', 
+            'description': 'Pesante! 3-5 rep, focus potenza'
         },
         'hypertrophy': {
-            'reps_min': 8, 'reps_max': 12, 'sets': 3,
-            'rpe_target': 7, 'rest_seconds': 90,
-            'label': '💪 Ipertrofia', 'description': '8-12 rep, connessione mente-muscolo'
+            'reps_min': 8, 'reps_max': 12, 
+            'sets_min': 3, 'sets_max': 5, 'sets_default': 4,
+            'rpe_target': 8,  # RIR 1-2
+            'rest_seconds': 90,
+            'tolerance': 1,  # 1 rep di tolleranza
+            'label': '💪 Ipertrofia', 
+            'description': '8-12 rep, connessione mente-muscolo'
         },
         'volume': {
-            'reps_min': 12, 'reps_max': 15, 'sets': 3,
-            'rpe_target': 6, 'rest_seconds': 60,
-            'label': '🔥 Volume', 'description': '12-15 rep, tecnica e pump'
+            'reps_min': 12, 'reps_max': 15, 
+            'sets_min': 2, 'sets_max': 4, 'sets_default': 3,
+            'rpe_target': 7,  # RIR 2-3
+            'rest_seconds': 60,
+            'tolerance': 1,
+            'label': '🔥 Volume', 
+            'description': '12-15 rep, tecnica e pump'
         }
     }
     
     def _get_increment_for_exercise(exercise_name):
         """
         Ritorna incremento appropriato per tipo esercizio
+        Secondo principi reali:
         - Bilanciere compound: +2.5kg
-        - Manubri: +2kg (1kg per mano)
-        - Isolamento: +1kg
+        - Manubri: +1kg totale (0.5kg per mano)
+        - Isolamento: +0.5-1kg
         """
         ex_lower = exercise_name.lower()
         
         # Compound bilanciere
-        if any(x in ex_lower for x in ['squat', 'deadlift', 'stacco', 'hip thrust', 'bench', 'panca', 'row', 'rematore', 'press']):
+        if any(x in ex_lower for x in ['squat', 'deadlift', 'stacco', 'hip thrust', 'bench', 'panca', 'row', 'rematore', 'barbell', 'bilanciere']):
             return 2.5
         # Manubri
-        elif any(x in ex_lower for x in ['dumbbell', 'manubr', 'goblet', 'bulgarian']):
-            return 2.0
+        elif any(x in ex_lower for x in ['dumbbell', 'manubr', 'goblet', 'bulgarian', 'lunge']):
+            return 1.0  # Corretto! Era 2.0
         # Isolamento
-        elif any(x in ex_lower for x in ['curl', 'extension', 'raise', 'alzat', 'fly', 'croci', 'kickback', 'pushdown']):
-            return 1.0
+        elif any(x in ex_lower for x in ['curl', 'extension', 'raise', 'alzat', 'fly', 'croci', 'kickback', 'pushdown', 'lateral']):
+            return 0.5  # Microcarico per isolamento
+        # Cable/machine
+        elif any(x in ex_lower for x in ['cable', 'cavo', 'machine', 'macchina', 'lat pull', 'pulldown']):
+            return 2.5  # Di solito hanno incrementi di 2.5-5kg
         # Default
         return 2.5
     
     def _check_completed_target(reps_array, target_reps, tolerance=1):
         """
         Controlla se tutte le serie hanno raggiunto il target
-        tolerance=1 significa che 9 rep su target 10 è ancora OK
+        tolerance=0 per forza (devi fare TUTTE le rep)
+        tolerance=1 per ipertrofia/volume (1 rep sotto è ok)
         """
         if not reps_array:
             return False
@@ -1369,13 +1386,21 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
         """
         Calcola peso intelligente seguendo principi DUP reali
         
-        REGOLE:
-        1. Aumenta solo se hai completato TUTTE le serie nel range
-        2. Aumenta solo se RPE ≤ target
-        3. Deload -10% se fallisci 2 volte consecutive
-        4. Incrementi diversi per tipo esercizio
+        REGOLA D'ORO: Prima aumenti le RIPETIZIONI → poi il CARICO
+        
+        1. Se tutte le serie sono al MAX del range → aumenta peso, torna a rep MIN
+        2. Se hai completato il target → aumenta rep (+1 per set)
+        3. Se non hai completato → mantieni
+        4. Se 2 fallimenti consecutivi → deload -10%
         """
-        # Prendi ultimi log per questo esercizio E questo day_type
+        # Config DUP per questo tipo giorno
+        dup_config = DUP_CONFIG.get(day_type, DUP_CONFIG['hypertrophy'])
+        reps_min = dup_config['reps_min']
+        reps_max = dup_config['reps_max']
+        target_rpe = dup_config['rpe_target']
+        tolerance = dup_config['tolerance']
+        
+        # Prendi ultimi log per questo esercizio
         logs = ExerciseLog.query.filter(
             ExerciseLog.user_id == user_id,
             ExerciseLog.exercise_name == exercise_name
@@ -1390,7 +1415,8 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
         if not relevant_logs:
             return None, None, {
                 'status': 'new',
-                'message': 'Prima volta! Trova il tuo peso'
+                'message': 'Prima volta! Trova il tuo peso',
+                'suggested_reps': reps_min
             }
         
         last_log = relevant_logs[0]
@@ -1399,29 +1425,29 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
         last_rpe = last_log.rpe or 7
         last_target_reps = getattr(last_log, 'target_reps', None) or target_reps
         
-        # Config DUP per questo tipo giorno
-        dup_config = DUP_CONFIG.get(day_type, DUP_CONFIG['hypertrophy'])
-        target_rpe = dup_config['rpe_target']
-        
         # Calcola incremento per questo esercizio
         increment = _get_increment_for_exercise(exercise_name)
         
         # Analisi performance
-        completed_all = _check_completed_target(last_reps, last_target_reps)
+        completed_all = _check_completed_target(last_reps, last_target_reps, tolerance)
         rpe_ok = last_rpe <= target_rpe + 1  # +1 tolleranza
+        
+        # Check se tutte le serie sono al MASSIMO del range
+        all_at_max = all(r >= reps_max for r in last_reps) if last_reps else False
         
         # Conta fallimenti consecutivi
         consecutive_failures = 0
         for log in relevant_logs[:3]:
             log_reps = log.get_reps_array()
-            log_target = getattr(log, 'target_reps', None) or target_reps
-            if not _check_completed_target(log_reps, log_target):
+            log_target = getattr(log, 'target_reps', None) or reps_min
+            if not _check_completed_target(log_reps, log_target, tolerance):
                 consecutive_failures += 1
             else:
                 break
         
-        # DECISIONE PESO
+        # DECISIONE PESO E REP
         suggested_weight = last_weight
+        suggested_reps = last_target_reps  # Mantieni le rep correnti come default
         reason = None
         status = 'maintain'
         
@@ -1429,36 +1455,54 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
         if consecutive_failures >= 2:
             suggested_weight = round(last_weight * 0.9 / 2.5) * 2.5  # -10% arrotondato
             suggested_weight = max(suggested_weight, 2.5)
-            reason = f"⚠️ Deload: {last_weight}kg -10% = {suggested_weight}kg"
+            suggested_reps = reps_min  # Ricomincia dal minimo
+            reason = f"⚠️ Deload: {last_weight}kg -10% = {suggested_weight}kg, riparti da {reps_min} rep"
             status = 'deload'
         
-        # Caso 2: Pronto per aumentare (completato + RPE ok)
-        elif completed_all and rpe_ok:
+        # Caso 2: Tutte le serie al MAX + RPE ok → AUMENTA PESO
+        elif all_at_max and rpe_ok:
             suggested_weight = last_weight + increment
+            suggested_reps = reps_min  # Ricomincia dal minimo con peso nuovo
             reps_str = '/'.join(str(r) for r in last_reps)
-            reason = f"✅ [{reps_str}] completato! +{increment}kg"
-            status = 'increase'
+            reason = f"🎯 [{reps_str}] al massimo! +{increment}kg → {suggested_weight}kg, riparti da {reps_min} rep"
+            status = 'increase_weight'
         
-        # Caso 3: Completato ma RPE troppo alto
+        # Caso 3: Completato + RPE ok → AUMENTA REP (non peso!)
+        elif completed_all and rpe_ok:
+            new_reps = min(last_target_reps + 1, reps_max)
+            if new_reps > last_target_reps:
+                suggested_reps = new_reps
+                reps_str = '/'.join(str(r) for r in last_reps)
+                reason = f"✅ [{reps_str}] completato! Prossimo target: {target_sets}×{new_reps}"
+                status = 'increase_reps'
+            else:
+                # Già al max rep ma non tutte le serie erano al max
+                reps_str = '/'.join(str(r) for r in last_reps)
+                reason = f"✅ [{reps_str}] Porta tutte le serie a {reps_max} rep!"
+                status = 'maintain'
+        
+        # Caso 4: Completato ma RPE troppo alto
         elif completed_all and not rpe_ok:
-            reason = f"⚠️ Completato ma RPE {last_rpe} alto. Mantieni e migliora tecnica"
+            reason = f"⚠️ Completato ma RPE {last_rpe} alto (target ≤{target_rpe}). Mantieni e migliora tecnica"
             status = 'maintain_rpe'
         
-        # Caso 4: Non completato
+        # Caso 5: Non completato
         else:
             reps_str = '/'.join(str(r) for r in last_reps) if last_reps else '?'
-            target_str = f"{target_sets}×{target_reps}"
-            reason = f"🎯 Target {target_str}, ultimo [{reps_str}]. Riprova!"
+            reason = f"🎯 Target {target_sets}×{last_target_reps}, ultimo [{reps_str}]. Riprova!"
             status = 'maintain'
         
         progress_info = {
             'status': status,
             'message': reason,
             'last_reps': last_reps,
-            'target_reps': target_reps,
+            'target_reps': last_target_reps,
+            'suggested_reps': suggested_reps,
+            'reps_range': f"{reps_min}-{reps_max}",
             'last_rpe': last_rpe,
             'target_rpe': target_rpe,
             'completed': completed_all,
+            'all_at_max': all_at_max,
             'consecutive_failures': consecutive_failures,
             'increment': increment
         }
@@ -4089,17 +4133,23 @@ Rispondi SOLO con JSON, niente altro:
                     # Determine target reps based on day type
                     if periodization == 'dup' and phase_info:
                         target_reps = phase_info.get('reps_min', ex.reps_min)
-                        target_sets = phase_info.get('sets', ex.sets)
+                        target_sets = phase_info.get('sets_default', ex.sets)
                         target_rpe = phase_info.get('rpe_target', 7)
+                        reps_max = phase_info.get('reps_max', ex.reps_max)
                     else:
                         target_reps = ex.reps_min
                         target_sets = ex.sets
                         target_rpe = ex.rpe_target or 7
+                        reps_max = ex.reps_max
                     
                     # Use new DUP smart weight function
                     smart_weight, smart_reason, progress_info = _get_smart_weight_dup(
                         current_user.id, ex.name, current_day_type, target_sets, target_reps
                     )
+                    
+                    # Override target_reps with suggested_reps from progress if available
+                    if progress_info and progress_info.get('suggested_reps'):
+                        target_reps = progress_info['suggested_reps']
                     
                     # If no history, use defaults
                     if smart_weight is None:
@@ -4125,9 +4175,9 @@ Rispondi SOLO con JSON, niente altro:
                         'muscle_group': ex.muscle_group,
                         'equipment': ex.equipment,
                         'sets': target_sets,
-                        'reps_min': target_reps if periodization == 'dup' else ex.reps_min,
-                        'reps_max': phase_info.get('reps_max', ex.reps_max) if periodization == 'dup' else ex.reps_max,
-                        'rest_seconds': phase_info.get('rest_seconds', ex.rest_seconds) if periodization == 'dup' else ex.rest_seconds,
+                        'reps_min': target_reps,
+                        'reps_max': reps_max,
+                        'rest_seconds': phase_info.get('rest_seconds', ex.rest_seconds) if periodization == 'dup' and phase_info else ex.rest_seconds,
                         'rpe_target': target_rpe,
                         'notes': ex.notes,
                         'last_weight': last_log.weight_kg if last_log else None,
