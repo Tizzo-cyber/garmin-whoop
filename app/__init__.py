@@ -3724,6 +3724,7 @@ Rispondi SOLO con JSON, niente altro:
     @token_required
     def reset_gym_data(current_user):
         """Reset all gym data for user - start fresh"""
+        import json
         try:
             # Delete exercise logs
             ExerciseLog.query.filter_by(user_id=current_user.id).delete()
@@ -3749,15 +3750,13 @@ Rispondi SOLO con JSON, niente altro:
                 profile.experience = 'beginner'
                 profile.days_per_week = 3
                 profile.session_minutes = 60
-                profile.set_excluded_muscles([])
-                profile.set_priority_muscles(['glutes', 'legs'])
-                profile.set_equipment(['barbell', 'dumbbells', 'cables', 'machines'])
+                profile.excluded_muscles = json.dumps([])
+                profile.priority_muscles = json.dumps(['glutes', 'legs'])
+                profile.equipment = json.dumps(['barbell', 'dumbbells', 'cables', 'machines'])
                 profile.primary_goal = 'toning'
                 profile.periodization_type = 'simple'
-                if hasattr(profile, 'set_favorite_exercises'):
-                    profile.set_favorite_exercises([])
-                if hasattr(profile, 'set_custom_exercises'):
-                    profile.set_custom_exercises([])
+                profile.favorite_exercises = json.dumps([])
+                profile.custom_exercises = json.dumps([])
             
             db.session.commit()
             return jsonify({'success': True, 'message': '🔄 Tutti i dati resettati! Ricomincia da zero.'})
