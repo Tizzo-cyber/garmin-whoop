@@ -1400,17 +1400,14 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
         target_rpe = dup_config['rpe_target']
         tolerance = dup_config['tolerance']
         
-        # Prendi ultimi log per questo esercizio
+        # Prendi ultimi log per questo esercizio (senza filtro day_type per consistenza con UI)
         logs = ExerciseLog.query.filter(
             ExerciseLog.user_id == user_id,
             ExerciseLog.exercise_name == exercise_name
         ).order_by(ExerciseLog.date.desc()).limit(10).all()
         
-        # Filtra per day_type se disponibile
-        logs_same_type = [l for l in logs if getattr(l, 'day_type', None) == day_type]
-        
-        # Usa logs dello stesso tipo se ci sono, altrimenti tutti
-        relevant_logs = logs_same_type if len(logs_same_type) >= 2 else logs
+        # Usa sempre il log più recente per consistenza
+        relevant_logs = logs
         
         if not relevant_logs:
             return None, None, {
@@ -1447,7 +1444,12 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
         
         # DECISIONE PESO E REP
         suggested_weight = last_weight
-        suggested_reps = last_target_reps  # Mantieni le rep correnti come default
+        
+        # Calcola statistiche sulle rep fatte
+        min_reps_done = min(last_reps) if last_reps else reps_min
+        max_reps_done = max(last_reps) if last_reps else reps_min
+        
+        suggested_reps = min_reps_done  # Default
         reason = None
         status = 'maintain'
         
@@ -1459,7 +1461,7 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
             reason = f"⚠️ Deload: {last_weight}kg -10% = {suggested_weight}kg, riparti da {reps_min} rep"
             status = 'deload'
         
-        # Caso 2: Tutte le serie al MAX + RPE ok → AUMENTA PESO
+        # Caso 2: Tutte le serie al MAX del range + RPE ok → AUMENTA PESO
         elif all_at_max and rpe_ok:
             suggested_weight = last_weight + increment
             suggested_reps = reps_min  # Ricomincia dal minimo con peso nuovo
@@ -1469,34 +1471,44 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
         
         # Caso 3: Completato + RPE ok → AUMENTA REP (non peso!)
         elif completed_all and rpe_ok:
-            new_reps = min(last_target_reps + 1, reps_max)
-            if new_reps > last_target_reps:
-                suggested_reps = new_reps
+            # Il target effettivo è il MAX tra target salvato e rep minime fatte
+            # Se target era 3 ma hai fatto [4,4,4,4], il tuo target effettivo era 4
+            effective_target = max(last_target_reps, min_reps_done)
+            new_target = min(effective_target + 1, reps_max)
+            
+            if new_target > effective_target:
+                suggested_reps = new_target
                 reps_str = '/'.join(str(r) for r in last_reps)
-                reason = f"✅ [{reps_str}] completato! Prossimo target: {target_sets}×{new_reps}"
+                reason = f"✅ [{reps_str}] completato! Prossimo: {target_sets}×{new_target}"
                 status = 'increase_reps'
             else:
-                # Già al max rep ma non tutte le serie erano al max
+                # Già al massimo rep range
                 reps_str = '/'.join(str(r) for r in last_reps)
-                reason = f"✅ [{reps_str}] Porta tutte le serie a {reps_max} rep!"
+                suggested_reps = reps_max
+                reason = f"✅ [{reps_str}] Porta tutte a {reps_max} per +peso"
                 status = 'maintain'
         
         # Caso 4: Completato ma RPE troppo alto
         elif completed_all and not rpe_ok:
-            reason = f"⚠️ Completato ma RPE {last_rpe} alto (target ≤{target_rpe}). Mantieni e migliora tecnica"
+            reps_str = '/'.join(str(r) for r in last_reps)
+            suggested_reps = min_reps_done  # Mantieni le stesse rep
+            reason = f"⚠️ [{reps_str}] RPE {last_rpe} alto (target ≤{target_rpe}). Mantieni peso, migliora tecnica"
             status = 'maintain_rpe'
         
-        # Caso 5: Non completato
+        # Caso 5: Non completato - alcune serie sotto target
         else:
             reps_str = '/'.join(str(r) for r in last_reps) if last_reps else '?'
-            reason = f"🎯 Target {target_sets}×{last_target_reps}, ultimo [{reps_str}]. Riprova!"
+            # Il target è il minimo delle rep fatte, ma almeno reps_min del range
+            target_to_hit = max(min_reps_done, reps_min)
+            suggested_reps = target_to_hit
+            reason = f"🎯 Ultimo [{reps_str}]. Obiettivo: tutte a {target_to_hit} rep. Riprova!"
             status = 'maintain'
         
         progress_info = {
             'status': status,
             'message': reason,
             'last_reps': last_reps,
-            'target_reps': last_target_reps,
+            'target_reps': suggested_reps,  # Usa suggested_reps, non last_target_reps
             'suggested_reps': suggested_reps,
             'reps_range': f"{reps_min}-{reps_max}",
             'last_rpe': last_rpe,
@@ -1504,7 +1516,9 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
             'completed': completed_all,
             'all_at_max': all_at_max,
             'consecutive_failures': consecutive_failures,
-            'increment': increment
+            'increment': increment,
+            'min_reps_done': min_reps_done,
+            'max_reps_done': max_reps_done
         }
         
         return suggested_weight, reason, progress_info
