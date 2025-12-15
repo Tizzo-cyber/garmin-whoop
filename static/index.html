@@ -1719,6 +1719,21 @@
                         const data = await profileRes.json();
                         setProfile(data);
                         if (!data.setup_complete) setShowSetup(true);
+                        // Populate setupData with existing profile
+                        if (data.profile) {
+                            setSetupData(prev => ({
+                                ...prev,
+                                experience: data.profile.experience || 'beginner',
+                                days_per_week: data.profile.days_per_week || 3,
+                                session_minutes: data.profile.session_minutes || 60,
+                                excluded_muscles: data.profile.excluded_muscles || [],
+                                priority_muscles: data.profile.priority_muscles || ['glutes', 'legs'],
+                                primary_goal: data.profile.primary_goal || 'toning',
+                                track_cycle: data.profile.track_cycle || false,
+                                cycle_length: data.profile.cycle_length || 28,
+                                last_period_start: data.profile.last_period_start || ''
+                            }));
+                        }
                     }
                     if (programRes.ok) setProgram((await programRes.json()).program);
                     if (todayRes.ok) setTodayWorkout(await todayRes.json());

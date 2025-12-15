@@ -3418,7 +3418,11 @@ Rispondi SOLO con JSON, niente altro:
                 'priority_muscles': profile.get_priority_muscles(),
                 'equipment': profile.get_equipment(),
                 'intensity_modifier': profile.intensity_modifier,
-                'primary_goal': profile.primary_goal
+                'primary_goal': profile.primary_goal,
+                # Cycle tracking
+                'track_cycle': getattr(profile, 'track_cycle', False),
+                'cycle_length': getattr(profile, 'cycle_length', 28),
+                'last_period_start': profile.last_period_start.isoformat() if getattr(profile, 'last_period_start', None) else None
             }
         })
     
