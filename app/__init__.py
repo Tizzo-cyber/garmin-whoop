@@ -3918,6 +3918,42 @@ Rispondi SOLO con JSON, niente altro:
                 date=date.today()
             ).first()
             
+            # Get profile for periodization
+            profile = GymProfile.query.filter_by(user_id=current_user.id).first()
+            periodization = getattr(profile, 'periodization_type', 'simple') if profile else 'simple'
+            
+            # Calculate periodization phase and weight modifier
+            phase_info = None
+            weight_modifier = 1.0  # 1.0 = no change
+            
+            if periodization == 'weekly' and program.current_week:
+                week = program.current_week
+                if week <= 2:
+                    phase_info = {'phase': 'accumulo', 'label': '🟢 Accumulo', 'description': 'Volume alto, costruisci la base'}
+                    weight_modifier = 1.0  # peso normale
+                elif week <= 4:
+                    phase_info = {'phase': 'intensificazione', 'label': '🟡 Intensificazione', 'description': 'Aumenta i carichi!'}
+                    weight_modifier = 1.05  # +5%
+                elif week == 5:
+                    phase_info = {'phase': 'peak', 'label': '🔴 Peak', 'description': 'Settimana di massimali!'}
+                    weight_modifier = 1.10  # +10%
+                else:  # week 6+
+                    phase_info = {'phase': 'deload', 'label': '⚪ Deload', 'description': 'Recupero attivo, -40% peso'}
+                    weight_modifier = 0.60  # -40%
+            
+            elif periodization == 'dup':
+                # DUP: detect day type from workout name
+                day_name = workout_day.name.lower() if workout_day else ''
+                if '🔴' in workout_day.name or 'forza' in day_name:
+                    phase_info = {'phase': 'strength', 'label': '🔴 Forza', 'description': 'Pesante! 4-6 rep, focus potenza'}
+                    weight_modifier = 1.10  # +10% per forza
+                elif '🔥' in workout_day.name or 'metabolic' in day_name:
+                    phase_info = {'phase': 'metabolic', 'label': '🔥 Metabolico', 'description': 'Pump! 15-20 rep, brucia'}
+                    weight_modifier = 0.70  # -30% per metabolico
+                else:
+                    phase_info = {'phase': 'hypertrophy', 'label': '💪 Ipertrofia', 'description': '8-12 rep, connessione mente-muscolo'}
+                    weight_modifier = 1.0
+            
             exercises = []
             for ex in workout_day.exercises.order_by(ProgramExercise.order):
                 try:
@@ -3937,6 +3973,19 @@ Rispondi SOLO con JSON, niente altro:
                     smart_weight, smart_reason = _get_smart_weight_for_exercise(
                         current_user.id, ex.name, ex.sets, ex.reps_min
                     )
+                    
+                    # Apply periodization weight modifier
+                    if smart_weight and weight_modifier != 1.0:
+                        original_weight = smart_weight
+                        smart_weight = round(smart_weight * weight_modifier, 1)
+                        # Round to nearest 2.5kg for practical use
+                        smart_weight = round(smart_weight / 2.5) * 2.5
+                        if phase_info:
+                            phase_label = phase_info['label']
+                            if weight_modifier > 1.0:
+                                smart_reason = f"{phase_label}: +{int((weight_modifier-1)*100)}% → {smart_weight}kg"
+                            else:
+                                smart_reason = f"{phase_label}: {int((weight_modifier-1)*100)}% → {smart_weight}kg"
                     
                     # Get progression analysis for this exercise
                     progression = _analyze_exercise_progression(current_user.id, ex.name)
@@ -3998,10 +4047,9 @@ Rispondi SOLO con JSON, niente altro:
             needs_deload = progression_context.get('needs_deload', False) if progression_context else False
             avg_rpe = progression_context.get('avg_rpe_week', 7) if progression_context else 7
             
-            # Get cycle phase if tracking (defensive - columns may not exist yet)
+            # Get cycle phase if tracking (profile already loaded above)
             cycle_phase = None
             try:
-                profile = GymProfile.query.filter_by(user_id=current_user.id).first()
                 if profile and hasattr(profile, 'track_cycle') and profile.track_cycle:
                     cycle_phase = profile.get_cycle_phase()
             except Exception:
@@ -4021,7 +4069,9 @@ Rispondi SOLO con JSON, niente altro:
                 'motivation': motivation,
                 'needs_deload': needs_deload,
                 'avg_rpe_week': avg_rpe,
-                'cycle_phase': cycle_phase
+                'cycle_phase': cycle_phase,
+                'periodization': periodization,
+                'phase_info': phase_info
             })
         except Exception as e:
             import traceback

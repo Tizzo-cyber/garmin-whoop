@@ -2331,6 +2331,24 @@
                                                 </div>
                                             )}
                                             
+                                            {/* Periodization Phase */}
+                                            {todayWorkout.phase_info && (
+                                                <div className="glass p-3 rounded-xl border-l-4" style={{
+                                                    borderLeftColor: todayWorkout.phase_info.phase === 'deload' ? '#888' :
+                                                                     todayWorkout.phase_info.phase === 'peak' ? '#ef4444' :
+                                                                     todayWorkout.phase_info.phase === 'strength' ? '#ef4444' :
+                                                                     todayWorkout.phase_info.phase === 'intensificazione' ? '#eab308' :
+                                                                     todayWorkout.phase_info.phase === 'metabolic' ? '#f97316' :
+                                                                     todayWorkout.phase_info.phase === 'accumulo' ? '#22c55e' : 'var(--accent-lou)'
+                                                }}>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-bold">{todayWorkout.phase_info.label}</span>
+                                                        <span className="text-xs text-[var(--text-muted)]">{todayWorkout.periodization === 'weekly' ? 'Periodizzazione Settimanale' : 'DUP'}</span>
+                                                    </div>
+                                                    <p className="text-xs text-[var(--text-muted)] mt-1">{todayWorkout.phase_info.description}</p>
+                                                </div>
+                                            )}
+                                            
                                             {/* Workout Header */}
                                             <div className="glass p-4 rounded-2xl">
                                                 <div className="flex items-center justify-between mb-2">
