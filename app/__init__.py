@@ -1404,7 +1404,7 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
         
         # Get recent workout data
         recent_sessions = WorkoutSession.query.filter_by(user_id=user.id).order_by(WorkoutSession.date.desc()).limit(5).all()
-        recent_logs = ExerciseLog.query.filter_by(user_id=user.id).order_by(ExerciseLog.date.desc()).limit(10).all()
+        recent_logs = ExerciseLog.query.filter_by(user_id=user.id).order_by(ExerciseLog.date.desc()).limit(15).all()
         
         # Get PRs
         prs = ExerciseLog.query.filter_by(user_id=user.id, is_pr=True).order_by(ExerciseLog.date.desc()).limit(5).all()
@@ -1416,6 +1416,18 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
                 f"- {s.date}: {s.total_volume or 0:.0f}kg volume, RPE {s.overall_rpe or '?'}, {s.feeling or '?'}"
                 for s in recent_sessions
             ])
+        
+        # Format recent exercise logs with details
+        recent_logs_text = "Nessun esercizio loggato"
+        if recent_logs:
+            feedback_map = {'too_easy': '😴 Facile', 'perfect': '💪 Giusto', 'too_hard': '😫 Duro'}
+            logs_lines = []
+            for log in recent_logs:
+                reps_str = "x".join(str(r) for r in log.get_reps_array()) if log.reps_per_set else "?"
+                fb = feedback_map.get(log.feedback, '?')
+                pr_flag = " 🎉PR!" if log.is_pr else ""
+                logs_lines.append(f"- {log.date} {log.exercise_name}: {log.weight_kg}kg, reps {reps_str}, RPE {log.rpe or '?'}, {fb}{pr_flag}")
+            recent_logs_text = "\n".join(logs_lines)
         
         prs_text = "Nessun PR registrato"
         if prs:
@@ -1500,6 +1512,9 @@ GARMIN (ieri):
 PROGRESSI PER MUSCOLO:
 {muscle_progress_text or "Nessun dato ancora"}
 
+--- ULTIMI ESERCIZI LOGGATI ---
+{recent_logs_text}
+
 SESSIONI RECENTI:
 {sessions_text}
 
@@ -1514,6 +1529,8 @@ Quando vedi trend negli esercizi:
 - 📈 progressing → celebra e mantieni
 - Se un muscolo ha >60% feedback "facile" → aumenta volume/frequenza
 - Se un muscolo ha >40% feedback "duro" → riduci e recupera
+
+USA I DATI: Se l'utente chiede dei suoi allenamenti, RISPONDI con i dati sopra! Non dire "non ho accesso".
 
 REGOLE ALLENAMENTO:
 - Progressione carichi > cardio per sculpting
