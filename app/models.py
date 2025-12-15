@@ -614,6 +614,11 @@ class ExerciseLog(db.Model):
     exercise_name = db.Column(db.String(100), nullable=False)
     muscle_group = db.Column(db.String(50))
     
+    # DUP tracking
+    day_type = db.Column(db.String(20))  # strength, hypertrophy, volume
+    target_reps = db.Column(db.Integer)  # rep target per questo giorno
+    target_rpe = db.Column(db.Integer)   # RPE target per questo giorno
+    
     # Risultati
     sets_completed = db.Column(db.Integer)
     reps_per_set = db.Column(db.Text)  # JSON array: [12, 12, 10, 8]
@@ -622,6 +627,9 @@ class ExerciseLog(db.Model):
     # Feedback
     rpe = db.Column(db.Integer)  # 1-10 Rate of Perceived Exertion
     feedback = db.Column(db.String(20))  # too_easy, perfect, too_hard
+    
+    # Progressione
+    completed_target = db.Column(db.Boolean)  # True se tutte le rep nel range
     
     # PR (Personal Record)?
     is_pr = db.Column(db.Boolean, default=False)

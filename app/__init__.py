@@ -57,6 +57,11 @@ def create_app():
                 # Favorite exercises
                 "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS favorite_exercises TEXT DEFAULT '[]'",
                 "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS custom_exercises TEXT DEFAULT '[]'",
+                # DUP tracking for exercise logs
+                "ALTER TABLE exercise_logs ADD COLUMN IF NOT EXISTS day_type VARCHAR(20)",
+                "ALTER TABLE exercise_logs ADD COLUMN IF NOT EXISTS target_reps INTEGER",
+                "ALTER TABLE exercise_logs ADD COLUMN IF NOT EXISTS target_rpe INTEGER",
+                "ALTER TABLE exercise_logs ADD COLUMN IF NOT EXISTS completed_target BOOLEAN DEFAULT FALSE",
             ]
             for sql in migrations:
                 try:
@@ -1311,53 +1316,159 @@ MEDITAZIONI: Segui le istruzioni sopra per la durata richiesta (ignora limite pa
             'hard_pct': round(hard_pct, 0)
         }
     
-    def _get_smart_weight_for_exercise(user_id, exercise_name, base_sets=4, base_reps=10):
-        """Calcola peso intelligente per un esercizio"""
-        # Prendi ultimi log
+    # ========== DUP CONFIGURATION ==========
+    DUP_CONFIG = {
+        'strength': {
+            'reps_min': 3, 'reps_max': 5, 'sets': 4,
+            'rpe_target': 8, 'rest_seconds': 180,
+            'label': '🔴 Forza', 'description': 'Pesante! 3-5 rep, focus potenza'
+        },
+        'hypertrophy': {
+            'reps_min': 8, 'reps_max': 12, 'sets': 3,
+            'rpe_target': 7, 'rest_seconds': 90,
+            'label': '💪 Ipertrofia', 'description': '8-12 rep, connessione mente-muscolo'
+        },
+        'volume': {
+            'reps_min': 12, 'reps_max': 15, 'sets': 3,
+            'rpe_target': 6, 'rest_seconds': 60,
+            'label': '🔥 Volume', 'description': '12-15 rep, tecnica e pump'
+        }
+    }
+    
+    def _get_increment_for_exercise(exercise_name):
+        """
+        Ritorna incremento appropriato per tipo esercizio
+        - Bilanciere compound: +2.5kg
+        - Manubri: +2kg (1kg per mano)
+        - Isolamento: +1kg
+        """
+        ex_lower = exercise_name.lower()
+        
+        # Compound bilanciere
+        if any(x in ex_lower for x in ['squat', 'deadlift', 'stacco', 'hip thrust', 'bench', 'panca', 'row', 'rematore', 'press']):
+            return 2.5
+        # Manubri
+        elif any(x in ex_lower for x in ['dumbbell', 'manubr', 'goblet', 'bulgarian']):
+            return 2.0
+        # Isolamento
+        elif any(x in ex_lower for x in ['curl', 'extension', 'raise', 'alzat', 'fly', 'croci', 'kickback', 'pushdown']):
+            return 1.0
+        # Default
+        return 2.5
+    
+    def _check_completed_target(reps_array, target_reps, tolerance=1):
+        """
+        Controlla se tutte le serie hanno raggiunto il target
+        tolerance=1 significa che 9 rep su target 10 è ancora OK
+        """
+        if not reps_array:
+            return False
+        return all(r >= (target_reps - tolerance) for r in reps_array)
+    
+    def _get_smart_weight_dup(user_id, exercise_name, day_type, target_sets, target_reps):
+        """
+        Calcola peso intelligente seguendo principi DUP reali
+        
+        REGOLE:
+        1. Aumenta solo se hai completato TUTTE le serie nel range
+        2. Aumenta solo se RPE ≤ target
+        3. Deload -10% se fallisci 2 volte consecutive
+        4. Incrementi diversi per tipo esercizio
+        """
+        # Prendi ultimi log per questo esercizio E questo day_type
         logs = ExerciseLog.query.filter(
             ExerciseLog.user_id == user_id,
             ExerciseLog.exercise_name == exercise_name
-        ).order_by(ExerciseLog.date.desc()).limit(5).all()
+        ).order_by(ExerciseLog.date.desc()).limit(10).all()
         
-        if not logs:
-            return None, "Prima volta! Inizia leggero per trovare il peso giusto."
+        # Filtra per day_type se disponibile
+        logs_same_type = [l for l in logs if getattr(l, 'day_type', None) == day_type]
         
-        last_log = logs[0]
+        # Usa logs dello stesso tipo se ci sono, altrimenti tutti
+        relevant_logs = logs_same_type if len(logs_same_type) >= 2 else logs
+        
+        if not relevant_logs:
+            return None, None, {
+                'status': 'new',
+                'message': 'Prima volta! Trova il tuo peso'
+            }
+        
+        last_log = relevant_logs[0]
         last_weight = last_log.weight_kg or 0
-        last_feedback = last_log.feedback
+        last_reps = last_log.get_reps_array()
         last_rpe = last_log.rpe or 7
+        last_target_reps = getattr(last_log, 'target_reps', None) or target_reps
         
-        # Analizza trend
-        recent_feedbacks = [l.feedback for l in logs[:3] if l.feedback]
-        easy_streak = all(f == 'too_easy' for f in recent_feedbacks) if recent_feedbacks else False
-        hard_streak = all(f == 'too_hard' for f in recent_feedbacks) if recent_feedbacks else False
+        # Config DUP per questo tipo giorno
+        dup_config = DUP_CONFIG.get(day_type, DUP_CONFIG['hypertrophy'])
+        target_rpe = dup_config['rpe_target']
         
-        # Calcola nuovo peso suggerito
+        # Calcola incremento per questo esercizio
+        increment = _get_increment_for_exercise(exercise_name)
+        
+        # Analisi performance
+        completed_all = _check_completed_target(last_reps, last_target_reps)
+        rpe_ok = last_rpe <= target_rpe + 1  # +1 tolleranza
+        
+        # Conta fallimenti consecutivi
+        consecutive_failures = 0
+        for log in relevant_logs[:3]:
+            log_reps = log.get_reps_array()
+            log_target = getattr(log, 'target_reps', None) or target_reps
+            if not _check_completed_target(log_reps, log_target):
+                consecutive_failures += 1
+            else:
+                break
+        
+        # DECISIONE PESO
         suggested_weight = last_weight
         reason = None
+        status = 'maintain'
         
-        if easy_streak or (len(recent_feedbacks) >= 2 and recent_feedbacks.count('too_easy') >= 2):
-            suggested_weight = last_weight + 2.5
-            reason = f"🔥 +2.5kg! Ultime sessioni troppo facili"
-        elif hard_streak or (len(recent_feedbacks) >= 2 and recent_feedbacks.count('too_hard') >= 2):
-            suggested_weight = max(0, last_weight - 2.5)
-            reason = f"📉 -2.5kg per tecnica perfetta"
-        elif last_rpe >= 9:
-            suggested_weight = last_weight
-            reason = "⚠️ RPE alto, mantieni peso e focus tecnica"
-        elif last_feedback == 'too_easy':
-            suggested_weight = last_weight + 2.5
-            reason = "💪 Prova +2.5kg!"
-        elif last_feedback == 'too_hard':
-            suggested_weight = max(0, last_weight - 2.5)
-            reason = "Scendiamo un po'"
-        elif last_feedback == 'perfect' and last_rpe <= 7:
-            suggested_weight = last_weight + 2.5
-            reason = "🎯 Perfetto! Pronto per +2.5kg?"
+        # Caso 1: Deload necessario (2+ fallimenti consecutivi)
+        if consecutive_failures >= 2:
+            suggested_weight = round(last_weight * 0.9 / 2.5) * 2.5  # -10% arrotondato
+            suggested_weight = max(suggested_weight, 2.5)
+            reason = f"⚠️ Deload: {last_weight}kg -10% = {suggested_weight}kg"
+            status = 'deload'
+        
+        # Caso 2: Pronto per aumentare (completato + RPE ok)
+        elif completed_all and rpe_ok:
+            suggested_weight = last_weight + increment
+            reps_str = '/'.join(str(r) for r in last_reps)
+            reason = f"✅ [{reps_str}] completato! +{increment}kg"
+            status = 'increase'
+        
+        # Caso 3: Completato ma RPE troppo alto
+        elif completed_all and not rpe_ok:
+            reason = f"⚠️ Completato ma RPE {last_rpe} alto. Mantieni e migliora tecnica"
+            status = 'maintain_rpe'
+        
+        # Caso 4: Non completato
         else:
-            reason = f"Mantieni {last_weight}kg"
+            reps_str = '/'.join(str(r) for r in last_reps) if last_reps else '?'
+            target_str = f"{target_sets}×{target_reps}"
+            reason = f"🎯 Target {target_str}, ultimo [{reps_str}]. Riprova!"
+            status = 'maintain'
         
-        return suggested_weight, reason
+        progress_info = {
+            'status': status,
+            'message': reason,
+            'last_reps': last_reps,
+            'target_reps': target_reps,
+            'last_rpe': last_rpe,
+            'target_rpe': target_rpe,
+            'completed': completed_all,
+            'consecutive_failures': consecutive_failures,
+            'increment': increment
+        }
+        
+        return suggested_weight, reason, progress_info
+    
+    def _get_smart_weight_for_exercise(user_id, exercise_name, base_sets=4, base_reps=10):
+        """Wrapper legacy per compatibilità"""
+        weight, reason, _ = _get_smart_weight_dup(user_id, exercise_name, 'hypertrophy', base_sets, base_reps)
+        return weight, reason
     
     def _build_lou_progression_context(user_id):
         """Costruisce contesto completo di progressione per Lou"""
@@ -3945,15 +4056,20 @@ Rispondi SOLO con JSON, niente altro:
             elif periodization == 'dup':
                 # DUP: detect day type from workout name
                 day_name = workout_day.name.lower() if workout_day else ''
-                if '🔴' in workout_day.name or 'forza' in day_name:
-                    phase_info = {'phase': 'strength', 'label': '🔴 Forza', 'description': 'Pesante! 4-6 rep, focus potenza'}
-                    weight_modifier = 1.10  # +10% per forza
-                elif '🔥' in workout_day.name or 'metabolic' in day_name:
-                    phase_info = {'phase': 'metabolic', 'label': '🔥 Metabolico', 'description': 'Pump! 15-20 rep, brucia'}
-                    weight_modifier = 0.70  # -30% per metabolico
+                if '🔴' in workout_day.name or 'forza' in day_name or 'strength' in day_name:
+                    current_day_type = 'strength'
+                    phase_info = DUP_CONFIG['strength'].copy()
+                    phase_info['phase'] = 'strength'
+                elif '🔥' in workout_day.name or 'volume' in day_name or 'metabolic' in day_name:
+                    current_day_type = 'volume'
+                    phase_info = DUP_CONFIG['volume'].copy()
+                    phase_info['phase'] = 'volume'
                 else:
-                    phase_info = {'phase': 'hypertrophy', 'label': '💪 Ipertrofia', 'description': '8-12 rep, connessione mente-muscolo'}
-                    weight_modifier = 1.0
+                    current_day_type = 'hypertrophy'
+                    phase_info = DUP_CONFIG['hypertrophy'].copy()
+                    phase_info['phase'] = 'hypertrophy'
+            else:
+                current_day_type = 'hypertrophy'
             
             exercises = []
             for ex in workout_day.exercises.order_by(ProgramExercise.order):
@@ -3970,58 +4086,35 @@ Rispondi SOLO con JSON, niente altro:
                         date=date.today()
                     ).first()
                     
-                    # SMART WEIGHT SUGGESTION
-                    smart_weight, smart_reason = _get_smart_weight_for_exercise(
-                        current_user.id, ex.name, ex.sets, ex.reps_min
+                    # Determine target reps based on day type
+                    if periodization == 'dup' and phase_info:
+                        target_reps = phase_info.get('reps_min', ex.reps_min)
+                        target_sets = phase_info.get('sets', ex.sets)
+                        target_rpe = phase_info.get('rpe_target', 7)
+                    else:
+                        target_reps = ex.reps_min
+                        target_sets = ex.sets
+                        target_rpe = ex.rpe_target or 7
+                    
+                    # Use new DUP smart weight function
+                    smart_weight, smart_reason, progress_info = _get_smart_weight_dup(
+                        current_user.id, ex.name, current_day_type, target_sets, target_reps
                     )
                     
-                    # Base weight: from history, or program suggestion, or default
-                    base_weight = None
-                    if smart_weight and smart_weight > 0:
-                        base_weight = smart_weight
-                    elif last_log and last_log.weight_kg:
-                        base_weight = last_log.weight_kg
-                        smart_reason = "Ultimo peso usato"
-                    elif ex.suggested_weight and ex.suggested_weight > 0:
-                        base_weight = ex.suggested_weight
-                        smart_reason = "Peso suggerito dal programma"
-                    else:
-                        # Default based on exercise type
-                        ex_lower = ex.name.lower()
-                        if any(x in ex_lower for x in ['squat', 'deadlift', 'hip thrust', 'leg press']):
-                            base_weight = 40
-                        elif any(x in ex_lower for x in ['row', 'press', 'pulldown']):
-                            base_weight = 30
-                        elif any(x in ex_lower for x in ['curl', 'extension', 'raise', 'fly', 'kickback']):
-                            base_weight = 8
+                    # If no history, use defaults
+                    if smart_weight is None:
+                        if ex.suggested_weight and ex.suggested_weight > 0:
+                            smart_weight = ex.suggested_weight
                         else:
-                            base_weight = 20
-                        smart_reason = "Prima volta! Trova il tuo peso"
-                    
-                    # Apply periodization modifier
-                    final_weight = base_weight
-                    if base_weight and weight_modifier != 1.0:
-                        # Calculate modified weight
-                        modified = base_weight * weight_modifier
-                        
-                        # Smart rounding: UP for increases, DOWN for decreases
-                        if weight_modifier > 1.0:
-                            # Round UP to next 2.5kg
-                            final_weight = math.ceil(modified / 2.5) * 2.5
-                        else:
-                            # Round DOWN to previous 2.5kg
-                            final_weight = math.floor(modified / 2.5) * 2.5
-                        
-                        # Minimum 2.5kg
-                        final_weight = max(final_weight, 2.5)
-                        
-                        # Clear message showing the math
-                        if phase_info:
-                            pct = int((weight_modifier - 1) * 100)
-                            pct_str = f"+{pct}%" if pct > 0 else f"{pct}%"
-                            smart_reason = f"{phase_info['label']}: {base_weight}kg {pct_str} = {final_weight}kg"
-                    
-                    smart_weight = final_weight
+                            ex_lower = ex.name.lower()
+                            if any(x in ex_lower for x in ['squat', 'deadlift', 'hip thrust', 'leg press']):
+                                smart_weight = 40
+                            elif any(x in ex_lower for x in ['row', 'press', 'pulldown']):
+                                smart_weight = 30
+                            elif any(x in ex_lower for x in ['curl', 'extension', 'raise', 'fly', 'kickback']):
+                                smart_weight = 8
+                            else:
+                                smart_weight = 20
                     
                     # Get progression analysis for this exercise
                     progression = _analyze_exercise_progression(current_user.id, ex.name)
@@ -4031,13 +4124,14 @@ Rispondi SOLO con JSON, niente altro:
                         'name': ex.name,
                         'muscle_group': ex.muscle_group,
                         'equipment': ex.equipment,
-                        'sets': ex.sets,
-                        'reps_min': ex.reps_min,
-                        'reps_max': ex.reps_max,
-                        'rest_seconds': ex.rest_seconds,
-                        'rpe_target': ex.rpe_target,
+                        'sets': target_sets,
+                        'reps_min': target_reps if periodization == 'dup' else ex.reps_min,
+                        'reps_max': phase_info.get('reps_max', ex.reps_max) if periodization == 'dup' else ex.reps_max,
+                        'rest_seconds': phase_info.get('rest_seconds', ex.rest_seconds) if periodization == 'dup' else ex.rest_seconds,
+                        'rpe_target': target_rpe,
                         'notes': ex.notes,
                         'last_weight': last_log.weight_kg if last_log else None,
+                        'last_reps': last_log.get_reps_array() if last_log else None,
                         'completed': today_log is not None,
                         'today_log': {
                             'weight': today_log.weight_kg,
@@ -4045,9 +4139,11 @@ Rispondi SOLO con JSON, niente altro:
                             'rpe': today_log.rpe,
                             'feedback': today_log.feedback
                         } if today_log else None,
-                        # SMART DATA
+                        # SMART DUP DATA
                         'smart_weight': smart_weight,
                         'smart_reason': smart_reason,
+                        'progress_info': progress_info,
+                        'day_type': current_day_type,
                         'trend': progression['trend'] if progression else None,
                         'weight_change': progression['weight_change'] if progression else None,
                         'sessions_logged': progression['sessions'] if progression else 0
@@ -4200,7 +4296,7 @@ Rispondi SOLO con JSON, niente altro:
     @app.route('/api/gym/log', methods=['POST'])
     @token_required
     def log_exercise(current_user):
-        """Log a completed exercise"""
+        """Log a completed exercise with DUP tracking"""
         data = request.get_json()
         
         exercise_id = data.get('exercise_id')
@@ -4209,6 +4305,11 @@ Rispondi SOLO con JSON, niente altro:
         reps = data.get('reps', [])  # array of reps per set
         rpe = data.get('rpe')
         feedback = data.get('feedback')  # too_easy, perfect, too_hard
+        
+        # DUP tracking data
+        day_type = data.get('day_type')  # strength, hypertrophy, volume
+        target_reps = data.get('target_reps')
+        target_rpe = data.get('target_rpe')
         
         if not exercise_name:
             return jsonify({'error': 'Nome esercizio richiesto'}), 400
@@ -4232,6 +4333,12 @@ Rispondi SOLO con JSON, niente altro:
             if ex:
                 muscle_group = ex.muscle_group
         
+        # Calculate if target was completed
+        completed_target = False
+        if target_reps and reps:
+            # All sets within 1 rep of target = completed
+            completed_target = all(r >= (target_reps - 1) for r in reps)
+        
         log = ExerciseLog(
             user_id=current_user.id,
             exercise_id=exercise_id,
@@ -4242,21 +4349,32 @@ Rispondi SOLO con JSON, niente altro:
             weight_kg=weight,
             rpe=rpe,
             feedback=feedback,
-            is_pr=is_pr
+            is_pr=is_pr,
+            # DUP tracking
+            day_type=day_type,
+            target_reps=target_reps,
+            target_rpe=target_rpe,
+            completed_target=completed_target
         )
         log.set_reps_array(reps)
         
         db.session.add(log)
         
-        # Update suggested weight based on feedback
-        if exercise_id and feedback:
+        # Smart weight update based on DUP logic
+        if exercise_id and weight:
             ex = ProgramExercise.query.get(exercise_id)
-            if ex and weight:
-                if feedback == 'too_easy':
-                    ex.suggested_weight = weight + 2.5
-                elif feedback == 'too_hard':
-                    ex.suggested_weight = max(0, weight - 2.5)
+            if ex:
+                # Get increment for this exercise type
+                increment = _get_increment_for_exercise(exercise_name)
+                
+                if completed_target and rpe and target_rpe and rpe <= target_rpe + 1:
+                    # Completed with good RPE -> increase
+                    ex.suggested_weight = weight + increment
+                elif not completed_target:
+                    # Not completed -> maintain
+                    ex.suggested_weight = weight
                 else:
+                    # Completed but RPE too high -> maintain
                     ex.suggested_weight = weight
         
         db.session.commit()
