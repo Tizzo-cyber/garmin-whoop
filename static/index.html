@@ -1689,10 +1689,14 @@
                 // Periodization
                 periodization_type: 'simple',
                 // Favorite exercises
-                favorite_exercises: []
+                favorite_exercises: [],
+                // Custom exercises
+                custom_exercises: []
             });
             const [availableExercises, setAvailableExercises] = useState({});
             const [showExercisePicker, setShowExercisePicker] = useState(false);
+            const [showAddCustom, setShowAddCustom] = useState(false);
+            const [newCustomExercise, setNewCustomExercise] = useState({ name: '', muscle: 'glutes' });
             const [loggingExercise, setLoggingExercise] = useState(null);
             const [logData, setLogData] = useState({ weight: '', reps: [], rpe: 7, feedback: 'perfect' });
             const [showReschedule, setShowReschedule] = useState(false);
@@ -1756,7 +1760,8 @@
                                 cycle_length: data.profile.cycle_length || 28,
                                 last_period_start: data.profile.last_period_start || '',
                                 periodization_type: data.profile.periodization_type || 'simple',
-                                favorite_exercises: data.profile.favorite_exercises || []
+                                favorite_exercises: data.profile.favorite_exercises || [],
+                                custom_exercises: data.profile.custom_exercises || []
                             }));
                         }
                     }
@@ -1971,15 +1976,24 @@
                                     {setupData.favorite_exercises.length > 0 ? (
                                         <div className="flex flex-wrap gap-2">
                                             {setupData.favorite_exercises.map(exId => {
-                                                // Find exercise name from availableExercises
+                                                // Find exercise name from availableExercises or custom_exercises
                                                 let exName = exId;
-                                                Object.values(availableExercises).forEach(muscleExs => {
-                                                    const found = muscleExs.find(e => e.id === exId);
-                                                    if (found) exName = found.name;
-                                                });
+                                                let isCustom = false;
+                                                // Check custom first
+                                                const customFound = setupData.custom_exercises.find(e => e.id === exId);
+                                                if (customFound) {
+                                                    exName = customFound.name;
+                                                    isCustom = true;
+                                                } else {
+                                                    // Check available exercises
+                                                    Object.values(availableExercises).forEach(muscleExs => {
+                                                        const found = muscleExs.find(e => e.id === exId);
+                                                        if (found) exName = found.name;
+                                                    });
+                                                }
                                                 return (
-                                                    <div key={exId} className="flex items-center gap-1 px-2 py-1 bg-[var(--accent-lou-dim)] text-[var(--accent-lou)] rounded-lg text-xs">
-                                                        <span>{exName}</span>
+                                                    <div key={exId} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${isCustom ? 'bg-[var(--accent-green-dim)] text-[var(--accent-green)]' : 'bg-[var(--accent-lou-dim)] text-[var(--accent-lou)]'}`}>
+                                                        <span>{isCustom ? '✨ ' : ''}{exName}</span>
                                                         <button onClick={() => setSetupData({...setupData, favorite_exercises: setupData.favorite_exercises.filter(id => id !== exId)})}
                                                             className="ml-1 text-[var(--text-muted)] hover:text-[var(--accent-red)]">×</button>
                                                     </div>
@@ -2047,7 +2061,28 @@
                 const muscleLabels = {
                     glutes: '🍑 Glutei', quads: '🦵 Quadricipiti', hamstrings: '🦵 Femorali',
                     back: '🔙 Schiena', chest: '💪 Petto', shoulders: '💪 Spalle',
-                    arms: '💪 Braccia', abs: '🎯 Addominali'
+                    arms: '💪 Braccia', abs: '🎯 Addominali', custom: '✨ Personalizzati'
+                };
+                
+                const addCustomExercise = () => {
+                    if (!newCustomExercise.name.trim()) return;
+                    const customId = 'custom_' + Date.now();
+                    const newEx = { id: customId, name: newCustomExercise.name.trim(), muscle: newCustomExercise.muscle };
+                    setSetupData({
+                        ...setupData, 
+                        custom_exercises: [...setupData.custom_exercises, newEx],
+                        favorite_exercises: [...setupData.favorite_exercises, customId]
+                    });
+                    setNewCustomExercise({ name: '', muscle: 'glutes' });
+                    setShowAddCustom(false);
+                };
+                
+                const removeCustomExercise = (customId) => {
+                    setSetupData({
+                        ...setupData,
+                        custom_exercises: setupData.custom_exercises.filter(ex => ex.id !== customId),
+                        favorite_exercises: setupData.favorite_exercises.filter(id => id !== customId)
+                    });
                 };
                 
                 return (
@@ -2058,6 +2093,72 @@
                                 <button onClick={() => setShowExercisePicker(false)} className="text-2xl">×</button>
                             </div>
                             <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                {/* Custom Exercises Section */}
+                                <div className="glass p-3 rounded-xl border-2 border-dashed border-[var(--accent-lou)]">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="font-medium">{muscleLabels.custom}</h3>
+                                        <button onClick={() => setShowAddCustom(!showAddCustom)} 
+                                            className="px-2 py-1 text-xs bg-[var(--accent-lou)] text-white rounded-lg">
+                                            + Nuovo
+                                        </button>
+                                    </div>
+                                    
+                                    {showAddCustom && (
+                                        <div className="mb-3 p-3 bg-[var(--bg-elevated)] rounded-lg space-y-2">
+                                            <input type="text" placeholder="Nome esercizio..."
+                                                value={newCustomExercise.name}
+                                                onChange={e => setNewCustomExercise({...newCustomExercise, name: e.target.value})}
+                                                className="w-full p-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-sm" />
+                                            <select value={newCustomExercise.muscle}
+                                                onChange={e => setNewCustomExercise({...newCustomExercise, muscle: e.target.value})}
+                                                className="w-full p-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-sm">
+                                                <option value="glutes">🍑 Glutei</option>
+                                                <option value="quads">🦵 Quadricipiti</option>
+                                                <option value="hamstrings">🦵 Femorali</option>
+                                                <option value="back">🔙 Schiena</option>
+                                                <option value="chest">💪 Petto</option>
+                                                <option value="shoulders">💪 Spalle</option>
+                                                <option value="arms">💪 Braccia</option>
+                                                <option value="abs">🎯 Addominali</option>
+                                            </select>
+                                            <button onClick={addCustomExercise}
+                                                className="w-full py-2 bg-[var(--accent-lou)] text-white rounded-lg text-sm font-medium">
+                                                ✓ Aggiungi
+                                            </button>
+                                        </div>
+                                    )}
+                                    
+                                    {setupData.custom_exercises.length > 0 ? (
+                                        <div className="flex flex-wrap gap-2">
+                                            {setupData.custom_exercises.map(ex => {
+                                                const isSelected = setupData.favorite_exercises.includes(ex.id);
+                                                return (
+                                                    <div key={ex.id} className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={() => {
+                                                                if (isSelected) {
+                                                                    setSetupData({...setupData, favorite_exercises: setupData.favorite_exercises.filter(id => id !== ex.id)});
+                                                                } else {
+                                                                    setSetupData({...setupData, favorite_exercises: [...setupData.favorite_exercises, ex.id]});
+                                                                }
+                                                            }}
+                                                            className={`px-3 py-2 rounded-lg text-sm transition-all ${isSelected ? 'bg-[var(--accent-lou)] text-white' : 'bg-[var(--bg-elevated)]'}`}>
+                                                            {ex.name}
+                                                        </button>
+                                                        <button onClick={() => removeCustomExercise(ex.id)}
+                                                            className="w-6 h-6 flex items-center justify-center text-xs text-[var(--text-muted)] hover:text-[var(--accent-red)] bg-[var(--bg-elevated)] rounded">
+                                                            🗑
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-[var(--text-muted)] italic">Aggiungi esercizi che non trovi nella lista</p>
+                                    )}
+                                </div>
+                                
+                                {/* Standard Exercises by Muscle */}
                                 {Object.entries(availableExercises).map(([muscle, exercises]) => (
                                     <div key={muscle} className="glass p-3 rounded-xl">
                                         <h3 className="font-medium mb-2">{muscleLabels[muscle] || muscle}</h3>

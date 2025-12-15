@@ -372,6 +372,7 @@ class GymProfile(db.Model):
     
     # === ESERCIZI PREFERITI ===
     favorite_exercises = db.Column(db.Text, default='[]')  # JSON array di exercise IDs
+    custom_exercises = db.Column(db.Text, default='[]')  # JSON array di {id, name, muscle}
     
     def get_favorite_exercises(self):
         import json
@@ -383,6 +384,17 @@ class GymProfile(db.Model):
     def set_favorite_exercises(self, exercises):
         import json
         self.favorite_exercises = json.dumps(exercises or [])
+    
+    def get_custom_exercises(self):
+        import json
+        try:
+            return json.loads(self.custom_exercises or '[]')
+        except:
+            return []
+    
+    def set_custom_exercises(self, exercises):
+        import json
+        self.custom_exercises = json.dumps(exercises or [])
     
     # Setup completato?
     setup_complete = db.Column(db.Boolean, default=False)

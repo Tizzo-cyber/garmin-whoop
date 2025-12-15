@@ -17,7 +17,7 @@ import requests
 
 from config import Config
 from app.models import db, User, DailyMetric, Activity, SyncLog, ChatMessage, UserMemory, FatigueLog, WeeklyCheck, FoodEntry, GymProfile, WorkoutProgram, WorkoutDay, ProgramExercise, ExerciseLog, WorkoutSession, GymWeeklyReport
-from app.exercises import EXERCISES, get_exercises_for_ui, get_exercise_by_id, select_exercises_for_day
+from app.exercises import EXERCISES, get_exercises_for_ui, get_exercise_by_id, select_exercises_for_day, get_exercises_for_muscle
 from app.garmin_sync import GarminSyncService
 
 
@@ -55,6 +55,7 @@ def create_app():
                 "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS periodization_type VARCHAR(20) DEFAULT 'simple'",
                 # Favorite exercises
                 "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS favorite_exercises TEXT DEFAULT '[]'",
+                "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS custom_exercises TEXT DEFAULT '[]'",
             ]
             for sql in migrations:
                 try:
@@ -3450,12 +3451,14 @@ Rispondi SOLO con JSON, niente altro:
         
         exercises = get_exercises_for_ui(equipment)
         
-        # Get user's current favorites
+        # Get user's current favorites and custom exercises
         favorites = profile.get_favorite_exercises() if profile else []
+        custom = profile.get_custom_exercises() if profile and hasattr(profile, 'get_custom_exercises') else []
         
         return jsonify({
             'exercises': exercises,
-            'favorites': favorites
+            'favorites': favorites,
+            'custom_exercises': custom
         })
     
     @app.route('/api/gym/profile', methods=['GET'])
@@ -3487,7 +3490,9 @@ Rispondi SOLO con JSON, niente altro:
                 # Periodization
                 'periodization_type': getattr(profile, 'periodization_type', 'simple'),
                 # Favorite exercises
-                'favorite_exercises': profile.get_favorite_exercises() if hasattr(profile, 'get_favorite_exercises') else []
+                'favorite_exercises': profile.get_favorite_exercises() if hasattr(profile, 'get_favorite_exercises') else [],
+                # Custom exercises
+                'custom_exercises': profile.get_custom_exercises() if hasattr(profile, 'get_custom_exercises') else []
             }
         })
     
@@ -3538,400 +3543,216 @@ Rispondi SOLO con JSON, niente altro:
         if 'favorite_exercises' in data:
             profile.set_favorite_exercises(data['favorite_exercises'])
         
+        # Custom exercises
+        if 'custom_exercises' in data:
+            profile.set_custom_exercises(data['custom_exercises'])
+        
         db.session.commit()
         return jsonify({'success': True, 'message': 'Profilo salvato'})
     
     @app.route('/api/gym/generate-program', methods=['POST'])
     @token_required
     def generate_gym_program(current_user):
-        """Generate workout program with Lou AI"""
-        if not openai_client:
-            return jsonify({'error': 'OpenAI non configurato'}), 500
-        
+        """Generate workout program using exercise database"""
         profile = GymProfile.query.filter_by(user_id=current_user.id).first()
         if not profile:
             return jsonify({'error': 'Prima configura il profilo'}), 400
         
         try:
-            # Get exercise history for smart weight suggestions
+            # Get user settings
+            days_per_week = profile.days_per_week
+            priority_muscles = profile.get_priority_muscles()
+            excluded_muscles = profile.get_excluded_muscles()
+            equipment = profile.get_equipment()
+            experience = profile.experience
+            periodization = getattr(profile, 'periodization_type', 'simple') or 'simple'
+            favorite_exercises = profile.get_favorite_exercises() if hasattr(profile, 'get_favorite_exercises') else []
+            custom_exercises = profile.get_custom_exercises() if hasattr(profile, 'get_custom_exercises') else []
+            
+            # Get exercise history for weight suggestions
+            exercise_history = {}
             recent_exercises = db.session.query(
                 ExerciseLog.exercise_name,
                 db.func.max(ExerciseLog.weight_kg).label('max_weight'),
                 db.func.avg(ExerciseLog.weight_kg).label('avg_weight')
-            ).filter_by(user_id=current_user.id).group_by(
-                ExerciseLog.exercise_name
-            ).all()
+            ).filter_by(user_id=current_user.id).group_by(ExerciseLog.exercise_name).all()
             
-            history_text = "Nessuno storico"
-            if recent_exercises:
-                history_lines = [f"- {ex.exercise_name}: max {ex.max_weight}kg, media {ex.avg_weight:.1f}kg" for ex in recent_exercises[:15]]
-                history_text = "\n".join(history_lines)
+            for ex in recent_exercises:
+                exercise_history[ex.exercise_name.lower()] = {
+                    'max': float(ex.max_weight) if ex.max_weight else 0,
+                    'avg': float(ex.avg_weight) if ex.avg_weight else 0
+                }
             
-            # Get periodization type (defensive - column may not exist)
-            try:
-                periodization = getattr(profile, 'periodization_type', 'simple') or 'simple'
-            except Exception:
-                periodization = 'simple'
+            # Define split based on days per week
+            if days_per_week <= 2:
+                split_type = "Full Body"
+                day_configs = [
+                    {'name': 'Full Body A', 'muscles': ['glutes', 'quads', 'back', 'shoulders'], 'day': 1},
+                    {'name': 'Full Body B', 'muscles': ['glutes', 'hamstrings', 'chest', 'arms'], 'day': 4},
+                ][:days_per_week]
+            elif days_per_week == 3:
+                split_type = "Push Pull Legs"
+                day_configs = [
+                    {'name': 'Lower A - Glute Focus', 'muscles': ['glutes', 'quads', 'hamstrings'], 'day': 1},
+                    {'name': 'Upper', 'muscles': ['back', 'chest', 'shoulders', 'arms'], 'day': 3},
+                    {'name': 'Lower B - Quad Focus', 'muscles': ['quads', 'glutes', 'hamstrings', 'abs'], 'day': 5},
+                ]
+            elif days_per_week == 4:
+                split_type = "Upper Lower"
+                day_configs = [
+                    {'name': 'Lower A - Glute Focus', 'muscles': ['glutes', 'quads'], 'day': 1},
+                    {'name': 'Upper A - Push', 'muscles': ['chest', 'shoulders', 'arms'], 'day': 2},
+                    {'name': 'Lower B - Posterior', 'muscles': ['hamstrings', 'glutes', 'abs'], 'day': 4},
+                    {'name': 'Upper B - Pull', 'muscles': ['back', 'shoulders', 'arms'], 'day': 5},
+                ]
+            else:  # 5-6 days
+                split_type = "PPL x2"
+                day_configs = [
+                    {'name': 'Push', 'muscles': ['chest', 'shoulders', 'arms'], 'day': 1},
+                    {'name': 'Pull', 'muscles': ['back', 'arms'], 'day': 2},
+                    {'name': 'Legs & Glutes', 'muscles': ['glutes', 'quads', 'hamstrings'], 'day': 3},
+                    {'name': 'Upper Mix', 'muscles': ['shoulders', 'chest', 'back'], 'day': 4},
+                    {'name': 'Glute Focus', 'muscles': ['glutes', 'hamstrings', 'abs'], 'day': 5},
+                    {'name': 'Full Body', 'muscles': ['quads', 'back', 'arms'], 'day': 6},
+                ][:days_per_week]
             
-            # Build periodization instructions
-            periodization_instructions = ""
-            if periodization == 'dup':
-                periodization_instructions = """
-=== DUP (Daily Undulating Periodization) ===
-OGNI GIORNO deve avere un FOCUS DIVERSO:
-
-GIORNO 1: FORZA - Rep: 4-6, RPE: 8-9, Rest: 2-3 min
-GIORNO 2: IPERTROFIA - Rep: 8-12, RPE: 7-8, Rest: 90 sec
-GIORNO 3: METABOLICO - Rep: 15-20, RPE: 7, Rest: 45 sec
-GIORNO 4+: alterna i focus
-
-Aggiungi "day_type": "strength"/"hypertrophy"/"metabolic" per ogni giorno.
-"""
-            elif periodization == 'weekly':
-                periodization_instructions = """
-=== ONDULATA SETTIMANALE (6 settimane) ===
-SETTIMANE 1-2: ACCUMULO - Rep: 12-15, RPE: 6-7
-SETTIMANE 3-4: INTENSIFICAZIONE - Rep: 8-10, RPE: 7-8  
-SETTIMANA 5: PEAK - Rep: 5-8, RPE: 8-9
-SETTIMANA 6: DELOAD - Rep: 12-15, RPE: 5-6, -40% peso
-"""
+            # Adjust for priority muscles - always include them
+            for config in day_configs:
+                for pm in priority_muscles:
+                    if pm == 'legs':
+                        if 'glutes' not in config['muscles'] and 'quads' not in config['muscles']:
+                            config['muscles'].insert(0, 'glutes')
+                    elif pm not in config['muscles'] and pm not in excluded_muscles:
+                        config['muscles'].insert(0, pm)
             
-            # Build prompt for Lou
-            prompt = f"""Sei LOU, coach di sculpting femminile ELITE. Genera un programma di allenamento basato sulla SCIENZA più recente.
-
-PROFILO UTENTE:
-- Nome: {current_user.name or 'Utente'}
-- Esperienza: {profile.experience}
-- Giorni disponibili: {profile.days_per_week}/settimana
-- Durata sessione: {profile.session_minutes} minuti
-- Muscoli prioritari: {', '.join(profile.get_priority_muscles())}
-- Muscoli da escludere: {', '.join(profile.get_excluded_muscles()) or 'nessuno'}
-- Obiettivo: {profile.primary_goal}
-- Equipaggiamento: {', '.join(profile.get_equipment())}
-- PERIODIZZAZIONE: {periodization}
-
-STORICO PESI (usa questi come base per suggested_weight):
-{history_text}
-{periodization_instructions}
-
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  METODOLOGIA SCIENTIFICA - FONTI: Renaissance Periodization (Dr. Mike       ║
-║  Israetel), Bret Contreras, Brad Schoenfeld, Menno Henselmans, Jeff Nippard ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🍑 GLUTEI (Bret Contreras - "The Glute Lab")
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Volume: 12-20 set/settimana | Frequenza: 2-3x/settimana | Recupero: 48-72h
-
-ANATOMIA: 3 muscoli distinti che richiedono stimoli diversi
-• Gluteo MASSIMO (upper + lower) → volume e potenza
-• Gluteo MEDIO → forma laterale "shelf"  
-• Gluteo MINIMO → stabilità
-
-ESERCIZI TIER 1 (attivazione EMG massima - OBBLIGATORI):
-• Hip Thrust (barbell) ⭐⭐⭐ - IL RE - attivazione >200% vs squat
-• Glute Bridge (barbell/single leg)
-• Romanian Deadlift / Stiff Leg Deadlift
-
-ESERCIZI TIER 2 (complementari - scegli 1-2):
-• Bulgarian Split Squat (glutei focus con busto avanti)
-• Sumo Deadlift (stance larga, punte fuori)
-• Cable Pull-Through
-• Reverse Hyper / Back Extension
-
-ESERCIZI TIER 3 (gluteo medio - ESSENZIALI per forma):
-• Cable/Machine Hip Abduction ⭐ 
-• Banded Clamshell
-• Side-Lying Hip Raise
-• Banded Monster Walks
-
-REGOLE GLUTEI:
-✓ Hip Thrust SEMPRE presente (almeno 2x/settimana se priorità)
-✓ Ogni sessione: 1 thrust + 1 hinge + 1 abduction
-✓ Mix range: pesante (6-10) + metabolico (15-20)
-✓ Squeeze 2sec al top di ogni rep
-✓ Full ROM - stretch profondo in basso
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🦵 QUADRICIPITI (Dr. Mike Israetel - RP)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Volume: 12-18 set/settimana | Frequenza: 2x/settimana | Recupero: 72h+
-
-ESERCIZI TIER 1:
-• Squat (High Bar, Front Squat) - profondità massima
-• Leg Press (piedi bassi sulla pedana)
-• Hack Squat
-• Bulgarian Split Squat (busto eretto = quad focus)
-
-ESERCIZI TIER 2:
-• Leg Extension ⭐ (isolamento perfetto)
-• Walking Lunges
-• Sissy Squat
-• Step Ups
-
-REGOLE QUAD:
-✓ Deep ROM - sotto il parallelo sempre
-✓ Leg Extension a fine workout (pre-exhaust o finisher)
-✓ Tempo lento in eccentrica (3-4 sec)
-✓ Piedi più stretti = più quad
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🦵 HAMSTRING/FEMORALI
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Volume: 10-16 set/settimana | Frequenza: 2x/settimana | Recupero: 72h
-
-DUE FUNZIONI (servono entrambe):
-• Flessione ginocchio → Leg Curl
-• Estensione anca → RDL, Stiff Leg
-
-ESERCIZI TIER 1:
-• Romanian Deadlift ⭐⭐ (stretch massimo)
-• Lying/Seated Leg Curl ⭐⭐
-• Nordic Curl (avanzato)
-
-ESERCIZI TIER 2:
-• Stiff Leg Deadlift
-• Good Morning
-• Single Leg Curl
-• Glute Ham Raise
-
-REGOLE HAMSTRING:
-✓ SEMPRE includere sia hip-hinge (RDL) che knee-flexion (curl)
-✓ Stretch profondo nel RDL - senti tirare!
-✓ Leg Curl: squeeze al top, lento in eccentrica
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔙 DORSALI/SCHIENA (Jeff Nippard)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Volume: 14-22 set/settimana | Frequenza: 2-3x/settimana | Recupero: 48-72h
-
-DUE MOVIMENTI FONDAMENTALI:
-• Trazione VERTICALE (lat focus) → Pull-down, Pull-up
-• Trazione ORIZZONTALE (spessore) → Row
-
-ESERCIZI TIER 1:
-• Lat Pulldown (wide grip) ⭐
-• Barbell/Dumbbell Row ⭐
-• Pull-Up / Chin-Up
-• Seated Cable Row
-
-ESERCIZI TIER 2:
-• Single Arm Dumbbell Row
-• Face Pull ⭐ (salute spalle + postura)
-• Straight Arm Pulldown
-• T-Bar Row
-
-REGOLE DORSALI:
-✓ Ogni sessione: 1 verticale + 1 orizzontale
-✓ Face Pull SEMPRE (postura + salute spalle)
-✓ Squeeze scapole, petto in fuori
-✓ Non usare momentum - controllo!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💪 SPALLE/DELTOIDI
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Volume: 12-20 set/settimana | Frequenza: 2-3x/settimana | Recupero: 48h
-
-TRE CAPI (tutti importanti per forma):
-• Deltoide ANTERIORE → Press (già lavora con petto)
-• Deltoide LATERALE ⭐ → Lateral Raise (crea larghezza!)
-• Deltoide POSTERIORE → Rear Delt Fly, Face Pull
-
-ESERCIZI TIER 1:
-• Overhead Press (DB o Barbell)
-• Lateral Raise ⭐⭐ (IL più importante per estetica)
-• Face Pull / Rear Delt Fly
-
-ESERCIZI TIER 2:
-• Arnold Press
-• Cable Lateral Raise
-• Upright Row (impugnatura larga)
-• Reverse Pec Deck
-
-REGOLE SPALLE:
-✓ Lateral Raise: volume ALTO (15-20 rep), peso moderato
-✓ Rear delt spesso trascurato → Face Pull ogni sessione upper
-✓ Press: non bloccare completamente sopra
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💪 BRACCIA (Bicipiti + Tricipiti)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Volume: 10-16 set/settimana ciascuno | Frequenza: 2-3x | Recupero: 48h
-
-BICIPITI - due capi:
-• Capo lungo (picco) → Curl inclinato, Hammer Curl
-• Capo corto (spessore) → Preacher Curl, Concentration Curl
-
-TRICIPITI - tre capi:
-• Capo lungo (massa) → Overhead Extension ⭐
-• Capo laterale → Pushdown
-• Capo mediale → Close Grip
-
-ESERCIZI TOP:
-• Bicep Curl (DB/Barbell)
-• Hammer Curl
-• Incline Dumbbell Curl
-• Tricep Pushdown
-• Overhead Tricep Extension ⭐
-• Skull Crushers
-
-REGOLE BRACCIA:
-✓ Tricipiti = 2/3 del braccio, non trascurarli!
-✓ Overhead extension essenziale (capo lungo)
-✓ Superset Bi/Tri efficiente per tempo
-✓ Full ROM sempre
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 ADDOMINALI/CORE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Volume: 10-16 set/settimana | Frequenza: 2-4x/settimana | Recupero: 24-48h
-
-MOVIMENTI:
-• Flessione (crunch) → Retto addominale upper
-• Rotazione → Obliqui
-• Anti-rotazione → Core stability
-• Leg Raise → Retto addominale lower
-
-ESERCIZI TOP:
-• Cable Crunch ⭐
-• Hanging Leg Raise
-• Ab Wheel Rollout
-• Pallof Press (anti-rotazione)
-• Plank (stabilità)
-• Bicycle Crunch
-
-REGOLE ABS:
-✓ Addome si vede con dieta, ma si costruisce con allenamento
-✓ Progressive overload anche qui (cable crunch!)
-✓ Non serve altissimo volume
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ PRINCIPI GENERALI DI PROGRAMMAZIONE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-PROGRESSIVE OVERLOAD (la chiave della crescita):
-• Aumenta peso quando riesci a fare il max delle rep con buona forma
-• Incrementi di 2.5kg per upper, 2.5-5kg per lower
-• Se non puoi aumentare peso, aumenta rep, poi set
-
-REP RANGES OTTIMALI (Brad Schoenfeld):
-• 6-8 rep: forza + ipertrofia (composti pesanti)
-• 8-12 rep: ipertrofia ottimale (la maggior parte)
-• 12-15 rep: ipertrofia + endurance
-• 15-20 rep: metabolico, pump, isolamento
-
-REST PERIODS:
-• Composti pesanti: 2-3 min
-• Composti moderati: 90-120 sec
-• Isolamento: 60-90 sec
-
-TEMPO DI ESECUZIONE:
-• Eccentrica (discesa): 2-3 secondi CONTROLLATA
-• Pausa in stretch: 1 sec
-• Concentrica (salita): 1-2 sec esplosiva
-• Contrazione: 1 sec squeeze
-
-RPE TARGET:
-• La maggior parte dei set: RPE 7-8 (2-3 rep in riserva)
-• Ultimo set del esercizio: RPE 8-9
-• Mai a cedimento ogni set (accumula troppa fatica)
-
-ORDINE ESERCIZI:
-1. Composti pesanti (Squat, Hip Thrust, Deadlift)
-2. Composti accessori (Bulgarian, Lunges)
-3. Isolamento (Curl, Extension, Abduction)
-4. Core/Abs a fine sessione
-
-STRUTTURA SESSIONE TIPO:
-• Warm-up: 5-10 min attivazione
-• Esercizio principale: 3-4 set compound pesante
-• Esercizi accessori: 2-3 esercizi, 3 set ciascuno
-• Isolamento/Finisher: 1-2 esercizi, 2-3 set
-• Stretching finale: 5 min
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 REGOLE FINALI PROGRAMMA
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✓ OGNI sessione lower: Hip Thrust + compound quad + isolation glute
-✓ OGNI sessione upper: push + pull + rear delt
-✓ Face Pull in OGNI sessione upper (salute spalle)
-✓ NO muscoli esclusi dall'utente
-✓ Se glutei priorità: 2-3 sessioni/settimana con focus
-✓ Bilancia push/pull per postura
-✓ Esercizi in ordine: pesante → leggero
-✓ 3-5 esercizi per sessione (qualità > quantità)
-✓ Rest appropriato per tipo esercizio
-✓ Notes con cue tecnici importanti
-
-Genera un programma JSON con questa struttura ESATTA:
-{{
-  "name": "Nome programma",
-  "split_type": "tipo split",
-  "weeks_total": 6,
-  "days": [
-    {{
-      "day_of_week": 1,
-      "name": "Nome giorno",
-      "muscle_groups": ["glutes", "quads"],
-      "exercises": [
-        {{
-          "name": "Hip Thrust",
-          "muscle_group": "glutes",
-          "equipment": "barbell",
-          "sets": 4,
-          "reps_min": 10,
-          "reps_max": 12,
-          "rest_seconds": 90,
-          "rpe_target": 7,
-          "suggested_weight": 50,
-          "notes": "Squeeze al top"
-        }}
-      ]
-    }}
-  ]
-}}
-
-Rispondi SOLO con il JSON, nessun altro testo."""
-
-            response = openai_client.chat.completions.create(
-                model="gpt-4.1",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=3000,
-                temperature=0.7
-            )
+            # Remove excluded muscles
+            for config in day_configs:
+                config['muscles'] = [m for m in config['muscles'] if m not in excluded_muscles]
             
-            ai_text = response.choices[0].message.content.strip()
+            # DUP day types
+            dup_day_types = ['strength', 'hypertrophy', 'metabolic']
             
-            # Debug: check if response looks like JSON
-            if ai_text.startswith('<'):
-                print(f"[ERROR] OpenAI returned HTML: {ai_text[:200]}")
-                return jsonify({'error': 'Errore API OpenAI, riprova'}), 500
+            # Build program data
+            program_days = []
             
-            # Extract JSON
-            import re
-            json_match = re.search(r'\{[\s\S]*\}', ai_text)
-            if not json_match:
-                print(f"[ERROR] No JSON found in: {ai_text[:500]}")
-                return jsonify({'error': 'Errore generazione programma, riprova'}), 500
-            
-            try:
-                program_data = json.loads(json_match.group())
-            except json.JSONDecodeError as je:
-                print(f"[ERROR] JSON decode error: {je}")
-                print(f"[ERROR] Text was: {json_match.group()[:500]}")
-                return jsonify({'error': 'Errore parsing programma, riprova'}), 500
+            for i, config in enumerate(day_configs):
+                # Determine day type for DUP
+                if periodization == 'dup':
+                    day_type = dup_day_types[i % 3]
+                else:
+                    day_type = 'hypertrophy'  # default
+                
+                # Select exercises for this day
+                day_exercises = []
+                exercises_per_muscle = max(1, 4 // len(config['muscles'])) if config['muscles'] else 2
+                
+                for muscle in config['muscles']:
+                    # Get exercises from database
+                    available = get_exercises_for_muscle(muscle, equipment)
+                    if not available:
+                        continue
+                    
+                    # Filter by favorites first
+                    favorite_available = [ex for ex in available if ex['id'] in favorite_exercises]
+                    
+                    # Add custom exercises for this muscle
+                    custom_for_muscle = [ex for ex in custom_exercises if ex.get('muscle') == muscle]
+                    
+                    # Priority: favorites > custom > tier1 > others
+                    selected = []
+                    
+                    # Add favorites first
+                    for fav in favorite_available[:exercises_per_muscle]:
+                        selected.append(fav)
+                    
+                    # Add custom exercises
+                    for custom in custom_for_muscle:
+                        if len(selected) < exercises_per_muscle and custom['id'] in favorite_exercises:
+                            selected.append({
+                                'id': custom['id'],
+                                'name': custom['name'],
+                                'primary': muscle,
+                                'equipment': equipment[0] if equipment else 'bodyweight'
+                            })
+                    
+                    # Fill with tier1 if needed
+                    tier1 = [ex for ex in available if 'tier1' in str(get_exercise_by_id(ex['id']))]
+                    for ex in tier1:
+                        if len(selected) >= exercises_per_muscle:
+                            break
+                        if ex['id'] not in [s['id'] for s in selected]:
+                            selected.append(ex)
+                    
+                    # Fill with any remaining
+                    for ex in available:
+                        if len(selected) >= exercises_per_muscle:
+                            break
+                        if ex['id'] not in [s['id'] for s in selected]:
+                            selected.append(ex)
+                    
+                    # Add to day exercises with rep scheme based on day_type
+                    for ex in selected:
+                        rep_config = {
+                            'strength': {'sets': 4, 'reps_min': 4, 'reps_max': 6, 'rpe': 8, 'rest': 180},
+                            'hypertrophy': {'sets': 3, 'reps_min': 8, 'reps_max': 12, 'rpe': 7, 'rest': 90},
+                            'metabolic': {'sets': 3, 'reps_min': 15, 'reps_max': 20, 'rpe': 7, 'rest': 45}
+                        }.get(day_type, {'sets': 3, 'reps_min': 8, 'reps_max': 12, 'rpe': 7, 'rest': 90})
+                        
+                        # Calculate suggested weight from history
+                        ex_name_lower = ex['name'].lower()
+                        suggested_weight = 20  # default
+                        if ex_name_lower in exercise_history:
+                            hist = exercise_history[ex_name_lower]
+                            suggested_weight = round(hist['avg'] * 0.9, 1)  # 90% of average
+                        elif experience == 'beginner':
+                            suggested_weight = 15
+                        elif experience == 'intermediate':
+                            suggested_weight = 25
+                        else:
+                            suggested_weight = 35
+                        
+                        day_exercises.append({
+                            'name': ex['name'],
+                            'muscle_group': muscle,
+                            'equipment': ex.get('equipment', ['bodyweight'])[0] if isinstance(ex.get('equipment'), list) else ex.get('equipment', 'bodyweight'),
+                            'sets': rep_config['sets'],
+                            'reps_min': rep_config['reps_min'],
+                            'reps_max': rep_config['reps_max'],
+                            'rest_seconds': rep_config['rest'],
+                            'rpe_target': rep_config['rpe'],
+                            'suggested_weight': suggested_weight,
+                            'notes': ''
+                        })
+                
+                # Limit to reasonable number and order (compounds first)
+                day_exercises = day_exercises[:6]
+                
+                day_name = config['name']
+                if periodization == 'dup':
+                    type_emoji = {'strength': '🔴', 'hypertrophy': '💪', 'metabolic': '🔥'}.get(day_type, '')
+                    day_name = f"{config['name']} {type_emoji}"
+                
+                program_days.append({
+                    'day_of_week': config['day'],
+                    'name': day_name,
+                    'muscle_groups': config['muscles'],
+                    'day_type': day_type,
+                    'exercises': day_exercises
+                })
             
             # Deactivate old programs
             WorkoutProgram.query.filter_by(user_id=current_user.id, is_active=True).update({'is_active': False})
             
+            # Create program name
+            focus = ', '.join(priority_muscles[:2]) if priority_muscles else 'Full Body'
+            program_name = f"Lou {split_type} - {focus.title()}"
+            
             # Create new program
             program = WorkoutProgram(
                 user_id=current_user.id,
-                name=program_data.get('name', 'Programma Lou'),
-                split_type=program_data.get('split_type', 'Custom'),
-                weeks_total=program_data.get('weeks_total', 6),
+                name=program_name,
+                split_type=split_type,
+                weeks_total=6,
                 current_week=1,
                 is_active=True,
                 created_by_ai=True,
@@ -3939,9 +3760,10 @@ Rispondi SOLO con il JSON, nessun altro testo."""
             )
             db.session.add(program)
             db.session.flush()
-            
-            # Create workout days
-            for i, day_data in enumerate(program_data.get('days', [])):
+
+
+            # Create workout days from database-generated program
+            for i, day_data in enumerate(program_days):
                 day = WorkoutDay(
                     program_id=program.id,
                     day_of_week=day_data.get('day_of_week', i + 1),
@@ -3966,6 +3788,7 @@ Rispondi SOLO con il JSON, nessun altro testo."""
                         reps_max=ex_data.get('reps_max', 12),
                         rest_seconds=ex_data.get('rest_seconds', 90),
                         rpe_target=ex_data.get('rpe_target', 7),
+                        suggested_weight=ex_data.get('suggested_weight'),
                         notes=ex_data.get('notes', '')
                     )
                     db.session.add(exercise)
@@ -3975,7 +3798,7 @@ Rispondi SOLO con il JSON, nessun altro testo."""
             return jsonify({
                 'success': True,
                 'program_id': program.id,
-                'message': f'Programma "{program.name}" creato!'
+                'message': f'Programma "{program.name}" creato con {len(program_days)} giorni!'
             })
             
         except Exception as e:
