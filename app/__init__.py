@@ -46,6 +46,10 @@ def create_app():
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS protein_goal INTEGER DEFAULT 120",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS carbs_goal INTEGER DEFAULT 250",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS fat_goal INTEGER DEFAULT 70",
+                # Cycle tracking (Dr. Stacy Sims)
+                "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS track_cycle BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS cycle_length INTEGER DEFAULT 28",
+                "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS last_period_start DATE",
             ]
             for sql in migrations:
                 try:
