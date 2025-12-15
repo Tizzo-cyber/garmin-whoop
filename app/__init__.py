@@ -3939,7 +3939,8 @@ Rispondi SOLO con il JSON, nessun altro testo."""
             
             # Calculate current week based on started_at
             if program.started_at:
-                days_elapsed = (date.today() - program.started_at).days
+                started_date = program.started_at.date() if hasattr(program.started_at, 'date') else program.started_at
+                days_elapsed = (date.today() - started_date).days
                 calculated_week = (days_elapsed // 7) + 1
                 
                 # Update current_week if changed
