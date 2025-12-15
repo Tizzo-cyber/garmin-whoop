@@ -13,6 +13,7 @@ import jwt
 import os
 
 import json
+import math
 import requests
 
 from config import Config
@@ -3974,37 +3975,53 @@ Rispondi SOLO con JSON, niente altro:
                         current_user.id, ex.name, ex.sets, ex.reps_min
                     )
                     
-                    # If no history, use program's suggested weight or sensible default
-                    if smart_weight is None:
-                        if ex.suggested_weight and ex.suggested_weight > 0:
-                            smart_weight = ex.suggested_weight
-                            smart_reason = "Prima volta! Peso suggerito dal programma"
+                    # Base weight: from history, or program suggestion, or default
+                    base_weight = None
+                    if smart_weight and smart_weight > 0:
+                        base_weight = smart_weight
+                    elif last_log and last_log.weight_kg:
+                        base_weight = last_log.weight_kg
+                        smart_reason = "Ultimo peso usato"
+                    elif ex.suggested_weight and ex.suggested_weight > 0:
+                        base_weight = ex.suggested_weight
+                        smart_reason = "Peso suggerito dal programma"
+                    else:
+                        # Default based on exercise type
+                        ex_lower = ex.name.lower()
+                        if any(x in ex_lower for x in ['squat', 'deadlift', 'hip thrust', 'leg press']):
+                            base_weight = 40
+                        elif any(x in ex_lower for x in ['row', 'press', 'pulldown']):
+                            base_weight = 30
+                        elif any(x in ex_lower for x in ['curl', 'extension', 'raise', 'fly', 'kickback']):
+                            base_weight = 8
                         else:
-                            # Default weights based on exercise type
-                            ex_lower = ex.name.lower()
-                            if any(x in ex_lower for x in ['squat', 'deadlift', 'hip thrust', 'press']):
-                                smart_weight = 30  # Compound exercises
-                            elif any(x in ex_lower for x in ['curl', 'extension', 'raise', 'fly']):
-                                smart_weight = 10  # Isolation exercises
-                            else:
-                                smart_weight = 20  # Default
-                            smart_reason = "Prima volta! Inizia leggero per trovare il peso giusto"
+                            base_weight = 20
+                        smart_reason = "Prima volta! Trova il tuo peso"
                     
-                    # Apply periodization weight modifier
-                    if smart_weight and smart_weight > 0 and weight_modifier != 1.0:
-                        original_weight = smart_weight
-                        smart_weight = round(smart_weight * weight_modifier, 1)
-                        # Round to nearest 2.5kg for practical use
-                        smart_weight = round(smart_weight / 2.5) * 2.5
-                        # Ensure minimum weight
-                        smart_weight = max(smart_weight, 2.5)
+                    # Apply periodization modifier
+                    final_weight = base_weight
+                    if base_weight and weight_modifier != 1.0:
+                        # Calculate modified weight
+                        modified = base_weight * weight_modifier
+                        
+                        # Smart rounding: UP for increases, DOWN for decreases
+                        if weight_modifier > 1.0:
+                            # Round UP to next 2.5kg
+                            final_weight = math.ceil(modified / 2.5) * 2.5
+                        else:
+                            # Round DOWN to previous 2.5kg
+                            final_weight = math.floor(modified / 2.5) * 2.5
+                        
+                        # Minimum 2.5kg
+                        final_weight = max(final_weight, 2.5)
+                        
+                        # Clear message showing the math
                         if phase_info:
-                            phase_emoji = {'strength': '🔴', 'hypertrophy': '💪', 'metabolic': '🔥', 
-                                          'accumulo': '🟢', 'intensificazione': '🟡', 'peak': '🔴', 'deload': '⚪'}.get(phase_info['phase'], '')
-                            if weight_modifier > 1.0:
-                                smart_reason = f"{phase_emoji} {original_weight}kg +{int((weight_modifier-1)*100)}% = {smart_weight}kg"
-                            else:
-                                smart_reason = f"{phase_emoji} {original_weight}kg {int((weight_modifier-1)*100)}% = {smart_weight}kg"
+                            pct = int((weight_modifier - 1) * 100)
+                            pct_str = f"+{pct}%" if pct > 0 else f"{pct}%"
+                            smart_reason = f"{phase_info['label']}: {base_weight}kg {pct_str} = {final_weight}kg"
+                    
+                    smart_weight = final_weight
                     
                     # Get progression analysis for this exercise
                     progression = _analyze_exercise_progression(current_user.id, ex.name)
