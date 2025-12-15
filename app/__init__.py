@@ -3649,34 +3649,30 @@ Rispondi SOLO con JSON, niente altro:
                 for muscle in config['muscles']:
                     # Get exercises from database
                     available = get_exercises_for_muscle(muscle, equipment)
+                    
+                    # Add custom exercises for this muscle to available list
+                    custom_for_muscle = [ex for ex in custom_exercises if ex.get('muscle') == muscle]
+                    for custom in custom_for_muscle:
+                        available.append({
+                            'id': custom['id'],
+                            'name': custom['name'],
+                            'primary': muscle,
+                            'equipment': equipment[0] if equipment else 'bodyweight'
+                        })
+                    
                     if not available:
                         continue
                     
-                    # Filter by favorites first
-                    favorite_available = [ex for ex in available if ex['id'] in favorite_exercises]
-                    
-                    # Add custom exercises for this muscle
-                    custom_for_muscle = [ex for ex in custom_exercises if ex.get('muscle') == muscle]
-                    
-                    # Priority: favorites > custom > tier1 > others
+                    # Priority: favorites first, then tier1, then others
                     selected = []
                     
-                    # Add favorites first
-                    for fav in favorite_available[:exercises_per_muscle]:
-                        selected.append(fav)
-                    
-                    # Add custom exercises
-                    for custom in custom_for_muscle:
-                        if len(selected) < exercises_per_muscle and custom['id'] in favorite_exercises:
-                            selected.append({
-                                'id': custom['id'],
-                                'name': custom['name'],
-                                'primary': muscle,
-                                'equipment': equipment[0] if equipment else 'bodyweight'
-                            })
+                    # Add ALL favorite exercises for this muscle first (no limit)
+                    for ex in available:
+                        if ex['id'] in favorite_exercises and len(selected) < exercises_per_muscle:
+                            selected.append(ex)
                     
                     # Fill with tier1 if needed
-                    tier1 = [ex for ex in available if 'tier1' in str(get_exercise_by_id(ex['id']))]
+                    tier1 = [ex for ex in available if get_exercise_by_id(ex['id']) is not None]
                     for ex in tier1:
                         if len(selected) >= exercises_per_muscle:
                             break

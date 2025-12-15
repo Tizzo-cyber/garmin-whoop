@@ -1771,6 +1771,14 @@
                     if (exercisesRes.ok) {
                         const exData = await exercisesRes.json();
                         setAvailableExercises(exData.exercises || {});
+                        // Also load custom exercises if not already in setupData
+                        if (exData.custom_exercises && exData.custom_exercises.length > 0) {
+                            setSetupData(prev => ({
+                                ...prev,
+                                custom_exercises: exData.custom_exercises,
+                                favorite_exercises: prev.favorite_exercises.length > 0 ? prev.favorite_exercises : exData.favorites || []
+                            }));
+                        }
                     }
                 } catch (e) { console.error(e); }
                 setLoading(false);
@@ -1793,6 +1801,16 @@
             const generateProgram = async () => {
                 setGenerating(true);
                 try {
+                    // Save profile first to ensure custom exercises are persisted
+                    await fetch(`${API}/api/gym/profile`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ 
+                            favorite_exercises: setupData.favorite_exercises,
+                            custom_exercises: setupData.custom_exercises
+                        })
+                    });
+                    
                     const res = await fetch(`${API}/api/gym/generate-program`, {
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${token}` }
