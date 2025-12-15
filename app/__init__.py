@@ -3447,6 +3447,15 @@ Rispondi SOLO con JSON, niente altro:
         if 'setup_complete' in data:
             profile.setup_complete = data['setup_complete']
         
+        # Cycle tracking (Dr. Stacy Sims)
+        if 'track_cycle' in data:
+            profile.track_cycle = data['track_cycle']
+        if 'cycle_length' in data:
+            profile.cycle_length = data['cycle_length']
+        if 'last_period_start' in data and data['last_period_start']:
+            from datetime import datetime
+            profile.last_period_start = datetime.strptime(data['last_period_start'], '%Y-%m-%d').date()
+        
         db.session.commit()
         return jsonify({'success': True, 'message': 'Profilo salvato'})
     
@@ -3477,7 +3486,7 @@ Rispondi SOLO con JSON, niente altro:
                 history_text = "\n".join(history_lines)
             
             # Build prompt for Lou
-            prompt = f"""Sei LOU, coach di sculpting femminile. Genera un programma di allenamento.
+            prompt = f"""Sei LOU, coach di sculpting femminile ELITE. Genera un programma di allenamento basato sulla SCIENZA più recente.
 
 PROFILO UTENTE:
 - Nome: {current_user.name or 'Utente'}
@@ -3492,14 +3501,256 @@ PROFILO UTENTE:
 STORICO PESI (usa questi come base per suggested_weight):
 {history_text}
 
-REGOLE:
-- Focus su glutei, gambe, e muscoli richiesti
-- 3-5 esercizi per sessione
-- Rep range 8-15 per ipertrofia
-- Includi progressione carichi
-- NO muscoli esclusi
-- Se c'è storico per un esercizio, usa quel peso come suggested_weight
-- Se non c'è storico, suggerisci peso appropriato per il livello
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  METODOLOGIA SCIENTIFICA - FONTI: Renaissance Periodization (Dr. Mike       ║
+║  Israetel), Bret Contreras, Brad Schoenfeld, Menno Henselmans, Jeff Nippard ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🍑 GLUTEI (Bret Contreras - "The Glute Lab")
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Volume: 12-20 set/settimana | Frequenza: 2-3x/settimana | Recupero: 48-72h
+
+ANATOMIA: 3 muscoli distinti che richiedono stimoli diversi
+• Gluteo MASSIMO (upper + lower) → volume e potenza
+• Gluteo MEDIO → forma laterale "shelf"  
+• Gluteo MINIMO → stabilità
+
+ESERCIZI TIER 1 (attivazione EMG massima - OBBLIGATORI):
+• Hip Thrust (barbell) ⭐⭐⭐ - IL RE - attivazione >200% vs squat
+• Glute Bridge (barbell/single leg)
+• Romanian Deadlift / Stiff Leg Deadlift
+
+ESERCIZI TIER 2 (complementari - scegli 1-2):
+• Bulgarian Split Squat (glutei focus con busto avanti)
+• Sumo Deadlift (stance larga, punte fuori)
+• Cable Pull-Through
+• Reverse Hyper / Back Extension
+
+ESERCIZI TIER 3 (gluteo medio - ESSENZIALI per forma):
+• Cable/Machine Hip Abduction ⭐ 
+• Banded Clamshell
+• Side-Lying Hip Raise
+• Banded Monster Walks
+
+REGOLE GLUTEI:
+✓ Hip Thrust SEMPRE presente (almeno 2x/settimana se priorità)
+✓ Ogni sessione: 1 thrust + 1 hinge + 1 abduction
+✓ Mix range: pesante (6-10) + metabolico (15-20)
+✓ Squeeze 2sec al top di ogni rep
+✓ Full ROM - stretch profondo in basso
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🦵 QUADRICIPITI (Dr. Mike Israetel - RP)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Volume: 12-18 set/settimana | Frequenza: 2x/settimana | Recupero: 72h+
+
+ESERCIZI TIER 1:
+• Squat (High Bar, Front Squat) - profondità massima
+• Leg Press (piedi bassi sulla pedana)
+• Hack Squat
+• Bulgarian Split Squat (busto eretto = quad focus)
+
+ESERCIZI TIER 2:
+• Leg Extension ⭐ (isolamento perfetto)
+• Walking Lunges
+• Sissy Squat
+• Step Ups
+
+REGOLE QUAD:
+✓ Deep ROM - sotto il parallelo sempre
+✓ Leg Extension a fine workout (pre-exhaust o finisher)
+✓ Tempo lento in eccentrica (3-4 sec)
+✓ Piedi più stretti = più quad
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🦵 HAMSTRING/FEMORALI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Volume: 10-16 set/settimana | Frequenza: 2x/settimana | Recupero: 72h
+
+DUE FUNZIONI (servono entrambe):
+• Flessione ginocchio → Leg Curl
+• Estensione anca → RDL, Stiff Leg
+
+ESERCIZI TIER 1:
+• Romanian Deadlift ⭐⭐ (stretch massimo)
+• Lying/Seated Leg Curl ⭐⭐
+• Nordic Curl (avanzato)
+
+ESERCIZI TIER 2:
+• Stiff Leg Deadlift
+• Good Morning
+• Single Leg Curl
+• Glute Ham Raise
+
+REGOLE HAMSTRING:
+✓ SEMPRE includere sia hip-hinge (RDL) che knee-flexion (curl)
+✓ Stretch profondo nel RDL - senti tirare!
+✓ Leg Curl: squeeze al top, lento in eccentrica
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔙 DORSALI/SCHIENA (Jeff Nippard)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Volume: 14-22 set/settimana | Frequenza: 2-3x/settimana | Recupero: 48-72h
+
+DUE MOVIMENTI FONDAMENTALI:
+• Trazione VERTICALE (lat focus) → Pull-down, Pull-up
+• Trazione ORIZZONTALE (spessore) → Row
+
+ESERCIZI TIER 1:
+• Lat Pulldown (wide grip) ⭐
+• Barbell/Dumbbell Row ⭐
+• Pull-Up / Chin-Up
+• Seated Cable Row
+
+ESERCIZI TIER 2:
+• Single Arm Dumbbell Row
+• Face Pull ⭐ (salute spalle + postura)
+• Straight Arm Pulldown
+• T-Bar Row
+
+REGOLE DORSALI:
+✓ Ogni sessione: 1 verticale + 1 orizzontale
+✓ Face Pull SEMPRE (postura + salute spalle)
+✓ Squeeze scapole, petto in fuori
+✓ Non usare momentum - controllo!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💪 SPALLE/DELTOIDI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Volume: 12-20 set/settimana | Frequenza: 2-3x/settimana | Recupero: 48h
+
+TRE CAPI (tutti importanti per forma):
+• Deltoide ANTERIORE → Press (già lavora con petto)
+• Deltoide LATERALE ⭐ → Lateral Raise (crea larghezza!)
+• Deltoide POSTERIORE → Rear Delt Fly, Face Pull
+
+ESERCIZI TIER 1:
+• Overhead Press (DB o Barbell)
+• Lateral Raise ⭐⭐ (IL più importante per estetica)
+• Face Pull / Rear Delt Fly
+
+ESERCIZI TIER 2:
+• Arnold Press
+• Cable Lateral Raise
+• Upright Row (impugnatura larga)
+• Reverse Pec Deck
+
+REGOLE SPALLE:
+✓ Lateral Raise: volume ALTO (15-20 rep), peso moderato
+✓ Rear delt spesso trascurato → Face Pull ogni sessione upper
+✓ Press: non bloccare completamente sopra
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💪 BRACCIA (Bicipiti + Tricipiti)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Volume: 10-16 set/settimana ciascuno | Frequenza: 2-3x | Recupero: 48h
+
+BICIPITI - due capi:
+• Capo lungo (picco) → Curl inclinato, Hammer Curl
+• Capo corto (spessore) → Preacher Curl, Concentration Curl
+
+TRICIPITI - tre capi:
+• Capo lungo (massa) → Overhead Extension ⭐
+• Capo laterale → Pushdown
+• Capo mediale → Close Grip
+
+ESERCIZI TOP:
+• Bicep Curl (DB/Barbell)
+• Hammer Curl
+• Incline Dumbbell Curl
+• Tricep Pushdown
+• Overhead Tricep Extension ⭐
+• Skull Crushers
+
+REGOLE BRACCIA:
+✓ Tricipiti = 2/3 del braccio, non trascurarli!
+✓ Overhead extension essenziale (capo lungo)
+✓ Superset Bi/Tri efficiente per tempo
+✓ Full ROM sempre
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 ADDOMINALI/CORE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Volume: 10-16 set/settimana | Frequenza: 2-4x/settimana | Recupero: 24-48h
+
+MOVIMENTI:
+• Flessione (crunch) → Retto addominale upper
+• Rotazione → Obliqui
+• Anti-rotazione → Core stability
+• Leg Raise → Retto addominale lower
+
+ESERCIZI TOP:
+• Cable Crunch ⭐
+• Hanging Leg Raise
+• Ab Wheel Rollout
+• Pallof Press (anti-rotazione)
+• Plank (stabilità)
+• Bicycle Crunch
+
+REGOLE ABS:
+✓ Addome si vede con dieta, ma si costruisce con allenamento
+✓ Progressive overload anche qui (cable crunch!)
+✓ Non serve altissimo volume
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ PRINCIPI GENERALI DI PROGRAMMAZIONE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PROGRESSIVE OVERLOAD (la chiave della crescita):
+• Aumenta peso quando riesci a fare il max delle rep con buona forma
+• Incrementi di 2.5kg per upper, 2.5-5kg per lower
+• Se non puoi aumentare peso, aumenta rep, poi set
+
+REP RANGES OTTIMALI (Brad Schoenfeld):
+• 6-8 rep: forza + ipertrofia (composti pesanti)
+• 8-12 rep: ipertrofia ottimale (la maggior parte)
+• 12-15 rep: ipertrofia + endurance
+• 15-20 rep: metabolico, pump, isolamento
+
+REST PERIODS:
+• Composti pesanti: 2-3 min
+• Composti moderati: 90-120 sec
+• Isolamento: 60-90 sec
+
+TEMPO DI ESECUZIONE:
+• Eccentrica (discesa): 2-3 secondi CONTROLLATA
+• Pausa in stretch: 1 sec
+• Concentrica (salita): 1-2 sec esplosiva
+• Contrazione: 1 sec squeeze
+
+RPE TARGET:
+• La maggior parte dei set: RPE 7-8 (2-3 rep in riserva)
+• Ultimo set del esercizio: RPE 8-9
+• Mai a cedimento ogni set (accumula troppa fatica)
+
+ORDINE ESERCIZI:
+1. Composti pesanti (Squat, Hip Thrust, Deadlift)
+2. Composti accessori (Bulgarian, Lunges)
+3. Isolamento (Curl, Extension, Abduction)
+4. Core/Abs a fine sessione
+
+STRUTTURA SESSIONE TIPO:
+• Warm-up: 5-10 min attivazione
+• Esercizio principale: 3-4 set compound pesante
+• Esercizi accessori: 2-3 esercizi, 3 set ciascuno
+• Isolamento/Finisher: 1-2 esercizi, 2-3 set
+• Stretching finale: 5 min
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 REGOLE FINALI PROGRAMMA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ OGNI sessione lower: Hip Thrust + compound quad + isolation glute
+✓ OGNI sessione upper: push + pull + rear delt
+✓ Face Pull in OGNI sessione upper (salute spalle)
+✓ NO muscoli esclusi dall'utente
+✓ Se glutei priorità: 2-3 sessioni/settimana con focus
+✓ Bilancia push/pull per postura
+✓ Esercizi in ordine: pesante → leggero
+✓ 3-5 esercizi per sessione (qualità > quantità)
+✓ Rest appropriato per tipo esercizio
+✓ Notes con cue tecnici importanti
 
 Genera un programma JSON con questa struttura ESATTA:
 {{
@@ -3780,6 +4031,10 @@ Rispondi SOLO con il JSON, nessun altro testo."""
         needs_deload = progression_context.get('needs_deload', False) if progression_context else False
         avg_rpe = progression_context.get('avg_rpe_week', 7) if progression_context else 7
         
+        # Get cycle phase if tracking
+        profile = GymProfile.query.filter_by(user_id=current_user.id).first()
+        cycle_phase = profile.get_cycle_phase() if profile and profile.track_cycle else None
+        
         return jsonify({
             'workout': {
                 'day_id': workout_day.id,
@@ -3792,7 +4047,8 @@ Rispondi SOLO con il JSON, nessun altro testo."""
             'week': program.current_week,
             'motivation': motivation,
             'needs_deload': needs_deload,
-            'avg_rpe_week': avg_rpe
+            'avg_rpe_week': avg_rpe,
+            'cycle_phase': cycle_phase
         })
     
     def _get_next_workout_day(program):

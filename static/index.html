@@ -1665,7 +1665,11 @@
                 session_minutes: 60,
                 excluded_muscles: [],
                 priority_muscles: ['glutes', 'legs'],
-                primary_goal: 'toning'
+                primary_goal: 'toning',
+                // Cycle tracking (Dr. Stacy Sims)
+                track_cycle: false,
+                cycle_length: 28,
+                last_period_start: ''
             });
             const [loggingExercise, setLoggingExercise] = useState(null);
             const [logData, setLogData] = useState({ weight: '', reps: [], rpe: 7, feedback: 'perfect' });
@@ -1870,6 +1874,48 @@
                                     </div>
                                 </div>
                                 
+                                {/* Cycle Tracking - Dr. Stacy Sims */}
+                                <div className="glass p-4 rounded-2xl">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <label className="text-sm font-medium">🌙 Traccia Ciclo Mestruale</label>
+                                        <button onClick={() => setSetupData({...setupData, track_cycle: !setupData.track_cycle})}
+                                            className={`w-12 h-6 rounded-full transition-all ${setupData.track_cycle ? 'bg-[var(--accent-lou)]' : 'bg-[var(--bg-elevated)]'}`}>
+                                            <div className={`w-5 h-5 rounded-full bg-white transition-all ${setupData.track_cycle ? 'ml-6' : 'ml-0.5'}`} />
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-[var(--text-muted)] mb-3">
+                                        Ottimizza l'intensità in base alla tua fase ormonale (metodo Dr. Stacy Sims)
+                                    </p>
+                                    
+                                    {setupData.track_cycle && (
+                                        <div className="space-y-3 pt-3 border-t border-[var(--border)]">
+                                            <div>
+                                                <label className="text-xs text-[var(--text-muted)] block mb-1">Lunghezza ciclo (giorni)</label>
+                                                <div className="flex gap-1">
+                                                    {[21, 25, 28, 30, 35].map(len => (
+                                                        <button key={len} onClick={() => setSetupData({...setupData, cycle_length: len})}
+                                                            className={`flex-1 p-2 rounded-lg text-sm ${setupData.cycle_length === len ? 'bg-[var(--accent-lou)] text-white' : 'bg-[var(--bg-elevated)]'}`}>
+                                                            {len}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-[var(--text-muted)] block mb-1">Primo giorno ultimo ciclo</label>
+                                                <input type="date" value={setupData.last_period_start}
+                                                    onChange={e => setSetupData({...setupData, last_period_start: e.target.value})}
+                                                    className="w-full p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)]" />
+                                            </div>
+                                            
+                                            <div className="text-xs text-[var(--text-muted)] space-y-1 pt-2">
+                                                <p>🟢 <b>Fase Follicolare</b>: Più forza! Ideale per spingere</p>
+                                                <p>🟠 <b>Fase Luteale</b>: Più fatica. Focus tecnica</p>
+                                                <p>🔴 <b>Mestruazione</b>: Ascolta il corpo</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                
                                 <button onClick={saveProfile} className="w-full btn-lou py-4 rounded-2xl text-lg font-bold">
                                     💪 Inizia con Lou!
                                 </button>
@@ -1952,6 +1998,26 @@
                                             {todayWorkout.motivation && (
                                                 <div className="glass p-4 rounded-2xl border-l-4 border-[var(--accent-lou)]">
                                                     <p className="text-sm">{todayWorkout.motivation}</p>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Cycle Phase - Dr. Stacy Sims */}
+                                            {todayWorkout.cycle_phase && (
+                                                <div className={`glass p-4 rounded-2xl border-l-4 ${
+                                                    todayWorkout.cycle_phase.phase === 'follicular' ? 'border-green-500 bg-green-500/10' :
+                                                    todayWorkout.cycle_phase.phase === 'ovulation' ? 'border-yellow-500 bg-yellow-500/10' :
+                                                    todayWorkout.cycle_phase.phase === 'luteal' ? 'border-orange-500 bg-orange-500/10' :
+                                                    todayWorkout.cycle_phase.phase === 'pms' ? 'border-purple-500 bg-purple-500/10' :
+                                                    'border-red-500 bg-red-500/10'
+                                                }`}>
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-sm font-bold">{todayWorkout.cycle_phase.phase_name}</span>
+                                                        <span className="text-xs text-[var(--text-muted)]">Giorno {todayWorkout.cycle_phase.day}</span>
+                                                    </div>
+                                                    <p className="text-xs">{todayWorkout.cycle_phase.recommendation}</p>
+                                                    <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                                                        Focus: {todayWorkout.cycle_phase.focus}
+                                                    </p>
                                                 </div>
                                             )}
                                             
