@@ -3462,6 +3462,20 @@ Rispondi SOLO con JSON, niente altro:
             return jsonify({'error': 'Prima configura il profilo'}), 400
         
         try:
+            # Get exercise history for smart weight suggestions
+            recent_exercises = db.session.query(
+                ExerciseLog.exercise_name,
+                db.func.max(ExerciseLog.weight_kg).label('max_weight'),
+                db.func.avg(ExerciseLog.weight_kg).label('avg_weight')
+            ).filter_by(user_id=current_user.id).group_by(
+                ExerciseLog.exercise_name
+            ).all()
+            
+            history_text = "Nessuno storico"
+            if recent_exercises:
+                history_lines = [f"- {ex.exercise_name}: max {ex.max_weight}kg, media {ex.avg_weight:.1f}kg" for ex in recent_exercises[:15]]
+                history_text = "\n".join(history_lines)
+            
             # Build prompt for Lou
             prompt = f"""Sei LOU, coach di sculpting femminile. Genera un programma di allenamento.
 
@@ -3475,12 +3489,17 @@ PROFILO UTENTE:
 - Obiettivo: {profile.primary_goal}
 - Equipaggiamento: {', '.join(profile.get_equipment())}
 
+STORICO PESI (usa questi come base per suggested_weight):
+{history_text}
+
 REGOLE:
 - Focus su glutei, gambe, e muscoli richiesti
 - 3-5 esercizi per sessione
 - Rep range 8-15 per ipertrofia
 - Includi progressione carichi
 - NO muscoli esclusi
+- Se c'è storico per un esercizio, usa quel peso come suggested_weight
+- Se non c'è storico, suggerisci peso appropriato per il livello
 
 Genera un programma JSON con questa struttura ESATTA:
 {{
@@ -3502,6 +3521,7 @@ Genera un programma JSON con questa struttura ESATTA:
           "reps_max": 12,
           "rest_seconds": 90,
           "rpe_target": 7,
+          "suggested_weight": 50,
           "notes": "Squeeze al top"
         }}
       ]
@@ -3660,7 +3680,28 @@ Rispondi SOLO con il JSON, nessun altro testo."""
         if not program:
             return jsonify({'workout': None, 'message': 'Nessun programma attivo'})
         
+        # Calculate current week based on started_at
+        if program.started_at:
+            days_elapsed = (date.today() - program.started_at).days
+            calculated_week = (days_elapsed // 7) + 1
+            
+            # Update current_week if changed
+            if calculated_week != program.current_week:
+                program.current_week = calculated_week
+                db.session.commit()
+            
+            # Check if program completed
+            if calculated_week > program.weeks_total:
+                return jsonify({
+                    'workout': None,
+                    'message': f'🎉 Programma completato! {program.weeks_total} settimane finite!',
+                    'program_completed': True,
+                    'weeks_completed': program.weeks_total,
+                    'suggestion': 'Genera un nuovo ciclo per continuare a progredire!'
+                })
+        
         # Get today's day of week (1=Monday, 7=Sunday)
+        today_dow = date.today().isoweekday()
         today_dow = date.today().isoweekday()
         
         # Find matching workout day

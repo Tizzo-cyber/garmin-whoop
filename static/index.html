@@ -1923,6 +1923,29 @@
                                                 {generating ? '🔄 Generazione...' : '✨ Genera Programma'}
                                             </button>
                                         </div>
+                                    ) : todayWorkout?.program_completed ? (
+                                        <div className="glass p-6 rounded-2xl text-center">
+                                            <span className="text-5xl block mb-4">🎉</span>
+                                            <h3 className="text-xl font-bold mb-2 text-[var(--accent-lou)]">Programma Completato!</h3>
+                                            <p className="text-sm text-[var(--text-muted)] mb-2">
+                                                Hai finito {todayWorkout.weeks_completed} settimane di allenamento!
+                                            </p>
+                                            <p className="text-sm mb-6">{todayWorkout.suggestion}</p>
+                                            
+                                            <div className="glass p-4 rounded-xl mb-4 text-left">
+                                                <p className="text-xs text-[var(--text-muted)] mb-2">Il nuovo programma partirà con:</p>
+                                                <ul className="text-sm space-y-1">
+                                                    <li>✅ Pesi aggiornati basati sui tuoi progressi</li>
+                                                    <li>✅ Stesse preferenze muscolari</li>
+                                                    <li>✅ Nuovi stimoli per continuare a crescere</li>
+                                                </ul>
+                                            </div>
+                                            
+                                            <button onClick={generateProgram} disabled={generating}
+                                                className="btn-lou px-6 py-3 rounded-xl font-bold">
+                                                {generating ? '🔄 Generazione...' : '🚀 Nuovo Ciclo'}
+                                            </button>
+                                        </div>
                                     ) : todayWorkout?.workout ? (
                                         <div className="space-y-4">
                                             {/* Motivation */}
@@ -1942,6 +1965,17 @@
                                                             <p className="text-xs text-[var(--text-muted)]">RPE medio {todayWorkout.avg_rpe_week} - Oggi focus tecnica, -20% peso</p>
                                                         </div>
                                                     </div>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Week Progress */}
+                                            {program && (
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span className="text-[var(--text-muted)]">Settimana {program.current_week} di {program.weeks_total}</span>
+                                                    <div className="flex-1 mx-3 h-1 bg-[var(--bg-elevated)] rounded-full overflow-hidden">
+                                                        <div className="h-full bg-[var(--accent-lou)]" style={{ width: `${(program.current_week / program.weeks_total) * 100}%` }} />
+                                                    </div>
+                                                    <span className="text-[var(--accent-lou)]">{Math.round((program.current_week / program.weeks_total) * 100)}%</span>
                                                 </div>
                                             )}
                                             
