@@ -3928,138 +3928,167 @@ Rispondi SOLO con il JSON, nessun altro testo."""
     @token_required
     def get_today_workout(current_user):
         """Get today's scheduled workout with smart weight suggestions"""
-        program = WorkoutProgram.query.filter_by(
-            user_id=current_user.id, 
-            is_active=True
-        ).first()
-        
-        if not program:
-            return jsonify({'workout': None, 'message': 'Nessun programma attivo'})
-        
-        # Calculate current week based on started_at
-        if program.started_at:
-            days_elapsed = (date.today() - program.started_at).days
-            calculated_week = (days_elapsed // 7) + 1
+        try:
+            program = WorkoutProgram.query.filter_by(
+                user_id=current_user.id, 
+                is_active=True
+            ).first()
             
-            # Update current_week if changed
-            if calculated_week != program.current_week:
-                program.current_week = calculated_week
-                db.session.commit()
+            if not program:
+                return jsonify({'workout': None, 'message': 'Nessun programma attivo'})
             
-            # Check if program completed
-            if calculated_week > program.weeks_total:
+            # Calculate current week based on started_at
+            if program.started_at:
+                days_elapsed = (date.today() - program.started_at).days
+                calculated_week = (days_elapsed // 7) + 1
+                
+                # Update current_week if changed
+                if calculated_week != program.current_week:
+                    program.current_week = calculated_week
+                    db.session.commit()
+                
+                # Check if program completed
+                if calculated_week > program.weeks_total:
+                    return jsonify({
+                        'workout': None,
+                        'message': f'🎉 Programma completato! {program.weeks_total} settimane finite!',
+                        'program_completed': True,
+                        'weeks_completed': program.weeks_total,
+                        'suggestion': 'Genera un nuovo ciclo per continuare a progredire!'
+                    })
+            
+            # Get today's day of week (1=Monday, 7=Sunday)
+            today_dow = date.today().isoweekday()
+            
+            # Find matching workout day
+            workout_day = WorkoutDay.query.filter_by(
+                program_id=program.id,
+                day_of_week=today_dow
+            ).first()
+            
+            if not workout_day:
                 return jsonify({
-                    'workout': None,
-                    'message': f'🎉 Programma completato! {program.weeks_total} settimane finite!',
-                    'program_completed': True,
-                    'weeks_completed': program.weeks_total,
-                    'suggestion': 'Genera un nuovo ciclo per continuare a progredire!'
+                    'workout': None, 
+                    'message': 'Oggi è giorno di riposo 🧘',
+                    'next_workout': _get_next_workout_day(program)
                 })
-        
-        # Get today's day of week (1=Monday, 7=Sunday)
-        today_dow = date.today().isoweekday()
-        today_dow = date.today().isoweekday()
-        
-        # Find matching workout day
-        workout_day = WorkoutDay.query.filter_by(
-            program_id=program.id,
-            day_of_week=today_dow
-        ).first()
-        
-        if not workout_day:
-            return jsonify({
-                'workout': None, 
-                'message': 'Oggi è giorno di riposo 🧘',
-                'next_workout': _get_next_workout_day(program)
-            })
-        
-        # Check if already completed today
-        today_session = WorkoutSession.query.filter_by(
-            user_id=current_user.id,
-            date=date.today()
-        ).first()
-        
-        exercises = []
-        for ex in workout_day.exercises.order_by(ProgramExercise.order):
-            last_log = ExerciseLog.query.filter_by(
-                user_id=current_user.id,
-                exercise_name=ex.name
-            ).order_by(ExerciseLog.date.desc()).first()
             
-            # Today's log if exists
-            today_log = ExerciseLog.query.filter_by(
+            # Check if already completed today
+            today_session = WorkoutSession.query.filter_by(
                 user_id=current_user.id,
-                exercise_id=ex.id,
                 date=date.today()
             ).first()
             
-            # SMART WEIGHT SUGGESTION
-            smart_weight, smart_reason = _get_smart_weight_for_exercise(
-                current_user.id, ex.name, ex.sets, ex.reps_min
-            )
+            exercises = []
+            for ex in workout_day.exercises.order_by(ProgramExercise.order):
+                try:
+                    last_log = ExerciseLog.query.filter_by(
+                        user_id=current_user.id,
+                        exercise_name=ex.name
+                    ).order_by(ExerciseLog.date.desc()).first()
+                    
+                    # Today's log if exists
+                    today_log = ExerciseLog.query.filter_by(
+                        user_id=current_user.id,
+                        exercise_id=ex.id,
+                        date=date.today()
+                    ).first()
+                    
+                    # SMART WEIGHT SUGGESTION
+                    smart_weight, smart_reason = _get_smart_weight_for_exercise(
+                        current_user.id, ex.name, ex.sets, ex.reps_min
+                    )
+                    
+                    # Get progression analysis for this exercise
+                    progression = _analyze_exercise_progression(current_user.id, ex.name)
+                    
+                    exercises.append({
+                        'id': ex.id,
+                        'name': ex.name,
+                        'muscle_group': ex.muscle_group,
+                        'equipment': ex.equipment,
+                        'sets': ex.sets,
+                        'reps_min': ex.reps_min,
+                        'reps_max': ex.reps_max,
+                        'rest_seconds': ex.rest_seconds,
+                        'rpe_target': ex.rpe_target,
+                        'notes': ex.notes,
+                        'last_weight': last_log.weight_kg if last_log else None,
+                        'completed': today_log is not None,
+                        'today_log': {
+                            'weight': today_log.weight_kg,
+                            'reps': today_log.get_reps_array(),
+                            'rpe': today_log.rpe,
+                            'feedback': today_log.feedback
+                        } if today_log else None,
+                        # SMART DATA
+                        'smart_weight': smart_weight,
+                        'smart_reason': smart_reason,
+                        'trend': progression['trend'] if progression else None,
+                        'weight_change': progression['weight_change'] if progression else None,
+                        'sessions_logged': progression['sessions'] if progression else 0
+                    })
+                except Exception as ex_error:
+                    print(f"[ERROR] Exercise {ex.name}: {ex_error}")
+                    exercises.append({
+                        'id': ex.id,
+                        'name': ex.name,
+                        'muscle_group': ex.muscle_group,
+                        'equipment': ex.equipment,
+                        'sets': ex.sets,
+                        'reps_min': ex.reps_min,
+                        'reps_max': ex.reps_max,
+                        'rest_seconds': ex.rest_seconds,
+                        'rpe_target': ex.rpe_target,
+                        'notes': ex.notes,
+                        'last_weight': None,
+                        'completed': False,
+                        'today_log': None,
+                        'smart_weight': ex.suggested_weight,
+                        'smart_reason': None,
+                        'trend': None,
+                        'weight_change': None,
+                        'sessions_logged': 0
+                    })
             
-            # Get progression analysis for this exercise
-            progression = _analyze_exercise_progression(current_user.id, ex.name)
+            # Get Lou's motivation based on recovery
+            motivation = _get_lou_motivation(current_user)
             
-            exercises.append({
-                'id': ex.id,
-                'name': ex.name,
-                'muscle_group': ex.muscle_group,
-                'equipment': ex.equipment,
-                'sets': ex.sets,
-                'reps_min': ex.reps_min,
-                'reps_max': ex.reps_max,
-                'rest_seconds': ex.rest_seconds,
-                'rpe_target': ex.rpe_target,
-                'notes': ex.notes,
-                'last_weight': last_log.weight_kg if last_log else None,
-                'completed': today_log is not None,
-                'today_log': {
-                    'weight': today_log.weight_kg,
-                    'reps': today_log.get_reps_array(),
-                    'rpe': today_log.rpe,
-                    'feedback': today_log.feedback
-                } if today_log else None,
-                # SMART DATA
-                'smart_weight': smart_weight,
-                'smart_reason': smart_reason,
-                'trend': progression['trend'] if progression else None,
-                'weight_change': progression['weight_change'] if progression else None,
-                'sessions_logged': progression['sessions'] if progression else 0
+            # Check if deload needed
+            progression_context = _build_lou_progression_context(current_user.id)
+            needs_deload = progression_context.get('needs_deload', False) if progression_context else False
+            avg_rpe = progression_context.get('avg_rpe_week', 7) if progression_context else 7
+            
+            # Get cycle phase if tracking (defensive - columns may not exist yet)
+            cycle_phase = None
+            try:
+                profile = GymProfile.query.filter_by(user_id=current_user.id).first()
+                if profile and hasattr(profile, 'track_cycle') and profile.track_cycle:
+                    cycle_phase = profile.get_cycle_phase()
+            except Exception:
+                pass  # Columns don't exist yet
+            
+            return jsonify({
+                'workout': {
+                    'day_id': workout_day.id,
+                    'name': workout_day.name,
+                    'muscle_groups': workout_day.get_muscle_groups(),
+                    'estimated_minutes': workout_day.estimated_minutes,
+                    'exercises': exercises,
+                    'completed': today_session is not None
+                },
+                'week': program.current_week,
+                'weeks_total': program.weeks_total,
+                'motivation': motivation,
+                'needs_deload': needs_deload,
+                'avg_rpe_week': avg_rpe,
+                'cycle_phase': cycle_phase
             })
-        
-        # Get Lou's motivation based on recovery
-        motivation = _get_lou_motivation(current_user)
-        
-        # Check if deload needed
-        progression_context = _build_lou_progression_context(current_user.id)
-        needs_deload = progression_context.get('needs_deload', False) if progression_context else False
-        avg_rpe = progression_context.get('avg_rpe_week', 7) if progression_context else 7
-        
-        # Get cycle phase if tracking (defensive - columns may not exist yet)
-        cycle_phase = None
-        try:
-            profile = GymProfile.query.filter_by(user_id=current_user.id).first()
-            if profile and hasattr(profile, 'track_cycle') and profile.track_cycle:
-                cycle_phase = profile.get_cycle_phase()
-        except Exception:
-            pass  # Columns don't exist yet
-        
-        return jsonify({
-            'workout': {
-                'day_id': workout_day.id,
-                'name': workout_day.name,
-                'muscle_groups': workout_day.get_muscle_groups(),
-                'estimated_minutes': workout_day.estimated_minutes,
-                'exercises': exercises,
-                'completed': today_session is not None
-            },
-            'week': program.current_week,
-            'motivation': motivation,
-            'needs_deload': needs_deload,
-            'avg_rpe_week': avg_rpe,
-            'cycle_phase': cycle_phase
-        })
+        except Exception as e:
+            import traceback
+            print(f"[ERROR] get_today_workout: {e}")
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
     
     def _get_next_workout_day(program):
         """Find next scheduled workout day"""
