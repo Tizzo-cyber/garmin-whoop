@@ -3974,18 +3974,37 @@ Rispondi SOLO con JSON, niente altro:
                         current_user.id, ex.name, ex.sets, ex.reps_min
                     )
                     
+                    # If no history, use program's suggested weight or sensible default
+                    if smart_weight is None:
+                        if ex.suggested_weight and ex.suggested_weight > 0:
+                            smart_weight = ex.suggested_weight
+                            smart_reason = "Prima volta! Peso suggerito dal programma"
+                        else:
+                            # Default weights based on exercise type
+                            ex_lower = ex.name.lower()
+                            if any(x in ex_lower for x in ['squat', 'deadlift', 'hip thrust', 'press']):
+                                smart_weight = 30  # Compound exercises
+                            elif any(x in ex_lower for x in ['curl', 'extension', 'raise', 'fly']):
+                                smart_weight = 10  # Isolation exercises
+                            else:
+                                smart_weight = 20  # Default
+                            smart_reason = "Prima volta! Inizia leggero per trovare il peso giusto"
+                    
                     # Apply periodization weight modifier
-                    if smart_weight and weight_modifier != 1.0:
+                    if smart_weight and smart_weight > 0 and weight_modifier != 1.0:
                         original_weight = smart_weight
                         smart_weight = round(smart_weight * weight_modifier, 1)
                         # Round to nearest 2.5kg for practical use
                         smart_weight = round(smart_weight / 2.5) * 2.5
+                        # Ensure minimum weight
+                        smart_weight = max(smart_weight, 2.5)
                         if phase_info:
-                            phase_label = phase_info['label']
+                            phase_emoji = {'strength': '🔴', 'hypertrophy': '💪', 'metabolic': '🔥', 
+                                          'accumulo': '🟢', 'intensificazione': '🟡', 'peak': '🔴', 'deload': '⚪'}.get(phase_info['phase'], '')
                             if weight_modifier > 1.0:
-                                smart_reason = f"{phase_label}: +{int((weight_modifier-1)*100)}% → {smart_weight}kg"
+                                smart_reason = f"{phase_emoji} {original_weight}kg +{int((weight_modifier-1)*100)}% = {smart_weight}kg"
                             else:
-                                smart_reason = f"{phase_label}: {int((weight_modifier-1)*100)}% → {smart_weight}kg"
+                                smart_reason = f"{phase_emoji} {original_weight}kg {int((weight_modifier-1)*100)}% = {smart_weight}kg"
                     
                     # Get progression analysis for this exercise
                     progression = _analyze_exercise_progression(current_user.id, ex.name)
