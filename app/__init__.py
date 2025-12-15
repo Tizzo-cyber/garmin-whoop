@@ -4183,14 +4183,21 @@ Rispondi SOLO con JSON, niente altro:
                     # Get progression analysis for this exercise
                     progression = _analyze_exercise_progression(current_user.id, ex.name)
                     
+                    # Get range from DUP config
+                    range_min = phase_info.get('reps_min', 3) if periodization == 'dup' and phase_info else ex.reps_min
+                    range_max = phase_info.get('reps_max', 5) if periodization == 'dup' and phase_info else ex.reps_max
+                    
                     exercises.append({
                         'id': ex.id,
                         'name': ex.name,
                         'muscle_group': ex.muscle_group,
                         'equipment': ex.equipment,
                         'sets': target_sets,
-                        'reps_min': target_reps,
-                        'reps_max': reps_max,
+                        # Range del giorno (es. 3-5 per forza)
+                        'reps_min': range_min,
+                        'reps_max': range_max,
+                        # Target personale corrente (es. 4)
+                        'target_reps': target_reps,
                         'rest_seconds': phase_info.get('rest_seconds', ex.rest_seconds) if periodization == 'dup' and phase_info else ex.rest_seconds,
                         'rpe_target': target_rpe,
                         'notes': ex.notes,

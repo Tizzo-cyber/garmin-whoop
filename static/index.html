@@ -2388,8 +2388,15 @@
                                                                     {trendEmoji && <span title={ex.trend}>{trendEmoji}</span>}
                                                                 </div>
                                                                 <div className="text-sm text-[var(--text-muted)] mt-1">
-                                                                    {ex.sets}×{ex.reps_min}{ex.reps_max && ex.reps_max !== ex.reps_min ? `-${ex.reps_max}` : ''} | Rest {ex.rest_seconds}s | RPE {ex.rpe_target}
+                                                                    {ex.sets}×{ex.reps_min}-{ex.reps_max} | Rest {ex.rest_seconds}s | RPE {ex.rpe_target}
                                                                 </div>
+                                                                
+                                                                {/* Personal target if set */}
+                                                                {ex.target_reps && ex.target_reps !== ex.reps_min && (
+                                                                    <div className="text-xs text-[var(--accent-lou)] mt-1 font-medium">
+                                                                        🎯 Tuo target oggi: {ex.sets}×{ex.target_reps}
+                                                                    </div>
+                                                                )}
                                                                 
                                                                 {/* Last session reps */}
                                                                 {ex.last_reps && ex.last_reps.length > 0 && (
@@ -2448,7 +2455,7 @@
                                                                 {ex.notes && <div className="text-xs text-[var(--text-muted)] mt-1 italic">{ex.notes}</div>}
                                                             </div>
                                                             {!ex.completed && (
-                                                                <button onClick={() => { setLoggingExercise(ex); setLogData({...logData, weight: ex.smart_weight || ex.last_weight || '', reps: Array(ex.sets).fill(ex.reps_min)}); }}
+                                                                <button onClick={() => { setLoggingExercise(ex); setLogData({...logData, weight: ex.smart_weight || ex.last_weight || '', reps: Array(ex.sets).fill(ex.target_reps || ex.reps_min)}); }}
                                                                     className="btn-lou px-4 py-2 rounded-xl text-sm">
                                                                     Log
                                                                 </button>
