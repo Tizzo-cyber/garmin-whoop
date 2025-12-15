@@ -54,9 +54,10 @@ def create_app():
             for sql in migrations:
                 try:
                     db.session.execute(text(sql))
-                except Exception:
-                    pass  # Colonna già esiste o altro errore non critico
-            db.session.commit()
+                    db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    print(f"[Migration] {sql[:50]}... -> {e}")
             print("[OK] Auto-migration completata")
         except Exception as e:
             print(f"[WARN] Auto-migration warning: {e}")
@@ -4035,9 +4036,14 @@ Rispondi SOLO con il JSON, nessun altro testo."""
         needs_deload = progression_context.get('needs_deload', False) if progression_context else False
         avg_rpe = progression_context.get('avg_rpe_week', 7) if progression_context else 7
         
-        # Get cycle phase if tracking
-        profile = GymProfile.query.filter_by(user_id=current_user.id).first()
-        cycle_phase = profile.get_cycle_phase() if profile and profile.track_cycle else None
+        # Get cycle phase if tracking (defensive - columns may not exist yet)
+        cycle_phase = None
+        try:
+            profile = GymProfile.query.filter_by(user_id=current_user.id).first()
+            if profile and hasattr(profile, 'track_cycle') and profile.track_cycle:
+                cycle_phase = profile.get_cycle_phase()
+        except Exception:
+            pass  # Columns don't exist yet
         
         return jsonify({
             'workout': {
