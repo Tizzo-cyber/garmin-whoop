@@ -3720,6 +3720,51 @@ Rispondi SOLO con JSON, niente altro:
         db.session.commit()
         return jsonify({'success': True, 'message': 'Profilo salvato'})
     
+    @app.route('/api/gym/reset', methods=['POST'])
+    @token_required
+    def reset_gym_data(current_user):
+        """Reset all gym data for user - start fresh"""
+        try:
+            # Delete exercise logs
+            ExerciseLog.query.filter_by(user_id=current_user.id).delete()
+            
+            # Delete workout sessions
+            WorkoutSession.query.filter_by(user_id=current_user.id).delete()
+            
+            # Delete program exercises (through workout days)
+            programs = WorkoutProgram.query.filter_by(user_id=current_user.id).all()
+            for program in programs:
+                days = WorkoutDay.query.filter_by(program_id=program.id).all()
+                for day in days:
+                    ProgramExercise.query.filter_by(workout_day_id=day.id).delete()
+                WorkoutDay.query.filter_by(program_id=program.id).delete()
+            
+            # Delete programs
+            WorkoutProgram.query.filter_by(user_id=current_user.id).delete()
+            
+            # Reset profile (keep user but clear settings)
+            profile = GymProfile.query.filter_by(user_id=current_user.id).first()
+            if profile:
+                profile.setup_complete = False
+                profile.experience = 'beginner'
+                profile.days_per_week = 3
+                profile.session_minutes = 60
+                profile.set_excluded_muscles([])
+                profile.set_priority_muscles(['glutes', 'legs'])
+                profile.set_equipment(['barbell', 'dumbbells', 'cables', 'machines'])
+                profile.primary_goal = 'toning'
+                profile.periodization_type = 'simple'
+                if hasattr(profile, 'set_favorite_exercises'):
+                    profile.set_favorite_exercises([])
+                if hasattr(profile, 'set_custom_exercises'):
+                    profile.set_custom_exercises([])
+            
+            db.session.commit()
+            return jsonify({'success': True, 'message': '🔄 Tutti i dati resettati! Ricomincia da zero.'})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 500
+    
     @app.route('/api/gym/generate-program', methods=['POST'])
     @token_required
     def generate_gym_program(current_user):

@@ -1798,6 +1798,46 @@
                 } catch (e) { console.error(e); }
             };
             
+            const resetAllData = async () => {
+                if (!confirm('⚠️ Sei sicuro? Questo cancellerà TUTTI i tuoi dati:\n\n• Programma attuale\n• Storico esercizi\n• Progressi\n\nQuesta azione è irreversibile!')) return;
+                
+                try {
+                    const res = await fetch(`${API}/api/gym/reset`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        alert(data.message || 'Reset completato!');
+                        // Reset local state
+                        setSetupData({
+                            experience: 'beginner',
+                            days_per_week: 3,
+                            session_minutes: 60,
+                            excluded_muscles: [],
+                            priority_muscles: ['glutes', 'legs'],
+                            equipment: ['barbell', 'dumbbells', 'cables', 'machines'],
+                            primary_goal: 'toning',
+                            track_cycle: false,
+                            cycle_length: 28,
+                            last_period_start: '',
+                            periodization_type: 'simple',
+                            favorite_exercises: [],
+                            custom_exercises: []
+                        });
+                        setProgram(null);
+                        setTodayWorkout(null);
+                        setShowSetup(true);
+                        loadData();
+                    } else {
+                        alert(data.error || 'Errore nel reset');
+                    }
+                } catch (e) { 
+                    console.error(e); 
+                    alert('Errore: ' + e.message);
+                }
+            };
+            
             const generateProgram = async () => {
                 setGenerating(true);
                 try {
@@ -2071,6 +2111,11 @@
                                 
                                 <button onClick={saveProfile} className="w-full btn-lou py-4 rounded-2xl text-lg font-bold">
                                     💪 Inizia con Lou!
+                                </button>
+                                
+                                {/* Reset button */}
+                                <button onClick={resetAllData} className="w-full mt-4 py-3 rounded-2xl text-sm border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors">
+                                    🗑️ Reset completo - Ricomincia da zero
                                 </button>
                             </div>
                         </div>
@@ -2375,95 +2420,45 @@
                                             
                                             {/* Exercises */}
                                             <div className="space-y-3">
-                                                {todayWorkout.workout.exercises?.map((ex, i) => {
-                                                    const trendEmoji = {'too_easy': '😴', 'too_hard': '😫', 'progressing': '📈', 'fatigued': '⚠️', 'stable': '➡️'}[ex.trend] || '';
-                                                    return (
+                                                {todayWorkout.workout.exercises?.map((ex, i) => (
                                                     <div key={ex.id} className={`glass p-4 rounded-2xl ${ex.completed ? 'opacity-60' : ''}`}>
-                                                        <div className="flex items-start justify-between">
+                                                        <div className="flex items-center justify-between">
                                                             <div className="flex-1">
+                                                                {/* Exercise name and completion */}
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="text-lg font-bold">{i + 1}.</span>
-                                                                    <span className="font-medium">{ex.name}</span>
+                                                                    <span className="font-bold">{i + 1}. {ex.name}</span>
                                                                     {ex.completed && <span className="text-green-400">✓</span>}
-                                                                    {trendEmoji && <span title={ex.trend}>{trendEmoji}</span>}
-                                                                </div>
-                                                                <div className="text-sm text-[var(--text-muted)] mt-1">
-                                                                    {ex.sets}×{ex.reps_min}-{ex.reps_max} | Rest {ex.rest_seconds}s | RPE {ex.rpe_target}
                                                                 </div>
                                                                 
-                                                                {/* Personal target if set */}
-                                                                {ex.target_reps && ex.target_reps !== ex.reps_min && (
-                                                                    <div className="text-xs text-[var(--accent-lou)] mt-1 font-medium">
-                                                                        🎯 Tuo target oggi: {ex.sets}×{ex.target_reps}
-                                                                    </div>
-                                                                )}
+                                                                {/* Simple: Sets × Reps @ Weight */}
+                                                                <div className="text-lg text-[var(--accent-lou)] font-medium mt-1">
+                                                                    {ex.sets}×{ex.target_reps || ex.reps_min} @ {ex.smart_weight || ex.last_weight || '?'}kg
+                                                                </div>
                                                                 
-                                                                {/* Last session reps */}
-                                                                {ex.last_reps && ex.last_reps.length > 0 && (
+                                                                {/* One line explanation */}
+                                                                {ex.smart_reason && (
                                                                     <div className="text-xs text-[var(--text-muted)] mt-1">
-                                                                        Ultimo: [{ex.last_reps.join('/')}] @ {ex.last_weight}kg
+                                                                        {ex.smart_reason}
                                                                     </div>
                                                                 )}
-                                                                
-                                                                {/* Smart Weight Suggestion with DUP status */}
-                                                                {ex.smart_weight ? (
-                                                                    <div className={`mt-2 p-2 rounded-lg ${
-                                                                        ex.progress_info?.status === 'increase_weight' ? 'bg-green-500/20 border border-green-500/30' :
-                                                                        ex.progress_info?.status === 'increase_reps' ? 'bg-blue-500/20 border border-blue-500/30' :
-                                                                        ex.progress_info?.status === 'deload' ? 'bg-orange-500/20 border border-orange-500/30' :
-                                                                        'bg-[var(--accent-lou-dim)]'
-                                                                    }`}>
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className={`text-lg font-bold ${
-                                                                                ex.progress_info?.status === 'increase_weight' ? 'text-green-400' :
-                                                                                ex.progress_info?.status === 'increase_reps' ? 'text-blue-400' :
-                                                                                ex.progress_info?.status === 'deload' ? 'text-orange-400' :
-                                                                                'text-[var(--accent-lou)]'
-                                                                            }`}>
-                                                                                {ex.smart_weight}kg
-                                                                            </span>
-                                                                            {ex.progress_info?.status === 'increase_weight' && <span className="text-green-400">📈 +peso</span>}
-                                                                            {ex.progress_info?.status === 'increase_reps' && <span className="text-blue-400">📊 +rep</span>}
-                                                                            {ex.progress_info?.status === 'deload' && <span className="text-orange-400">⚠️</span>}
-                                                                        </div>
-                                                                        {ex.smart_reason && (
-                                                                            <div className={`text-xs mt-1 ${
-                                                                                ex.progress_info?.status === 'increase_weight' ? 'text-green-400' :
-                                                                                ex.progress_info?.status === 'increase_reps' ? 'text-blue-400' :
-                                                                                ex.progress_info?.status === 'deload' ? 'text-orange-400' :
-                                                                                'text-[var(--accent-lou)]'
-                                                                            }`}>{ex.smart_reason}</div>
-                                                                        )}
-                                                                    </div>
-                                                                ) : ex.last_weight ? (
-                                                                    <div className="text-xs text-[var(--accent-lou)] mt-1">
-                                                                        Ultimo: {ex.last_weight}kg
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="text-xs text-[var(--text-muted)] mt-1 italic">
-                                                                        Prima volta! Inizia leggero 💪
-                                                                    </div>
-                                                                )}
-                                                                
-                                                                {ex.sessions_logged > 0 && (
-                                                                    <div className="text-[10px] text-[var(--text-muted)] mt-1">
-                                                                        {ex.sessions_logged} sessioni tracciate
-                                                                        {ex.weight_change > 0 && ` • +${ex.weight_change}kg totali 📈`}
-                                                                    </div>
-                                                                )}
-                                                                
-                                                                {ex.notes && <div className="text-xs text-[var(--text-muted)] mt-1 italic">{ex.notes}</div>}
                                                             </div>
+                                                            
                                                             {!ex.completed && (
-                                                                <button onClick={() => { setLoggingExercise(ex); setLogData({...logData, weight: ex.smart_weight || ex.last_weight || '', reps: Array(ex.sets).fill(ex.target_reps || ex.reps_min)}); }}
+                                                                <button onClick={() => { 
+                                                                    setLoggingExercise(ex); 
+                                                                    setLogData({
+                                                                        ...logData, 
+                                                                        weight: ex.smart_weight || ex.last_weight || '', 
+                                                                        reps: Array(ex.sets).fill(ex.target_reps || ex.reps_min)
+                                                                    }); 
+                                                                }}
                                                                     className="btn-lou px-4 py-2 rounded-xl text-sm">
                                                                     Log
                                                                 </button>
                                                             )}
                                                         </div>
                                                     </div>
-                                                    );
-                                                })}
+                                                ))}
                                             </div>
                                         </div>
                                     ) : (
