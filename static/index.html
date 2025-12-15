@@ -2161,8 +2161,8 @@
                     
                     {/* Log Exercise Modal */}
                     {loggingExercise && (
-                        <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50" onClick={() => setLoggingExercise(null)}>
-                            <div className="bg-[var(--bg-card)] w-full max-w-lg rounded-t-3xl p-6" onClick={e => e.stopPropagation()}>
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setLoggingExercise(null)}>
+                            <div className="bg-[var(--bg-card)] w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                                 <h3 className="text-lg font-bold mb-4">{loggingExercise.name}</h3>
                                 
                                 {/* Weight */}
@@ -2170,13 +2170,16 @@
                                     <label className="text-sm text-[var(--text-muted)] mb-2 block">Peso (kg)</label>
                                     <input type="number" value={logData.weight} onChange={e => setLogData({...logData, weight: e.target.value})}
                                         className="w-full p-3 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] text-lg font-bold text-center"
-                                        placeholder={loggingExercise.last_weight ? `Ultimo: ${loggingExercise.last_weight}` : '0'} />
+                                        placeholder={loggingExercise.smart_weight || loggingExercise.last_weight || '0'} />
+                                    {loggingExercise.smart_reason && (
+                                        <p className="text-xs text-[var(--accent-lou)] mt-1 text-center">{loggingExercise.smart_reason}</p>
+                                    )}
                                 </div>
                                 
                                 {/* Reps per set */}
                                 <div className="mb-4">
                                     <label className="text-sm text-[var(--text-muted)] mb-2 block">Reps per set</label>
-                                    <div className="flex gap-2">
+                                    <div className="grid grid-cols-4 gap-2">
                                         {Array(loggingExercise.sets).fill(0).map((_, i) => (
                                             <input key={i} type="number" value={logData.reps[i] || ''}
                                                 onChange={e => {
@@ -2184,7 +2187,7 @@
                                                     newReps[i] = parseInt(e.target.value) || 0;
                                                     setLogData({...logData, reps: newReps});
                                                 }}
-                                                className="flex-1 p-2 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)] text-center"
+                                                className="p-3 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)] text-center font-bold"
                                                 placeholder={loggingExercise.reps_min.toString()} />
                                         ))}
                                     </div>
@@ -2197,38 +2200,48 @@
                                     </label>
                                     <input type="range" min="1" max="10" value={logData.rpe} 
                                         onChange={e => setLogData({...logData, rpe: parseInt(e.target.value)})}
-                                        className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-[var(--accent-lou)]"
+                                        className="w-full h-3 rounded-lg appearance-none cursor-pointer"
                                         style={{ background: `linear-gradient(to right, var(--accent-lou) ${(logData.rpe - 1) * 11.1}%, var(--bg-elevated) ${(logData.rpe - 1) * 11.1}%)` }} />
-                                    <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">
+                                    <div className="flex justify-between text-xs text-[var(--text-muted)] mt-2">
                                         <span>😴 Facile</span>
                                         <span>💪 Medio</span>
                                         <span>💀 Max</span>
                                     </div>
-                                    <div className="text-xs text-center mt-2 text-[var(--text-muted)]">
+                                    <p className="text-xs text-center mt-2 text-[var(--accent-lou)]">
                                         {logData.rpe <= 3 && "Potevi farne molte altre"}
                                         {logData.rpe >= 4 && logData.rpe <= 5 && "Ne avevi ancora 4-5 nel serbatoio"}
                                         {logData.rpe >= 6 && logData.rpe <= 7 && "Impegnativo, 2-3 reps in più max"}
                                         {logData.rpe === 8 && "Duro, forse 1-2 reps in più"}
                                         {logData.rpe === 9 && "Quasi al limite!"}
                                         {logData.rpe === 10 && "Cedimento totale 💀"}
-                                    </div>
+                                    </p>
                                 </div>
                                 
                                 {/* Feedback */}
-                                <div className="mb-4">
+                                <div className="mb-6">
                                     <label className="text-sm text-[var(--text-muted)] mb-2 block">Com'è stato?</label>
                                     <div className="grid grid-cols-3 gap-2">
-                                        {[{id: 'too_hard', label: '😫 Duro', color: 'red'}, {id: 'perfect', label: '💪 Giusto', color: 'green'}, {id: 'too_easy', label: '😴 Facile', color: 'orange'}].map(f => (
-                                            <button key={f.id} onClick={() => setLogData({...logData, feedback: f.id})}
-                                                className={`p-3 rounded-xl text-sm ${logData.feedback === f.id ? `bg-${f.color}-500/30 ring-2 ring-${f.color}-500` : 'bg-[var(--bg-elevated)]'}`}>
-                                                {f.label}
-                                            </button>
-                                        ))}
+                                        <button onClick={() => setLogData({...logData, feedback: 'too_hard'})}
+                                            className={`p-3 rounded-xl text-sm transition-all ${logData.feedback === 'too_hard' ? 'bg-red-500/30 ring-2 ring-red-500' : 'bg-[var(--bg-elevated)]'}`}>
+                                            😫 Duro
+                                        </button>
+                                        <button onClick={() => setLogData({...logData, feedback: 'perfect'})}
+                                            className={`p-3 rounded-xl text-sm transition-all ${logData.feedback === 'perfect' ? 'bg-green-500/30 ring-2 ring-green-500' : 'bg-[var(--bg-elevated)]'}`}>
+                                            💪 Giusto
+                                        </button>
+                                        <button onClick={() => setLogData({...logData, feedback: 'too_easy'})}
+                                            className={`p-3 rounded-xl text-sm transition-all ${logData.feedback === 'too_easy' ? 'bg-orange-500/30 ring-2 ring-orange-500' : 'bg-[var(--bg-elevated)]'}`}>
+                                            😴 Facile
+                                        </button>
                                     </div>
                                 </div>
                                 
                                 <button onClick={logExercise} className="w-full btn-lou py-4 rounded-xl font-bold">
                                     ✓ Salva
+                                </button>
+                                
+                                <button onClick={() => setLoggingExercise(null)} className="w-full py-3 text-sm text-[var(--text-muted)] mt-2">
+                                    Annulla
                                 </button>
                             </div>
                         </div>
