@@ -1687,8 +1687,12 @@
                 cycle_length: 28,
                 last_period_start: '',
                 // Periodization
-                periodization_type: 'simple'
+                periodization_type: 'simple',
+                // Favorite exercises
+                favorite_exercises: []
             });
+            const [availableExercises, setAvailableExercises] = useState({});
+            const [showExercisePicker, setShowExercisePicker] = useState(false);
             const [loggingExercise, setLoggingExercise] = useState(null);
             const [logData, setLogData] = useState({ weight: '', reps: [], rpe: 7, feedback: 'perfect' });
             const [showReschedule, setShowReschedule] = useState(false);
@@ -1726,11 +1730,12 @@
             
             const loadData = async () => {
                 try {
-                    const [profileRes, programRes, todayRes, statsRes] = await Promise.all([
+                    const [profileRes, programRes, todayRes, statsRes, exercisesRes] = await Promise.all([
                         fetch(`${API}/api/gym/profile`, { headers: { 'Authorization': `Bearer ${token}` } }),
                         fetch(`${API}/api/gym/program`, { headers: { 'Authorization': `Bearer ${token}` } }),
                         fetch(`${API}/api/gym/today`, { headers: { 'Authorization': `Bearer ${token}` } }),
-                        fetch(`${API}/api/gym/stats?days=30`, { headers: { 'Authorization': `Bearer ${token}` } })
+                        fetch(`${API}/api/gym/stats?days=30`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                        fetch(`${API}/api/gym/exercises`, { headers: { 'Authorization': `Bearer ${token}` } })
                     ]);
                     
                     if (profileRes.ok) {
@@ -1750,13 +1755,18 @@
                                 track_cycle: data.profile.track_cycle || false,
                                 cycle_length: data.profile.cycle_length || 28,
                                 last_period_start: data.profile.last_period_start || '',
-                                periodization_type: data.profile.periodization_type || 'simple'
+                                periodization_type: data.profile.periodization_type || 'simple',
+                                favorite_exercises: data.profile.favorite_exercises || []
                             }));
                         }
                     }
                     if (programRes.ok) setProgram((await programRes.json()).program);
                     if (todayRes.ok) setTodayWorkout(await todayRes.json());
                     if (statsRes.ok) setStats(await statsRes.json());
+                    if (exercisesRes.ok) {
+                        const exData = await exercisesRes.json();
+                        setAvailableExercises(exData.exercises || {});
+                    }
                 } catch (e) { console.error(e); }
                 setLoading(false);
             };
@@ -1945,6 +1955,42 @@
                                     )}
                                 </div>
                                 
+                                {/* Esercizi Preferiti */}
+                                <div className="glass p-4 rounded-2xl">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <label className="text-sm font-medium">⭐ Esercizi Preferiti</label>
+                                        <button onClick={() => setShowExercisePicker(true)}
+                                            className="px-3 py-1 text-xs bg-[var(--accent-lou)] text-white rounded-lg">
+                                            + Aggiungi
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-[var(--text-muted)] mb-3">
+                                        Lou darà priorità a questi esercizi nel tuo programma
+                                    </p>
+                                    
+                                    {setupData.favorite_exercises.length > 0 ? (
+                                        <div className="flex flex-wrap gap-2">
+                                            {setupData.favorite_exercises.map(exId => {
+                                                // Find exercise name from availableExercises
+                                                let exName = exId;
+                                                Object.values(availableExercises).forEach(muscleExs => {
+                                                    const found = muscleExs.find(e => e.id === exId);
+                                                    if (found) exName = found.name;
+                                                });
+                                                return (
+                                                    <div key={exId} className="flex items-center gap-1 px-2 py-1 bg-[var(--accent-lou-dim)] text-[var(--accent-lou)] rounded-lg text-xs">
+                                                        <span>{exName}</span>
+                                                        <button onClick={() => setSetupData({...setupData, favorite_exercises: setupData.favorite_exercises.filter(id => id !== exId)})}
+                                                            className="ml-1 text-[var(--text-muted)] hover:text-[var(--accent-red)]">×</button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-[var(--text-muted)] italic">Nessun preferito selezionato</p>
+                                    )}
+                                </div>
+                                
                                 {/* Cycle Tracking - Dr. Stacy Sims */}
                                 <div className="glass p-4 rounded-2xl">
                                     <div className="flex items-center justify-between mb-3">
@@ -1989,6 +2035,56 @@
                                 
                                 <button onClick={saveProfile} className="w-full btn-lou py-4 rounded-2xl text-lg font-bold">
                                     💪 Inizia con Lou!
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+            
+            // Exercise Picker Modal
+            if (showExercisePicker) {
+                const muscleLabels = {
+                    glutes: '🍑 Glutei', quads: '🦵 Quadricipiti', hamstrings: '🦵 Femorali',
+                    back: '🔙 Schiena', chest: '💪 Petto', shoulders: '💪 Spalle',
+                    arms: '💪 Braccia', abs: '🎯 Addominali'
+                };
+                
+                return (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-end justify-center z-50">
+                        <div className="bg-[var(--bg-primary)] w-full max-w-lg max-h-[85vh] rounded-t-3xl flex flex-col">
+                            <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
+                                <h2 className="text-lg font-bold">⭐ Scegli Esercizi Preferiti</h2>
+                                <button onClick={() => setShowExercisePicker(false)} className="text-2xl">×</button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                {Object.entries(availableExercises).map(([muscle, exercises]) => (
+                                    <div key={muscle} className="glass p-3 rounded-xl">
+                                        <h3 className="font-medium mb-2">{muscleLabels[muscle] || muscle}</h3>
+                                        <div className="flex flex-wrap gap-2">
+                                            {exercises.map(ex => {
+                                                const isSelected = setupData.favorite_exercises.includes(ex.id);
+                                                return (
+                                                    <button key={ex.id}
+                                                        onClick={() => {
+                                                            if (isSelected) {
+                                                                setSetupData({...setupData, favorite_exercises: setupData.favorite_exercises.filter(id => id !== ex.id)});
+                                                            } else {
+                                                                setSetupData({...setupData, favorite_exercises: [...setupData.favorite_exercises, ex.id]});
+                                                            }
+                                                        }}
+                                                        className={`px-3 py-2 rounded-lg text-sm transition-all ${isSelected ? 'bg-[var(--accent-lou)] text-white' : 'bg-[var(--bg-elevated)]'}`}>
+                                                        {ex.name}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="p-4 border-t border-[var(--border)]">
+                                <button onClick={() => setShowExercisePicker(false)} className="w-full btn-lou py-3 rounded-xl font-bold">
+                                    ✓ Fatto ({setupData.favorite_exercises.length} selezionati)
                                 </button>
                             </div>
                         </div>

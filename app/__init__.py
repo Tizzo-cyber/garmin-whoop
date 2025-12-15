@@ -17,6 +17,7 @@ import requests
 
 from config import Config
 from app.models import db, User, DailyMetric, Activity, SyncLog, ChatMessage, UserMemory, FatigueLog, WeeklyCheck, FoodEntry, GymProfile, WorkoutProgram, WorkoutDay, ProgramExercise, ExerciseLog, WorkoutSession, GymWeeklyReport
+from app.exercises import EXERCISES, get_exercises_for_ui, get_exercise_by_id, select_exercises_for_day
 from app.garmin_sync import GarminSyncService
 
 
@@ -52,6 +53,8 @@ def create_app():
                 "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS last_period_start DATE",
                 # Periodization
                 "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS periodization_type VARCHAR(20) DEFAULT 'simple'",
+                # Favorite exercises
+                "ALTER TABLE gym_profiles ADD COLUMN IF NOT EXISTS favorite_exercises TEXT DEFAULT '[]'",
             ]
             for sql in migrations:
                 try:
@@ -3438,6 +3441,23 @@ Rispondi SOLO con JSON, niente altro:
     
     # ========== LOU - SCULPTING COACH ==========
     
+    @app.route('/api/gym/exercises', methods=['GET'])
+    @token_required
+    def get_exercises_list(current_user):
+        """Get available exercises for selection"""
+        profile = GymProfile.query.filter_by(user_id=current_user.id).first()
+        equipment = profile.get_equipment() if profile else ['barbell', 'dumbbells', 'cables', 'machines', 'bodyweight']
+        
+        exercises = get_exercises_for_ui(equipment)
+        
+        # Get user's current favorites
+        favorites = profile.get_favorite_exercises() if profile else []
+        
+        return jsonify({
+            'exercises': exercises,
+            'favorites': favorites
+        })
+    
     @app.route('/api/gym/profile', methods=['GET'])
     @token_required
     def get_gym_profile(current_user):
@@ -3465,7 +3485,9 @@ Rispondi SOLO con JSON, niente altro:
                 'cycle_length': getattr(profile, 'cycle_length', 28),
                 'last_period_start': profile.last_period_start.isoformat() if getattr(profile, 'last_period_start', None) else None,
                 # Periodization
-                'periodization_type': getattr(profile, 'periodization_type', 'simple')
+                'periodization_type': getattr(profile, 'periodization_type', 'simple'),
+                # Favorite exercises
+                'favorite_exercises': profile.get_favorite_exercises() if hasattr(profile, 'get_favorite_exercises') else []
             }
         })
     
@@ -3511,6 +3533,10 @@ Rispondi SOLO con JSON, niente altro:
         # Periodization type
         if 'periodization_type' in data:
             profile.periodization_type = data['periodization_type']
+        
+        # Favorite exercises
+        if 'favorite_exercises' in data:
+            profile.set_favorite_exercises(data['favorite_exercises'])
         
         db.session.commit()
         return jsonify({'success': True, 'message': 'Profilo salvato'})
