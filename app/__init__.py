@@ -217,6 +217,42 @@ def create_app():
         
         return jsonify(result)
     
+    _year_sync_running = set()
+    
+    @app.route('/api/sync/year', methods=['POST'])
+    @token_required
+    def sync_year(current_user):
+        """Sincronizza l'ultimo anno da Garmin a blocchi di 30 giorni, in background"""
+        if not current_user.garmin_email:
+            return jsonify({'error': 'Account Garmin non collegato'}), 400
+        if current_user.id in _year_sync_running:
+            return jsonify({'message': 'Sync anno già in corso, attendi qualche minuto'})
+        
+        user_id = current_user.id
+        _year_sync_running.add(user_id)
+        
+        def run():
+            import time
+            try:
+                with app.app_context():
+                    user = User.query.get(user_id)
+                    service = GarminSyncService(app.config['ENCRYPTION_KEY'])
+                    for block in range(12):
+                        result = service.sync_user(user, days_back=30, offset_days=block * 30)
+                        # Se il login Garmin fallisce, inutile continuare
+                        if not result.get('success'):
+                            break
+                        time.sleep(3)  # pausa per non farsi bloccare da Garmin
+            except Exception:
+                import traceback
+                traceback.print_exc()
+            finally:
+                _year_sync_running.discard(user_id)
+        
+        import threading
+        threading.Thread(target=run, daemon=True).start()
+        return jsonify({'message': 'Sync anno avviata in background: servono alcuni minuti, poi aggiorna la pagina'})
+    
     # ========== METRICS ==========
     
     @app.route('/api/metrics/today', methods=['GET'])
