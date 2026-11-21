@@ -924,7 +924,12 @@ def create_app():
     openai_client = None
     if os.environ.get('OPENAI_API_KEY'):
         from openai import OpenAI
-        openai_client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+        # OPENAI_BASE_URL permette endpoint compatibili self-hosted (Ollama, vLLM)
+        openai_client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'),
+                               base_url=os.environ.get('OPENAI_BASE_URL') or None)
+    MODEL_CHAT = os.environ.get('OPENAI_MODEL_CHAT', 'gpt-4.1')
+    MODEL_DEEP = os.environ.get('OPENAI_MODEL_DEEP', 'gpt-4o')
+    MODEL_TTS = os.environ.get('OPENAI_MODEL_TTS', 'gpt-4o-mini-tts')
     
     def _get_sensei_prompt(user, context, memories):
         name = user.name or "atleta"
@@ -2416,7 +2421,7 @@ Max 200 parole. Sii pratica e motivante! Usa i dati di progressione per dare con
         max_tokens = 2000 if is_meditation_request else 800
         
         try:
-            resp = openai_client.chat.completions.create(model="gpt-4.1", messages=messages, max_tokens=max_tokens, temperature=0.8)
+            resp = openai_client.chat.completions.create(model=MODEL_CHAT, messages=messages, max_tokens=max_tokens, temperature=0.8)
             ai_raw = resp.choices[0].message.content
             
             # Save messages
@@ -2626,7 +2631,7 @@ Sii specifico, cita numeri esatti, evita generalita. Parla come uno scienziato e
 {analysis_prompt}"""
             
             response = openai_client.chat.completions.create(
-                model="gpt-4o",
+                model=MODEL_DEEP,
                 messages=[
                     {"role": "system", "content": "Sei Dr. Data, scienziato dei dati biometrici del Performance Lab. Analizzi pattern complessi con entusiasmo scientifico."},
                     {"role": "user", "content": analysis_prompt}
@@ -2650,7 +2655,7 @@ Sii specifico, cita numeri esatti, evita generalita. Parla come uno scienziato e
                 'analysis': analysis_text,
                 'days_analyzed': len(data_rows),
                 'activities_analyzed': len(activity_data),
-                'model': 'gpt-4o'
+                'model': MODEL_DEEP
             })
             
         except Exception as e:
@@ -2895,7 +2900,7 @@ Rispondi in italiano, in modo diretto e motivante."""
 
         try:
             response = openai_client.chat.completions.create(
-                model="gpt-4.1",
+                model=MODEL_CHAT,
                 messages=[
                     {"role": "system", "content": "Sei Sensei, un coach sportivo esperto. Dai feedback brevi e motivanti sulle attività."},
                     {"role": "user", "content": prompt}
@@ -2979,7 +2984,7 @@ Pauses: Use thoughtful pauses, especially between sentences, enhancing relaxatio
         
         try:
             response = openai_client.audio.speech.create(
-                model="gpt-4o-mini-tts",
+                model=MODEL_TTS,
                 voice=voice,
                 input=clean_text,
                 instructions=instructions,
@@ -3278,7 +3283,7 @@ Rispondi SOLO con JSON, niente altro:
 {{"name": "nome cibo", "calories": numero, "protein": numero, "carbs": numero, "fat": numero}}"""
                 
                 resp = openai_client.chat.completions.create(
-                    model="gpt-4.1",
+                    model=MODEL_CHAT,
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=150,
                     temperature=0.3
