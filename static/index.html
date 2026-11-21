@@ -3281,6 +3281,24 @@
                 setPage('landing');
             };
             
+            // Se il server risponde 401 (token scaduto/non valido) torna al login
+            // invece di far fallire in silenzio chat, voce e altre chiamate.
+            useEffect(() => {
+                const originalFetch = window.fetch;
+                window.fetch = async (...args) => {
+                    const res = await originalFetch(...args);
+                    try {
+                        const url = String(typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '');
+                        if (res.status === 401 && url.includes('/api/') && !url.includes('/api/login') && localStorage.getItem('token')) {
+                            handleLogout();
+                            alert('Sessione scaduta: accedi di nuovo.');
+                        }
+                    } catch (e) {}
+                    return res;
+                };
+                return () => { window.fetch = originalFetch; };
+            }, []);
+            
             const handleSetupComplete = () => {
                 const u = { ...user, garmin_connected: true };
                 setUser(u);
